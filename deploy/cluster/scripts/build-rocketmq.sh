@@ -39,6 +39,8 @@ fileReservedTime = 48
 autoCreateTopicEnable = true
 autoCreateSubscriptionGroup = true
 timerWheelEnable = true
+storePathRootDir = /home/rocketmq/store
+storePathCommitLog = /home/rocketmq/store/commitlog
 brokerIP1 = ${ip}
 listenPort = ${ROCKETMQ_BROKER_PORT:-10911}
 EOF

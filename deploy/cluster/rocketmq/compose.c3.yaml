@@ -26,6 +26,9 @@ services:
     image: apache/rocketmq:5.3.2
     container_name: rocketmq-broker
     network_mode: host
+    # 命名卷初建属主 root，镜像内 rocketmq 用户写 store 会权限失败（ScheduleMessageService
+    # NPE 即此因，单机版同坑已修）——以 root 运行规避。
+    user: "0:0"
     command: sh mqbroker -c /home/rocketmq/conf/smartlect-dledger.conf
     depends_on:
       rocketmq-namesrv: {condition: service_healthy}
