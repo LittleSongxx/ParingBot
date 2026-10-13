@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/Python-3.11+-3776ab?style=flat-square&amp;logo=python&amp;logoColor=white" />
   <img src="https://img.shields.io/badge/LangGraph-1.2-bounded-1a1a2e?style=flat-square" />
   <img src="https://img.shields.io/badge/Elasticsearch_+_Qdrant-混检-005571?style=flat-square&amp;logo=elasticsearch&amp;logoColor=white" />
-  <img src="https://img.shields.io/badge/MySQL_·_Redis_·_RabbitMQ-9_容器-4479a1?style=flat-square&amp;logo=mysql&amp;logoColor=white" />
+  <img src="https://img.shields.io/badge/MySQL_·_Redis_·_RocketMQ-11_容器-4479a1?style=flat-square&amp;logo=mysql&amp;logoColor=white" />
   <a href="https://github.com/LittleSongxx/Smartlect/actions/workflows/ci.yml"><img src="https://github.com/LittleSongxx/Smartlect/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
@@ -143,8 +143,8 @@ flowchart LR
   G -->|/api/**| J["Java 交易域 · 9 服务"]
   A -->|混检| R["ES 8.19 + Qdrant 1.15"]
   A -->|价格/库存回问| J
-  J --> D["MySQL · Redis · RabbitMQ"]
-  M[("MySQL binlog")] -->|Canal| Q["RabbitMQ"] -->|ProductIndexConsumer| E["ES 商品索引"]
+  J --> D["MySQL · Redis · RocketMQ"]
+  M[("MySQL binlog")] -->|Canal| Q["RocketMQ"] -->|ProductIndexConsumer| E["ES 商品索引"]
   X["xxl-job 2.5<br/>9 个定时任务"] -.->|调度| J
   C["Nacos 2.5<br/>发现 + 配置中心"] -.->|注册 / 下发| J
   C -.-> A
@@ -157,7 +157,7 @@ flowchart LR
 | 浏览 | nginx → Gateway（限流/鉴权）→ product → Caffeine L1 → Redis L2 → MySQL；未命中回源，Canal 兜底失效 |
 | 导购 | 浏览器 → Assistant 选工具 → ES + Qdrant 混检（只查已发布知识）→ 价格库存回问 Java → 带引用作答或出提案，人点确认才下单 |
 
-**一致性没有用分布式事务框架。** 本地事务 + 事务性 Outbox 投递到 RabbitMQ 做最终一致；订单幂等账本挡住重复提交，库存用条件更新，延迟队列取消超时未付款单，补偿日志自动重放失败的消费者。
+**一致性没有用分布式事务框架。** 本地事务 + 事务性 Outbox 投递到 RocketMQ 做最终一致；订单幂等账本挡住重复提交，库存用条件更新，延迟队列取消超时未付款单，补偿日志自动重放失败的消费者。
 
 ---
 
@@ -166,17 +166,17 @@ flowchart LR
 | | |
 |---|---|
 | **前端** | Vue 3 · Vite · Element Plus · TypeScript（用户端）· JavaScript（管理端） |
-| **交易** | Java 17 · Spring Boot 3.5 · Spring Cloud 2025 · 9 个服务 · MyBatis + PageHelper |
+| **交易** | Java 17 · Spring Boot 3.5 · Spring Cloud 2025 + Dubbo 3.3 · 9 个服务 · MyBatis + PageHelper |
 | **鉴权** | Sa-Token 1.39（网关统一校验 + 服务端 `@SaCheckLogin` / `@SaCheckPermission`） |
 | **Agent** | Python 3.11 · FastAPI · LangGraph 1.2 · openai SDK（兼容模式端点白名单） |
 | **检索** | Elasticsearch 8.19（IK BM25 + 商品索引）· Qdrant 1.15（HNSW dense）→ RRF → gte-rerank |
 | **缓存** | Caffeine L1 + Redis L2 + pub/sub 失效 + Canal 兜底 |
-| **消息** | RabbitMQ 4.2（Outbox 可靠投递 · 延迟队列 · 秒杀削峰） |
-| **变更捕获** | Canal 1.1.8（MySQL binlog → RabbitMQ → ES 商品索引与缓存失效） |
+| **消息** | RocketMQ 5.3（任意精度定时消息 · Outbox 可靠投递 · 定时回投重试） |
+| **变更捕获** | Canal 1.1.8（MySQL binlog → RocketMQ → ES 商品索引与缓存失效） |
 | **调度** | xxl-job 2.5（9 个定时任务：订单超时、支付轮询、Outbox 补偿、秒杀对账等） |
 | **服务治理** | Nacos 2.5（服务发现 + 配置中心）· 锁/限流 Redisson 4.0 |
 | **模型** | LiteLLM 网关（可选）；演示走 live，缺配置时明确失败 |
-| **基础设施** | 9 个容器（MySQL 8.4 · Redis 7.4 · RabbitMQ 4.2 · Nacos 2.5 · ES 8.19 · Qdrant 1.15 · Canal 1.1.8 · xxl-job 2.5 · LiteLLM） |
+| **基础设施** | 11 个容器（MySQL 8.4 · Redis 7.4 · RocketMQ 5.3 三件套 · Nacos 2.5 · ES 8.19(IK) · Qdrant 1.15 · Canal 1.1.8 · xxl-job 2.5 · LiteLLM） |
 
 ```
 backend/   gateway · user · product · stock · cart · order · pay · coupon · admin
@@ -206,7 +206,7 @@ docs/      设计说明与 ADR，给想往下翻的人
 
 | 层 | 端口 |
 |---|---|
-| 中间件 | MySQL 13306 · Redis 16379 · RabbitMQ 15672/15674 · Nacos 18848 · ES 9200 · Qdrant 6333 · Canal 11111 · xxl-job 18090 · LiteLLM 14000 |
+| 中间件 | MySQL 13306 · Redis 16379 · RocketMQ gRPC 8081 · Nacos 18848 · ES 9200 · Qdrant 6333 · Canal 11111 · xxl-job 18090 · LiteLLM 14000 |
 | 应用 | gateway 18080 · admin 18101 · cart 18102 · pay 18103 · order 18104 · user 18105 · product 18106 · coupon 18107 · stock 18108 · assistant 18000 |
 | 前端 | 用户端 18180 · 管理端 18181 |
 
