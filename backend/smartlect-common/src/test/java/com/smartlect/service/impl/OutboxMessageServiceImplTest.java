@@ -163,7 +163,7 @@ class OutboxMessageServiceImplTest {
                 "test.key",
                 payload,
                 "same-key",
-                MessageReliabilityLevelEnum.STANDARD);
+                MessageReliabilityLevelEnum.STANDARD, null);
 
         assertEquals(7L, id);
     }
@@ -178,7 +178,8 @@ class OutboxMessageServiceImplTest {
                 "test.key",
                 Map.of("id", 8),
                 "same-key",
-                MessageReliabilityLevelEnum.STANDARD));
+                MessageReliabilityLevelEnum.STANDARD,
+                null));
     }
 
     @Test
@@ -191,7 +192,8 @@ class OutboxMessageServiceImplTest {
                 "test.key",
                 Map.of("id", 7),
                 "same-key",
-                MessageReliabilityLevelEnum.STANDARD));
+                MessageReliabilityLevelEnum.STANDARD,
+                null));
     }
 
     private static LocalMessageOutbox existingMessage(String payloadJson) {

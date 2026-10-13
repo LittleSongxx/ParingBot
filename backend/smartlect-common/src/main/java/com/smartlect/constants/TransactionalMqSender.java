@@ -48,31 +48,6 @@ public class TransactionalMqSender {
         }
     }
 
-    public void sendAfterCommit(String exchange, String routingKey, Object message,
-                                String idempotencyKey, MessageReliabilityLevelEnum reliabilityLevel) {
-        MessageReliabilityLevelEnum level = reliabilityLevel == null
-                ? MessageReliabilityLevelEnum.STANDARD : reliabilityLevel;
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            Long id = outboxMessageService.savePending(exchange, routingKey, message, idempotencyKey, level);
-            if (id == null) {
-                return;
-            }
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    dispatchAsync(id);
-                }
-            });
-            return;
-        }
-        Long id = outboxMessageService.savePending(
-                exchange, routingKey, message, idempotencyKey, level);
-        if (id == null) {
-            return;
-        }
-        dispatchAsync(id);
-    }
-
     /**
      * 定时投递版本（RocketMQ 任意精度定时消息，取代原 TTL+死信延迟队列）：
      * deliveryExpireAt 为绝对到期时间（epoch 毫秒），事务提交后经 Outbox 投递，

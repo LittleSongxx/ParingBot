@@ -133,3 +133,20 @@ xxl:
       port: ${SMARTLECT_XXLJOB_EXECUTOR_PORT:0}
       logpath: ./logs/xxl-job
       logretentiondays: 7
+
+dubbo:
+  registry:
+    address: nacos://${SMARTLECT_NACOS_ADDR:127.0.0.1:18848}?username=${SMARTLECT_NACOS_USERNAME:nacos}&password=${SMARTLECT_NACOS_PASSWORD:}&use-as-config-center=false&use-as-metadata-center=false
+    group: ${SMARTLECT_NACOS_GROUP:SMARTLECT_GROUP}
+    parameters:
+      namespace: ${SMARTLECT_NACOS_NAMESPACE:}
+    register-mode: interface
+  protocol:
+    name: dubbo
+    port: -1
+  consumer:
+    timeout: 10000
+    retries: 0
+    check: false
+  provider:
+    timeout: 10000

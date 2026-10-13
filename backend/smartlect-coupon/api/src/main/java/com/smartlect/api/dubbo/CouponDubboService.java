@@ -1,9 +1,19 @@
 package com.smartlect.api.dubbo;
 
-import com.smartlect.api.dto.*;
-import com.smartlect.api.vo.*;
-import com.smartlect.entity.vo.PaginationResultVO;
 import com.smartlect.entity.vo.ResponseVO;
+import com.smartlect.api.dto.CouponIdDTO;
+import com.smartlect.api.dto.CouponRushOpsDTO;
+import com.smartlect.api.dto.CouponValidateAndLockDTO;
+import com.smartlect.api.dto.UserCouponCreateDTO;
+import com.smartlect.api.dto.UserCouponIdDTO;
+import com.smartlect.api.dto.UserCouponStatusChangeDTO;
+import com.smartlect.api.vo.CouponBriefVO;
+import com.smartlect.api.vo.CouponGrantResultVO;
+import com.smartlect.api.vo.CouponLockResultVO;
+import com.smartlect.api.vo.DiscountCouponVO;
+import com.smartlect.api.vo.StockChangeResultVO;
+import com.smartlect.api.vo.UserCouponVO;
+
 
 /**
  * coupon 域内部 Dubbo 契约（取代原 FeignClient，方法签名一致；

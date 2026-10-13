@@ -75,7 +75,8 @@ class PayChannel4MockTest {
                 argThat((PayOrderNotifyDTO dto) -> "pay-1".equals(dto.getPayOrderId())
                         && "smartlect-mock-pay-1".equals(dto.getChannelOrderId())),
                 eq("pay-success:pay-1"),
-                eq(MessageReliabilityLevelEnum.HIGH));
+                eq(MessageReliabilityLevelEnum.HIGH),
+                org.mockito.ArgumentMatchers.isNull());
     }
 
     @Test

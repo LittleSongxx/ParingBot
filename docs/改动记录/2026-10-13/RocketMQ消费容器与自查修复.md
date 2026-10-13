@@ -32,3 +32,42 @@
 ## 关联
 
 自查对象：b3cca6b / ec9e6fa / ec794c6 / b3c5787 四个提交。
+
+## 第二轮深挖（同日补充）：版本唯一与死代码治理
+
+在第一轮自查基础上，按「版本唯一、无死代码、无重复实现」标准再深挖一轮：
+
+### 消除的新旧共存
+
+- **兼容重载合并**：`TransactionalMqSender.sendAfterCommit` 与
+  `OutboxMessageService.savePending` 原各有 5 参（即时）/6 参（定时）两个版本，
+  5 参只是兼容层。将仅存的两处 5 参调用点（RefundSagaTransactionService、
+  PayChannel4Mock）显式传 null 后**删除 5 参版本**——现在每个 API 只有一个签名
+  （定时语义显式携带 expire 参数，null 即立即），相关测试匹配器同步为 6 参。
+
+### 删除的死代码
+
+- `FeignFallbackResponses` 工具类（fallbackFactory 全删后零引用）；
+- `StockDubboService.VERSION` 常量（零引用）；
+- `RocketMqTopics.allLogicalQueues()`（自检用途从未被调用）；
+- `RocketMqClientHolder.sendText()`（调试便利方法零引用）。
+
+### 配置与文件卫生
+
+- **dubbo 配置去重**：registry/protocol/consumer/provider 公共段上提到
+  smartlect-common.yml（一处维护），8 个服务 yml 的 dubbo 段缩为
+  application.name 三行——原 8 份约 20 行重复配置归一。
+- 5 个生成的 Dubbo 接口（Stock/Coupon/Order/Pay/Product）由通配 import
+  （dto.* / vo.*）统一为**显式 import**，与手写的 User/Cart 风格一致；
+  ProductSnapshotBatchVO 的实际包位（dto 而非 vo）在显式化时被纠正。
+- 删除空目录：admin/api 两处空 fallback 目录、common 空 prompt 目录、
+  product-api 空 resources、admin 三个空测试目录。
+- assistant 的 `requirements.lock` 剔除 pika==1.4.1 并从 venv 卸载
+  （RabbitMQ 退役后零引用的传输依赖；assistant 测试 OK）。
+- `deploy/mq-rename-runbook.md`（growth→assistant 拓扑改名 runbook）移入
+  docs/history/——描述的拓扑已两次更迭（RabbitMQ→RocketMQ），保留仅作历史。
+
+### 验证
+
+backend 全量编译零错误、全量单测通过（common 118 项含容器模板 7 项）；
+assistant 全量测试通过；`bash -n` 集群脚本语法通过。

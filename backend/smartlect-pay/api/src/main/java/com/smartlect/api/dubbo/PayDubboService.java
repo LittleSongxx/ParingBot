@@ -1,9 +1,15 @@
 package com.smartlect.api.dubbo;
 
-import com.smartlect.api.dto.*;
-import com.smartlect.api.vo.*;
-import com.smartlect.entity.vo.PaginationResultVO;
 import com.smartlect.entity.vo.ResponseVO;
+import com.smartlect.api.dto.PayCloseDTO;
+import com.smartlect.api.dto.PayInfoDTO;
+import com.smartlect.api.dto.PayOrderNotifyDTO;
+import com.smartlect.api.dto.PayQueryDTO;
+import com.smartlect.api.dto.PayRefundDTO;
+import com.smartlect.api.dto.PayTradeCreateDTO;
+import com.smartlect.api.dto.PayTradeStatusDTO;
+import com.smartlect.api.dto.PayUrlRequestDTO;
+
 
 /**
  * pay 域内部 Dubbo 契约（取代原 FeignClient，方法签名一致；

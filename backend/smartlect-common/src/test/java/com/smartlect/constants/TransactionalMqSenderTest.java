@@ -14,6 +14,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
@@ -59,15 +60,15 @@ class TransactionalMqSenderTest {
     void outboxIsSavedInTransactionAndDispatchedOnlyAfterCommit() {
         when(outboxMessageService.savePending(
                 eq("exchange"), eq("route"), eq("payload"), eq("request-key"),
-                eq(MessageReliabilityLevelEnum.HIGH))).thenReturn(41L);
+                eq(MessageReliabilityLevelEnum.HIGH), isNull())).thenReturn(41L);
         TransactionSynchronizationManager.initSynchronization();
 
         sender.sendAfterCommit(
-                "exchange", "route", "payload", "request-key", MessageReliabilityLevelEnum.HIGH);
+                "exchange", "route", "payload", "request-key", MessageReliabilityLevelEnum.HIGH, null);
 
         verify(outboxMessageService).savePending(
                 eq("exchange"), eq("route"), eq("payload"), eq("request-key"),
-                eq(MessageReliabilityLevelEnum.HIGH));
+                eq(MessageReliabilityLevelEnum.HIGH), isNull());
         verify(outboxMessageService, never()).tryDispatch(any());
         TransactionSynchronizationUtils.invokeAfterCommit(
                 TransactionSynchronizationManager.getSynchronizations());
@@ -77,11 +78,10 @@ class TransactionalMqSenderTest {
     @Test
     void rollbackDoesNotDispatchTheOutboxRecord() {
         when(outboxMessageService.savePending(
-                any(), any(), any(), any(), eq(MessageReliabilityLevelEnum.STANDARD))).thenReturn(42L);
+                any(), any(), any(), any(), eq(MessageReliabilityLevelEnum.STANDARD), any())).thenReturn(42L);
         TransactionSynchronizationManager.initSynchronization();
 
-        sender.sendAfterCommit("exchange", "route", "payload", "request-key",
-                MessageReliabilityLevelEnum.STANDARD);
+        sender.sendAfterCommit("exchange", "route", "payload", "request-key", MessageReliabilityLevelEnum.STANDARD, null);
 
         TransactionSynchronizationUtils.invokeAfterCompletion(
                 TransactionSynchronizationManager.getSynchronizations(),
@@ -98,16 +98,15 @@ class TransactionalMqSenderTest {
     void dispatchIsHandedOffToTheExecutor() {
         when(outboxMessageService.savePending(
                 eq("exchange"), eq("route"), eq("payload"), eq("request-key"),
-                eq(MessageReliabilityLevelEnum.STANDARD))).thenReturn(44L);
+                eq(MessageReliabilityLevelEnum.STANDARD), isNull())).thenReturn(44L);
         doThrow(new RejectedExecutionException("queue full"))
                 .when(mqAsyncExecutor).execute(any(Runnable.class));
 
-        sender.sendAfterCommit("exchange", "route", "payload", "request-key",
-                MessageReliabilityLevelEnum.STANDARD);
+        sender.sendAfterCommit("exchange", "route", "payload", "request-key", MessageReliabilityLevelEnum.STANDARD, null);
 
         verify(outboxMessageService).savePending(
                 eq("exchange"), eq("route"), eq("payload"), eq("request-key"),
-                eq(MessageReliabilityLevelEnum.STANDARD));
+                eq(MessageReliabilityLevelEnum.STANDARD), isNull());
         verify(outboxMessageService, never()).tryDispatch(any());
     }
 
@@ -115,14 +114,14 @@ class TransactionalMqSenderTest {
     void callWithoutTransactionStillPersistsOutboxBeforeDispatch() {
         when(outboxMessageService.savePending(
                 eq("exchange"), eq("route"), eq("payload"), eq("request-key"),
-                eq(MessageReliabilityLevelEnum.HIGH))).thenReturn(43L);
+                eq(MessageReliabilityLevelEnum.HIGH), isNull())).thenReturn(43L);
 
         sender.sendAfterCommit(
-                "exchange", "route", "payload", "request-key", MessageReliabilityLevelEnum.HIGH);
+                "exchange", "route", "payload", "request-key", MessageReliabilityLevelEnum.HIGH, null);
 
         verify(outboxMessageService).savePending(
                 eq("exchange"), eq("route"), eq("payload"), eq("request-key"),
-                eq(MessageReliabilityLevelEnum.HIGH));
+                eq(MessageReliabilityLevelEnum.HIGH), isNull());
         verify(outboxMessageService).tryDispatch(43L);
     }
 }

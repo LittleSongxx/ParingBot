@@ -43,12 +43,6 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
 
     @Override
     public Long savePending(String exchange, String routingKey, Object payload,
-                            String idempotencyKey, MessageReliabilityLevelEnum reliabilityLevel) {
-        return savePending(exchange, routingKey, payload, idempotencyKey, reliabilityLevel, null);
-    }
-
-    @Override
-    public Long savePending(String exchange, String routingKey, Object payload,
                             String idempotencyKey, MessageReliabilityLevelEnum reliabilityLevel,
                             Long deliveryExpireAt) {
         if (StringTools.isEmpty(idempotencyKey) || StringTools.isEmpty(exchange) || StringTools.isEmpty(routingKey)) {

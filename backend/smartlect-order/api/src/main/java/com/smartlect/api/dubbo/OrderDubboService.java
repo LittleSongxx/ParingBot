@@ -1,9 +1,19 @@
 package com.smartlect.api.dubbo;
 
-import com.smartlect.api.dto.*;
-import com.smartlect.api.vo.*;
-import com.smartlect.entity.vo.PaginationResultVO;
 import com.smartlect.entity.vo.ResponseVO;
+import com.smartlect.api.dto.CouponRushPayRequestDTO;
+import com.smartlect.api.dto.CouponRushPrepareDTO;
+import com.smartlect.api.dto.CouponRushPrepareRequestDTO;
+import com.smartlect.api.dto.OrderIdDTO;
+import com.smartlect.api.dto.OrderStatsRangeDTO;
+import com.smartlect.api.dto.PayInfoDTO;
+import com.smartlect.api.dto.PayOrderNotifyDTO;
+import com.smartlect.api.dto.UserIdDTO;
+import com.smartlect.api.vo.OrderBriefVO;
+import com.smartlect.api.vo.OrderDailyStatsVO;
+import com.smartlect.api.vo.OrderRangeStatsVO;
+import java.util.List;
+
 
 /**
  * order 域内部 Dubbo 契约（取代原 FeignClient，方法签名一致；

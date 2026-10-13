@@ -82,7 +82,8 @@ public class PayChannel4Mock implements PayChannel {
                     RocketMqTopics.TAG_PAY_SUCCESS,
                     new PayOrderNotifyDTO(record.getPayOrderId(), record.getChannelOrderId()),
                     MqIdempotencyKeys.paySuccess(record.getPayOrderId()),
-                    MessageReliabilityLevelEnum.HIGH);
+                    MessageReliabilityLevelEnum.HIGH,
+                    null);
         }
         return new PaymentResult(record.getUserId(), record.getPayOrderId(), record.getPayAmount(),
                 record.getChannelOrderId(), record.getTradeStatus());

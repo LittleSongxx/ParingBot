@@ -1,9 +1,16 @@
 package com.smartlect.api.dubbo;
 
-import com.smartlect.api.dto.*;
-import com.smartlect.api.vo.*;
-import com.smartlect.entity.vo.PaginationResultVO;
 import com.smartlect.entity.vo.ResponseVO;
+import com.smartlect.entity.vo.PaginationResultVO;
+import com.smartlect.api.dto.LessStockPageDTO;
+import com.smartlect.api.dto.ProductIdDTO;
+import com.smartlect.api.dto.ProductIdListDTO;
+import com.smartlect.api.dto.ProductSalesIncreaseDTO;
+import com.smartlect.api.vo.ProductSkuListVO;
+import com.smartlect.api.vo.ProductSkuSnapshotVO;
+import com.smartlect.api.dto.ProductSnapshotBatchVO;
+import java.util.List;
+
 
 /**
  * product 域内部 Dubbo 契约（取代原 FeignClient，方法签名一致；
