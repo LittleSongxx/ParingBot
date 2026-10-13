@@ -28,8 +28,12 @@ services:
   rocketmq-broker:
     profiles: ["single-only"]
 
+  # 集群期应用副本（node2/3）与应用主进程都经内网 IP 访问 node1 的单机 proxy——
+  # 基线 compose 把 8081 绑在 127.0.0.1，这里叠加内网绑定（ports 是合并语义）。
   rocketmq-proxy:
     profiles: ["single-only"]
+    ports:
+      - "${NODE1_IP:?source deploy/cluster/nodes.env}:${SMARTLECT_ROCKETMQ_GRPC_PORT:-8081}:8081"
 
   nacos:
     profiles: ["single-only"]
