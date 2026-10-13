@@ -60,7 +60,7 @@ class ProductIndexServiceTest {
 
     @Test
     void consumerIgnoresOtherTablesAndMissingRows() throws IOException {
-        ProductIndexConsumer consumer = new ProductIndexConsumer(null, null, new ObjectMapper(), null);
+        ProductIndexConsumer consumer = new ProductIndexConsumer(null, new ObjectMapper(), null);
         consumer.consume("{\"table\":\"product_sku\",\"type\":\"UPDATE\",\"data\":[{\"product_id\":\"P1\"}]}");
         consumer.consume("{\"table\":\"product_info\",\"type\":\"UPDATE\",\"data\":[]}");
     }

@@ -26,7 +26,6 @@ import com.smartlect.utils.DateUtil;
 import com.smartlect.utils.StringTools;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -47,8 +46,6 @@ public class DiscountCouponServiceImpl implements DiscountCouponService {
 	private UserCouponMapper<UserCoupon, UserCouponQuery> userCouponMapper;
 	@Resource
 	private CouponRushRedisComponent couponRushRedisComponent;
-	@Resource
-	private RabbitTemplate rabbitTemplate;
 
 	@Resource
 	private OrderFeignSupport orderFeignSupport;

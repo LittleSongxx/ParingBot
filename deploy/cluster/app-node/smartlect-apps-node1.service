@@ -12,7 +12,7 @@ Wants=smartlect-infra.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/smartlect
-# 集群形态下还要等对端中间件（rabbit-c2/c3、nacos-c2/c3、sentinel）就绪。
+# 集群形态下还要等对端中间件（rocketmq、nacos-c2/c3、sentinel）就绪。
 # 单机形态该命令直接放行，不影响回退后的开机流程。
 ExecStartPre=/usr/bin/python3 scripts/runtime.py wait-cluster --timeout 300
 ExecStart=/usr/bin/python3 scripts/runtime.py up

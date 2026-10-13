@@ -44,6 +44,13 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
     @Override
     public Long savePending(String exchange, String routingKey, Object payload,
                             String idempotencyKey, MessageReliabilityLevelEnum reliabilityLevel) {
+        return savePending(exchange, routingKey, payload, idempotencyKey, reliabilityLevel, null);
+    }
+
+    @Override
+    public Long savePending(String exchange, String routingKey, Object payload,
+                            String idempotencyKey, MessageReliabilityLevelEnum reliabilityLevel,
+                            Long deliveryExpireAt) {
         if (StringTools.isEmpty(idempotencyKey) || StringTools.isEmpty(exchange) || StringTools.isEmpty(routingKey)) {
             throw new IllegalArgumentException("outbox 参数不完整");
         }
@@ -65,6 +72,7 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
         row.setReliabilityLevel(reliabilityCode);
         row.setStatus(OutboxMessageStatusEnum.PENDING.getStatus());
         row.setRetryCount(0);
+        row.setDeliveryExpireAt(deliveryExpireAt);
         row.setCreateTime(now);
         row.setUpdateTime(now);
         try {
@@ -112,8 +120,12 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
         }
         try {
             Object payload = JsonUtils.parse(row.getPayloadJson());
+            // 定时消息按当前时间折算剩余延迟：到期前投递剩余时长，过期即立即投递
+            java.time.Duration remainingDelay = row.getDeliveryExpireAt() == null ? null
+                    : java.time.Duration.ofMillis(Math.max(0L, row.getDeliveryExpireAt() - now.getTime()));
             reliableMessageSender.replaySend(
-                    row.getExchangeName(), row.getRoutingKey(), payload, row.getIdempotencyKey());
+                    row.getExchangeName(), row.getRoutingKey(), payload,
+                    row.getIdempotencyKey(), remainingDelay);
             Integer marked = localMessageOutboxMapper.markSent(
                     id,
                     OutboxMessageStatusEnum.SENDING.getStatus(),

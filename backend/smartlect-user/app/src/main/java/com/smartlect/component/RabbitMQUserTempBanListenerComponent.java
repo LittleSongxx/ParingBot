@@ -1,51 +1,40 @@
 package com.smartlect.component;
 
-import com.smartlect.constants.RabbitMQConfig;
 import com.smartlect.api.dto.UserTempBanDTO;
-import com.smartlect.component.UserTempBanService;
-import com.rabbitmq.client.Channel;
+import com.smartlect.mq.MqSubscription;
+import com.smartlect.mq.RocketMqTopics;
+import com.smartlect.mq.SmartlectMessageListener;
+import com.smartlect.mq.SmartlectMqMessage;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
-
+/**
+ * 临时封禁到期自动解封：封禁时投递的定时消息（默认 2 小时）到期触发。
+ */
 @Slf4j
 @Component
-public class RabbitMQUserTempBanListenerComponent {
+public class RabbitMQUserTempBanListenerComponent implements SmartlectMessageListener<UserTempBanDTO> {
 
     @Resource
     private UserTempBanService userTempBanService;
-    @Resource
-    private MqListenerHelper mqListenerHelper;
 
-    @RabbitListener(queues = RabbitMQConfig.USER_TEMP_BAN_DEAD_QUEUE, ackMode = "MANUAL")
-    public void onTempBanExpire(UserTempBanDTO dto, Channel channel, Message message) throws IOException {
-        long deliveryTag = message.getMessageProperties().getDeliveryTag();
-        if (!mqListenerHelper.tryBeginConsume(
-                message, MqListenerHelper.CONSUME_IDEMPOTENCY_TTL_STANDARD_SECONDS)) {
-            mqListenerHelper.ackCompletedOrDeferBusy(
-                    channel, deliveryTag, message, RabbitMQConfig.USER_TEMP_BAN_DEAD_QUEUE);
-            return;
+    @Override
+    public MqSubscription subscription() {
+        return MqSubscription.of(RocketMqTopics.TOPIC_DELAY, RocketMqTopics.TAG_TEMPBAN_EXPIRE,
+                "G_smartlect_tempban_expire");
+    }
+
+    @Override
+    public Class<UserTempBanDTO> payloadType() {
+        return UserTempBanDTO.class;
+    }
+
+    @Override
+    public void onMessage(UserTempBanDTO dto, SmartlectMqMessage mqMessage) {
+        if (dto == null || dto.getUserId() == null) {
+            throw new IllegalArgumentException("临时解封消息字段不完整");
         }
-        try {
-            if (dto == null || dto.getUserId() == null) {
-                throw new IllegalArgumentException("临时解封消息字段不完整");
-            }
-            userTempBanService.tryAutoUnban(dto);
-            mqListenerHelper.clearConsumeRetry(RabbitMQConfig.USER_TEMP_BAN_DEAD_QUEUE, message);
-            channel.basicAck(deliveryTag, false);
-        } catch (Exception e) {
-            log.error("临时封禁解封失败 userId={}", dto == null ? null : dto.getUserId(), e);
-            mqListenerHelper.nackWithRetryOrDlq(
-                    channel,
-                    deliveryTag,
-                    message,
-                    RabbitMQConfig.USER_TEMP_BAN_DEAD_QUEUE,
-                    dto,
-                    e);
-        }
+        userTempBanService.tryAutoUnban(dto);
     }
 }

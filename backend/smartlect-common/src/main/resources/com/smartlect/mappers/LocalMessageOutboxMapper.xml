@@ -19,15 +19,16 @@
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
         <result column="sent_time" property="sentTime"/>
+        <result column="delivery_expire_at" property="deliveryExpireAt"/>
     </resultMap>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         insert into local_message_outbox
         (idempotency_key, exchange_name, routing_key, payload_json, reliability_level,
-         status, retry_count, create_time, update_time)
+         status, retry_count, delivery_expire_at, create_time, update_time)
         values
         (#{idempotencyKey}, #{exchangeName}, #{routingKey}, #{payloadJson}, #{reliabilityLevel},
-         #{status}, #{retryCount}, #{createTime}, #{updateTime})
+         #{status}, #{retryCount}, #{deliveryExpireAt}, #{createTime}, #{updateTime})
     </insert>
 
     <select id="selectById" resultMap="base_result_map">

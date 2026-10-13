@@ -3,7 +3,7 @@ package com.smartlect.biz;
 import com.smartlect.api.dto.RefundStockRestoreDTO;
 import com.smartlect.api.enums.OrderItemStatusEnum;
 import com.smartlect.api.enums.OrderStatusEnum;
-import com.smartlect.constants.RabbitMQConfig;
+import com.smartlect.mq.RocketMqTopics;
 import com.smartlect.constants.TransactionalMqSender;
 import com.smartlect.entity.enums.MessageReliabilityLevelEnum;
 import com.smartlect.entity.enums.RefundSagaStatus;
@@ -192,8 +192,8 @@ public class RefundSagaTransactionService {
         payload.setPropertyValueIdHash(request.getPropertyValueIdHash());
         payload.setChangeAmount(request.getBuyCount());
         transactionalMqSender.sendAfterCommit(
-                RabbitMQConfig.REFUND_EXCHANGE,
-                RabbitMQConfig.REFUND_STOCK_KEY,
+                RocketMqTopics.TOPIC_REFUND,
+                RocketMqTopics.TAG_REFUND_STOCK,
                 payload,
                 MqIdempotencyKeys.refundStock(request.getRefundRequestId(), attempt),
                 MessageReliabilityLevelEnum.STANDARD);

@@ -4,20 +4,19 @@ import com.smartlect.api.dto.RushingCouponMessageDTO;
 import com.smartlect.api.support.OrderFeignSupport;
 import com.smartlect.biz.DiscountCouponService;
 import com.smartlect.biz.UserCouponService;
-import com.smartlect.constants.RabbitMQConfig;
-import com.rabbitmq.client.Channel;
+import com.smartlect.mq.RocketMqTopics;
+import com.smartlect.mq.SmartlectMqMessage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.core.MessageProperties;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,55 +29,41 @@ class RabbitMQOrderDeadListListenerComponentTest {
     private UserCouponService userCouponService;
     @Mock
     private OrderFeignSupport orderFeignSupport;
-    @Mock
-    private MqListenerHelper mqListenerHelper;
-    @Mock
-    private Channel channel;
     @InjectMocks
     private RabbitMQOrderDeadListListenerComponent listener;
 
     @Test
-    void preOrderTimeoutMarksConsumptionCompletedBeforeAck() throws Exception {
+    void preOrderTimeoutReleasesCouponReserveWhenNoOrderWasCreated() {
         RushingCouponMessageDTO payload = payload(null);
-        Message message = message(17L);
-        when(mqListenerHelper.tryBeginConsume(message, 86_400L)).thenReturn(true);
         when(userCouponService.getUserCouponByUserCouponId("uc-1")).thenReturn(null);
 
-        listener.handleDeadOrder(payload, channel, message);
+        listener.onMessage(payload, message());
 
         verify(discountCouponService).releaseRushCouponReserve("coupon-1", "user-1");
-        InOrder completion = inOrder(mqListenerHelper, channel);
-        completion.verify(mqListenerHelper)
-                .clearConsumeRetry(RabbitMQConfig.RUSHING_DEAD_QUEUE, message);
-        completion.verify(channel).basicAck(17L, false);
     }
 
     @Test
-    void missingOrderRollbackMarksConsumptionCompletedBeforeAck() throws Exception {
+    void missingOrderRollbackOnlyReleasesRedisReserve() {
         RushingCouponMessageDTO payload = payload("order-1");
-        Message message = message(18L);
-        when(mqListenerHelper.tryBeginConsume(message, 86_400L)).thenReturn(true);
         when(userCouponService.getUserCouponByUserCouponId("uc-1")).thenReturn(null);
         when(orderFeignSupport.getOrder("order-1")).thenReturn(null);
 
-        listener.handleDeadOrder(payload, channel, message);
+        listener.onMessage(payload, message());
 
         verify(discountCouponService).releaseRushRedisReserve("coupon-1", "user-1");
-        InOrder completion = inOrder(mqListenerHelper, channel);
-        completion.verify(mqListenerHelper)
-                .clearConsumeRetry(RabbitMQConfig.RUSHING_DEAD_QUEUE, message);
-        completion.verify(channel).basicAck(18L, false);
     }
 
     @Test
-    void listenerDoesNotWrapRemoteCallsAndAckInOneDatabaseTransaction() throws Exception {
+    void listenerDoesNotWrapRemoteCallsInOneDatabaseTransaction() throws NoSuchMethodException {
         assertNull(RabbitMQOrderDeadListListenerComponent.class
-                .getMethod(
-                        "handleDeadOrder",
-                        RushingCouponMessageDTO.class,
-                        Channel.class,
-                        Message.class)
+                .getMethod("onMessage", RushingCouponMessageDTO.class, SmartlectMqMessage.class)
                 .getAnnotation(Transactional.class));
+    }
+
+    @Test
+    void subscriptionPointsToRushTimeoutTopic() {
+        assertEquals(RocketMqTopics.TOPIC_DELAY, listener.subscription().topic());
+        assertEquals(RocketMqTopics.TAG_RUSH_TIMEOUT, listener.subscription().tag());
     }
 
     private static RushingCouponMessageDTO payload(String orderId) {
@@ -90,10 +75,8 @@ class RabbitMQOrderDeadListListenerComponentTest {
         return payload;
     }
 
-    private static Message message(long deliveryTag) {
-        MessageProperties properties = new MessageProperties();
-        properties.setDeliveryTag(deliveryTag);
-        properties.setConsumerQueue(RabbitMQConfig.RUSHING_DEAD_QUEUE);
-        return new Message(new byte[0], properties);
+    private static SmartlectMqMessage message() {
+        return SmartlectMqMessage.of(RocketMqTopics.TOPIC_RUSH, RocketMqTopics.TAG_RUSH_TIMEOUT,
+                new byte[0], "msg-1", new HashMap<>());
     }
 }

@@ -2,7 +2,7 @@ package com.smartlect.component;
 
 import com.smartlect.api.dto.UserTempBanDTO;
 import com.smartlect.api.enums.UserStatusEnum;
-import com.smartlect.constants.RabbitMQConfig;
+import com.smartlect.mq.RocketMqTopics;
 import com.smartlect.constants.TransactionalMqSender;
 import com.smartlect.entity.enums.MessageReliabilityLevelEnum;
 import com.smartlect.entity.po.UserInfo;
@@ -55,11 +55,12 @@ class UserTempBanServiceTest {
         verify(userInfoMapper).applyTemporaryBan("u1", unbanAtMs);
         ArgumentCaptor<UserTempBanDTO> payload = ArgumentCaptor.forClass(UserTempBanDTO.class);
         verify(transactionalMqSender).sendAfterCommit(
-                eq(RabbitMQConfig.USER_TEMP_BAN_EXCHANGE),
-                eq(RabbitMQConfig.USER_TEMP_BAN_DELAY_KEY),
+                eq(RocketMqTopics.TOPIC_DELAY),
+                eq(RocketMqTopics.TAG_TEMPBAN_EXPIRE),
                 payload.capture(),
                 eq(MqIdempotencyKeys.tempBanUnban("u1", unbanAtMs)),
-                eq(MessageReliabilityLevelEnum.STANDARD));
+                eq(MessageReliabilityLevelEnum.STANDARD),
+                eq(unbanAtMs));
         assertEquals("u1", payload.getValue().getUserId());
         assertEquals(unbanAtMs, payload.getValue().getUnbanAtMs());
         verify(redisComponent).cleanAllToken("u1");

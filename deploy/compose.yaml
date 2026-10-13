@@ -44,23 +44,83 @@ services:
       timeout: 3s
       retries: 20
 
-  rabbitmq:
-    image: rabbitmq:4.2.9-management
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.2
+    command: sh mqnamesrv
     ports:
-      - "127.0.0.1:${SMARTLECT_RABBIT_PORT:?run bootstrap}:5672"
-      - "127.0.0.1:${SMARTLECT_RABBIT_MANAGEMENT_PORT:?run bootstrap}:15672"
+      - "127.0.0.1:${SMARTLECT_ROCKETMQ_NAMESRV_PORT:-9876}:9876"
     environment:
-      RABBITMQ_DEFAULT_USER: ${SMARTLECT_RABBIT_USER:?run bootstrap}
-      RABBITMQ_DEFAULT_PASS: ${SMARTLECT_RABBIT_PASSWORD:?run bootstrap}
-      RABBITMQ_DEFAULT_VHOST: ${SMARTLECT_RABBIT_VHOST:?run bootstrap}
+      JAVA_OPT_EXT: "-Xms256m -Xmx256m"
+    mem_limit: 384m
+    healthcheck:
+      test: [CMD-SHELL, 'bash -c "echo > /dev/tcp/127.0.0.1/9876"']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.2
+    command: sh mqbroker -n rocketmq-namesrv:9876 -c /home/rocketmq/conf/smartlect-broker.conf
+    depends_on:
+      rocketmq-namesrv: {condition: service_healthy}
+    # 命名卷初建属主 root，镜像内 rocketmq 用户(uid 3000)写 store 会权限失败（实测
+    # ScheduleMessageService NPE 即此因），演示环境以 root 运行规避。
+    user: "0:0"
+    environment:
+      JAVA_OPT_EXT: "-Xms512m -Xmx512m"
     volumes:
-      - rabbit:/var/lib/rabbitmq
-      - ./rabbitmq.conf:/etc/rabbitmq/conf.d/20-smartlect.conf:ro
+      - rocketmq-store:/home/rocketmq/store
+      - ./rocketmq/broker.conf:/home/rocketmq/conf/smartlect-broker.conf:ro
     mem_limit: 768m
     healthcheck:
-      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      test: [CMD-SHELL, 'bash -c "echo > /dev/tcp/127.0.0.1/10911"']
       interval: 5s
       timeout: 5s
+      retries: 40
+
+  # 业务 Topic 预建：autoCreateTopicEnable 只对发送生效，5.x 客户端**订阅**时
+  # 即校验路由（No topic route info 会让消费者启动直接 FAILED），必须显式建。
+  rocketmq-topic-init:
+    image: apache/rocketmq:5.3.2
+    depends_on:
+      rocketmq-broker: {condition: service_healthy}
+    entrypoint: [sh, -ec]
+    command:
+      - |
+        # 注意必须显式 +message.type=NORMAL：5.3.2 mqadmin 不带 -a 时会给新 Topic 写
+        # "NORMAL,DELAY" 组合默认值，而 proxy 校验路径 Enum.valueOf 不认多值组合，订阅即 50001。
+        for topic in smartlect-pay smartlect-refund smartlect-rush smartlect-canal smartlect-mq-failure; do
+          for i in $(seq 1 30); do
+            sh mqadmin updateTopic -n rocketmq-namesrv:9876 -c DefaultCluster -t $$topic -a "+message.type=NORMAL" >/dev/null 2>&1 && break
+            sleep 2
+          done
+        done
+        # 定时消息专用 Topic：message.type=DELAY（单值可经 CLI 表达；NORMAL,DELAY 多值
+        # 的逗号与 -a 的属性分隔符冲突，无法设置，故定时消息独立成 Topic）
+        for i in $(seq 1 30); do
+          sh mqadmin updateTopic -n rocketmq-namesrv:9876 -c DefaultCluster -t smartlect-delay -a "+message.type=DELAY" >/dev/null 2>&1 && break
+          sleep 2
+        done
+        echo "topics ready"
+    restart: "no"
+
+  # gRPC Proxy：5.x 新客户端（rocketmq-client-java）统一经 proxy 接入，
+  # 定时消息/事务语义在 proxy 后面的 broker 集群上保持。
+  rocketmq-proxy:
+    image: apache/rocketmq:5.3.2
+    command: sh mqproxy -n rocketmq-namesrv:9876
+    depends_on:
+      rocketmq-broker: {condition: service_healthy}
+      rocketmq-topic-init: {condition: service_completed_successfully}
+    ports:
+      - "127.0.0.1:${SMARTLECT_ROCKETMQ_GRPC_PORT:?run bootstrap}:8081"
+    environment:
+      JAVA_OPT_EXT: "-Xms256m -Xmx256m"
+    mem_limit: 384m
+    healthcheck:
+      test: [CMD-SHELL, 'bash -c "echo > /dev/tcp/127.0.0.1/8081"']
+      interval: 5s
+      timeout: 3s
       retries: 30
 
   nacos:
@@ -128,7 +188,7 @@ services:
       timeout: 3s
       retries: 24
 
-  # Canal：伪装 MySQL 从库解析 binlog，直投 RabbitMQ（flat JSON）。
+  # Canal：伪装 MySQL 从库解析 binlog，直投 RocketMQ（flat JSON，remoting 协议）。
   # 消息路由见 deploy/canal/instance.properties；Java 消费方为 product 服务的
   # ProductIndexConsumer（商品索引增量同步与缓存失效的变更源）。
   canal:
@@ -136,19 +196,16 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      rocketmq-namesrv:
+        condition: service_healthy
     environment:
-      canal.serverMode: rabbitMQ
+      canal.serverMode: rocketMQ
       CANAL_MYSQL_ADDRESS: "mysql:3306"
       CANAL_MYSQL_USER: smartlect_canal
       CANAL_MYSQL_PASSWORD: ${SMARTLECT_CANAL_MYSQL_PASSWORD:?run bootstrap}
-      # 单机形态走 compose 服务名；集群形态下 RabbitMQ 由 /opt/cluster 提供，
-      # 必须用 SMARTLECT_CANAL_RABBIT_HOST 指向集群成员，否则 canal 启动即 DNS 失败。
-      CANAL_RABBIT_HOST: ${SMARTLECT_CANAL_RABBIT_HOST:-rabbitmq}
-      CANAL_RABBIT_PORT: "5672"
-      CANAL_RABBIT_VHOST: ${SMARTLECT_RABBIT_VHOST:?run bootstrap}
-      CANAL_RABBIT_USER: ${SMARTLECT_RABBIT_USER:?run bootstrap}
-      CANAL_RABBIT_MGMT_PORT: ${SMARTLECT_CANAL_RABBIT_MGMT_PORT:-15672}
-      CANAL_RABBIT_PASSWORD: ${SMARTLECT_RABBIT_PASSWORD:?run bootstrap}
+      # 单机形态走 compose 服务名；集群形态下 RocketMQ 由 deploy/cluster 提供，
+      # 必须用 SMARTLECT_CANAL_ROCKETMQ_NAMESRV 指向集群成员，否则 canal 启动即 DNS 失败。
+      CANAL_ROCKETMQ_NAMESRV: ${SMARTLECT_CANAL_ROCKETMQ_NAMESRV:-rocketmq-namesrv:9876}
     ports:
       - "127.0.0.1:${SMARTLECT_CANAL_PORT:-11111}:11111"
     volumes:
@@ -220,6 +277,6 @@ services:
 volumes:
   mysql:
   redis:
-  rabbit:
+  rocketmq-store:
   es-data:
   qdrant-data:

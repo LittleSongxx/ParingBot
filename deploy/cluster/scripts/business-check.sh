@@ -18,4 +18,4 @@ q smartlect_cart "SELECT CONCAT('product_cart 行数=', COUNT(*)) FROM product_c
 echo "=== 库存（demo 前缀） ==="
 q smartlect_stock "SELECT CONCAT('sku_stock 总库存=', SUM(stock)) FROM sku_stock"
 echo "=== MQ 堆积 ==="
-docker exec rabbit-c1 rabbitmqctl list_queues -p smartlect --silent name messages 2>/dev/null | awk '{s+=$2; n++} END {print "  队列数=" n ", 消息总数=" s+0}'
+docker exec rocketmq-broker sh mqadmin consumerProgress -n 127.0.0.1:9876 -g G_smartlect_pay_success 2>/dev/null | tail -2 | head -1 || echo "  消费组查询不可用"'

@@ -17,14 +17,14 @@ bash "$HERE/gen-cluster-env.sh"
 for n in 2 3; do
   eval "ip=\$NODE${n}_IP"
   log "syncing orchestration to $ip ..."
-  remote "$ip" "mkdir -p $CL/{rabbit,redis,sentinel,nacos,evidence} && chmod 700 $CL/{rabbit,redis,sentinel,nacos}"
+  remote "$ip" "mkdir -p $CL/{rocketmq,redis,sentinel,nacos,evidence} && chmod 700 $CL/{rocketmq,redis,sentinel,nacos}"
   # 编排文件（无密钥）
-  for f in nodes.env rabbit/compose.c$n.yaml rabbit/rabbitmq-cluster.conf \
+  for f in nodes.env rocketmq/compose.c$n.yaml \
            redis/compose.replica.yaml sentinel/compose.sentinel.yaml nacos/compose.cluster.yaml; do
     scp $CLUSTER_SSH_OPTS "$CL/$f" "root@$ip:$CL/$f" >/dev/null
   done
   # 含密钥的 .env（权限 600 随文件走）
-  for f in rabbit/.env redis/.env sentinel/.env nacos/.env; do
+  for f in rocketmq/.env redis/.env sentinel/.env nacos/.env; do
     scp $CLUSTER_SSH_OPTS "$CL/$f" "root@$ip:$CL/$f" >/dev/null
   done
   remote "$ip" "chmod 600 $CL/rabbit/.env $CL/redis/.env $CL/sentinel/.env $CL/nacos/.env && echo '  synced'"

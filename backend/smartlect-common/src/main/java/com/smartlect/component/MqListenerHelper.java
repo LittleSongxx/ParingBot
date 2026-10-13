@@ -1,197 +1,114 @@
 package com.smartlect.component;
 
-import com.smartlect.constants.RabbitMQConfig;
-import com.smartlect.utils.StringTools;
-import com.rabbitmq.client.Channel;
+import com.smartlect.mq.RocketMqClientHolder;
+import com.smartlect.mq.RocketMqTopics;
+import com.smartlect.mq.SmartlectMqMessage;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.core.MessageProperties;
-import org.springframework.amqp.core.MessagePropertiesBuilder;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 消费失败调度：重试链（定时回投原 Topic/Tag，间隔 5s/30s/120s，对齐原三级 TTL
+ * 拓扑）与最终失败归档（mq_compensation_log 审查表 + 统一失败 Topic）。
+ *
+ * <p>返回 true 表示失败已被妥善调度（回投或归档成功），容器据此向 broker 返回
+ * SUCCESS；false 表示调度本身失败，容器返回 FAILURE 交由 broker 重投兜底。</p>
+ */
 @Slf4j
 @Component
 public class MqListenerHelper {
 
-    public static final int DEFAULT_MAX_CONSUME_RETRIES = 3;
+    private static final int MAX_RETRIES = RocketMqTopics.DEFAULT_MAX_CONSUME_RETRIES;
 
-    public static final long CONSUME_IDEMPOTENCY_TTL_STANDARD_SECONDS = 24 * 3600L;
-
-    public static final long CONSUME_IDEMPOTENCY_TTL_HIGH_SECONDS = 7 * 24 * 3600L;
-    public static final String HEADER_RETRY_ATTEMPT = "x-smartlect-retry-attempt";
-    private static final int BUSY_RETRY_QUEUE_ATTEMPT = 2;
-
+    @Resource
+    private RocketMqClientHolder rocketMqClientHolder;
     @Resource
     private MqConsumerIdempotencyHelper mqConsumerIdempotencyHelper;
     @Resource
     private MqConsumeFailureRecorder mqConsumeFailureRecorder;
-    @Resource
-    private MqPublisherConfirmHelper mqPublisherConfirmHelper;
 
-    public boolean tryBeginConsume(Message message, long ttlSeconds) {
-        return mqConsumerIdempotencyHelper.tryBeginConsume(message, ttlSeconds);
-    }
-
-    public void ackCompletedOrDeferBusy(Channel channel, long deliveryTag, Message message,
-                                        String queueName) throws IOException {
-        if (mqConsumerIdempotencyHelper.resolveClaimResult(message)
-                != MqConsumerIdempotencyHelper.ClaimResult.BUSY) {
-            channel.basicAck(deliveryTag, false);
-            return;
-        }
-        String idempotencyKey = resolveIdempotencyKey(message);
+    /** 幂等租约被占用（BUSY）：30s 后回投原 Topic/Tag 重试。 */
+    public boolean deferBusy(SmartlectMqMessage message) {
+        String queue = message.logicalQueue();
+        String key = message.idempotencyKey();
         try {
-            Message deferredMessage = cloneForBusyDeferral(message, queueName);
-            mqPublisherConfirmHelper.sendRawAndAwaitConfirm(
-                    RabbitMQConfig.MQ_RETRY_EXCHANGE,
-                    RabbitMQConfig.retryRoutingKey(queueName, BUSY_RETRY_QUEUE_ATTEMPT),
-                    deferredMessage,
-                    "busy:" + queueName + ":" + idempotencyKey + ":" + UUID.randomUUID());
-            channel.basicAck(deliveryTag, false);
-            log.debug("MQ 消费租约占用，消息已延后重试 queue={}, key={}", queueName, idempotencyKey);
+            redeliver(message, Duration.ofMillis(RocketMqTopics.BUSY_DEFER_MS),
+                    "busy:" + queue + ":" + key + ":" + UUID.randomUUID());
+            log.debug("MQ 消费租约占用，消息已延后重试 queue={}, key={}", queue, key);
+            return true;
         } catch (Exception publishError) {
-            log.error("MQ 消费租约占用消息延后失败 queue={}, key={}",
-                    queueName, idempotencyKey, publishError);
-            channel.basicNack(deliveryTag, false, true);
+            log.error("MQ 消费租约占用消息延后失败 queue={}, key={}", queue, key, publishError);
+            return false;
         }
     }
 
-    public void releaseConsume(Message message) {
-        mqConsumerIdempotencyHelper.releaseConsume(message);
-    }
-
-    public String resolveIdempotencyKey(Message message) {
-        return mqConsumerIdempotencyHelper.resolveIdempotencyKey(message);
-    }
-
-    public void nackWithRetryOrDlq(Channel channel, long deliveryTag, Message message,
-                                   String queueName, Object payload, Exception error) throws IOException {
-        String idempotencyKey = resolveIdempotencyKey(message);
-        if (StringTools.isEmpty(idempotencyKey)) {
-            mqConsumeFailureRecorder.record(queueName, message, payload, error);
-            publishFailureOrNack(
-                    channel,
-                    deliveryTag,
-                    message,
-                    queueName,
-                    "missing-id:" + queueName + ":" + UUID.randomUUID(),
-                    1,
-                    error);
-            return;
-        }
-        int attempt = retryAttempt(message) + 1;
-        releaseConsume(message);
-        if (attempt <= DEFAULT_MAX_CONSUME_RETRIES) {
+    /**
+     * 业务失败：attempt ≤ MAX_RETRIES 时按 5s/30s/120s 定时回投；耗尽则落审查表
+     * 并归档统一失败 Topic。
+     */
+    public boolean handleFailure(SmartlectMqMessage message, Object payload, Exception error) {
+        String queue = message.logicalQueue();
+        String key = message.idempotencyKey();
+        mqConsumerIdempotencyHelper.release(message);
+        int attempt = message.retryAttempt() + 1;
+        if (attempt <= MAX_RETRIES) {
+            long delay = RocketMqTopics.RETRY_DELAYS_MS[attempt - 1];
             log.warn("MQ 消费失败进入延迟重试 queue={}, key={}, attempt={}/{}",
-                    queueName, idempotencyKey, attempt, DEFAULT_MAX_CONSUME_RETRIES);
+                    queue, key, attempt, MAX_RETRIES);
             try {
-                Message retryMessage = cloneForRetry(message, attempt, queueName, error);
-                mqPublisherConfirmHelper.sendRawAndAwaitConfirm(
-                        RabbitMQConfig.MQ_RETRY_EXCHANGE,
-                        RabbitMQConfig.retryRoutingKey(queueName, attempt),
-                        retryMessage,
-                        "retry:" + queueName + ":" + idempotencyKey + ":" + attempt + ":" + UUID.randomUUID());
-                channel.basicAck(deliveryTag, false);
+                redeliverWithAttempt(message, attempt, Duration.ofMillis(delay),
+                        "retry:" + queue + ":" + key + ":" + attempt);
+                return true;
             } catch (Exception publishError) {
-                log.error("MQ 延迟重试消息发布失败 queue={}, key={}", queueName, idempotencyKey, publishError);
-                mqConsumeFailureRecorder.record(queueName, message, payload, publishError);
-                channel.basicNack(deliveryTag, false, false);
+                log.error("MQ 延迟重试消息发布失败 queue={}, key={}", queue, key, publishError);
+                mqConsumeFailureRecorder.record(queue, message, payload, publishError);
+                return publishFailure(message, "failed:" + queue + ":" + key + ":" + UUID.randomUUID());
             }
-            return;
         }
-        mqConsumeFailureRecorder.record(queueName, message, payload, error);
-        publishFailureOrNack(
-                channel,
-                deliveryTag,
-                message,
-                queueName,
-                "failed:" + queueName + ":" + idempotencyKey + ":" + UUID.randomUUID(),
-                attempt,
-                error);
+        mqConsumeFailureRecorder.record(queue, message, payload, error);
+        return publishFailure(message, "failed:" + queue + ":" + key + ":" + UUID.randomUUID());
     }
 
-    private void publishFailureOrNack(Channel channel, long deliveryTag, Message message,
-                                      String queueName, String correlationId, int attempt,
-                                      Exception error) throws IOException {
+    /** 归档到统一失败 Topic（无消费者，DB 审查表为准）。 */
+    private boolean publishFailure(SmartlectMqMessage message, String correlationId) {
         try {
-            Message failedMessage = cloneForRetry(message, attempt, queueName, error);
-            mqPublisherConfirmHelper.sendRawAndAwaitConfirm(
-                    RabbitMQConfig.MQ_FAILURE_EXCHANGE,
-                    RabbitMQConfig.MQ_FAILURE_KEY,
-                    failedMessage,
-                    correlationId);
-            channel.basicAck(deliveryTag, false);
+            Map<String, String> properties = new HashMap<>(message.properties());
+            properties.put(SmartlectMqMessage.PROPERTY_IDEMPOTENCY_KEY, correlationId);
+            properties.remove(MqConsumerIdempotencyHelper.PROPERTY_CONSUMER_LEASE_TOKEN);
+            properties.remove(MqConsumerIdempotencyHelper.PROPERTY_CONSUMER_CLAIM_RESULT);
+            rocketMqClientHolder.send(RocketMqTopics.TOPIC_MQ_FAILURE,
+                    message.logicalQueue(), message.body(), properties, null);
+            return true;
         } catch (Exception publishError) {
-            log.error("MQ 最终失败消息发布失败 queue={}, correlationId={}",
-                    queueName, correlationId, publishError);
-            channel.basicNack(deliveryTag, false, false);
+            log.error("MQ 最终失败消息归档发布失败 queue={}, correlationId={}",
+                    message.logicalQueue(), correlationId, publishError);
+            return false;
         }
     }
 
-    private int retryAttempt(Message message) {
-        Object value = message.getMessageProperties().getHeaders().get(HEADER_RETRY_ATTEMPT);
-        if (value instanceof Number number) {
-            return number.intValue();
-        }
-        try {
-            return value == null ? 0 : Integer.parseInt(String.valueOf(value));
-        } catch (NumberFormatException ignored) {
-            return 0;
-        }
+    private void redeliver(SmartlectMqMessage message, Duration delay, String idempotencyKey)
+            throws Exception {
+        redeliverInternal(message, message.retryAttempt(), delay, idempotencyKey);
     }
 
-    private Message cloneForRetry(Message source, int attempt, String queueName, Exception error) {
-        MessageProperties properties = MessagePropertiesBuilder
-                .fromClonedProperties(source.getMessageProperties())
-                .setHeader(HEADER_RETRY_ATTEMPT, attempt)
-                .setHeader("x-smartlect-original-queue", queueName)
-                .setHeader("x-smartlect-last-error", truncate(error == null ? null : error.getMessage()))
-                .setDeliveryTag(0L)
-                .build();
-        properties.getHeaders().remove(MqConsumerIdempotencyHelper.HEADER_CONSUMER_LEASE_TOKEN);
-        properties.getHeaders().remove(MqConsumerIdempotencyHelper.HEADER_CONSUMER_CLAIM_RESULT);
-        properties.setConsumerQueue(null);
-        properties.setReceivedExchange(null);
-        properties.setReceivedRoutingKey(null);
-        return new Message(source.getBody(), properties);
+    private void redeliverWithAttempt(SmartlectMqMessage message, int attempt,
+                                      Duration delay, String idempotencyKey) throws Exception {
+        redeliverInternal(message, attempt, delay, idempotencyKey);
     }
 
-    private Message cloneForBusyDeferral(Message source, String queueName) {
-        MessageProperties properties = MessagePropertiesBuilder
-                .fromClonedProperties(source.getMessageProperties())
-                .setHeader("x-smartlect-original-queue", queueName)
-                .setDeliveryTag(0L)
-                .build();
-        properties.getHeaders().remove(MqConsumerIdempotencyHelper.HEADER_CONSUMER_LEASE_TOKEN);
-        properties.getHeaders().remove(MqConsumerIdempotencyHelper.HEADER_CONSUMER_CLAIM_RESULT);
-        properties.setConsumerQueue(null);
-        properties.setReceivedExchange(null);
-        properties.setReceivedRoutingKey(null);
-        return new Message(source.getBody(), properties);
-    }
-
-    private String truncate(String value) {
-        if (value == null) {
-            return "";
-        }
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length <= 500) {
-            return value;
-        }
-        int end = 500;
-        while (end > 0 && (bytes[end] & 0xC0) == 0x80) {
-            end--;
-        }
-        return new String(bytes, 0, end, StandardCharsets.UTF_8);
-    }
-
-    public void clearConsumeRetry(String queueName, Message message) {
-        mqConsumerIdempotencyHelper.markCompleted(
-                queueName, message, CONSUME_IDEMPOTENCY_TTL_HIGH_SECONDS);
+    private void redeliverInternal(SmartlectMqMessage message, int attempt,
+                                   Duration delay, String idempotencyKey) throws Exception {
+        Map<String, String> properties = new HashMap<>(message.properties());
+        properties.put(SmartlectMqMessage.PROPERTY_RETRY_ATTEMPT, String.valueOf(attempt));
+        // 回投是新的投递：幂等键保持业务键不变（Redis done/processing 按业务键去重），
+        // 租约相关 property 只存在于内存，不进入重发消息。
+        properties.remove(MqConsumerIdempotencyHelper.PROPERTY_CONSUMER_LEASE_TOKEN);
+        properties.remove(MqConsumerIdempotencyHelper.PROPERTY_CONSUMER_CLAIM_RESULT);
+        rocketMqClientHolder.send(message.topic(), message.tag(), message.body(), properties, delay);
     }
 }

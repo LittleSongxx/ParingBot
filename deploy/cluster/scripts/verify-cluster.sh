@@ -9,20 +9,15 @@ EV="$CL/evidence"
 mkdir -p "$EV"
 log() { echo "[verify $(date +%T)] $*"; }
 remote() { ssh $CLUSTER_SSH_OPTS "root@$1" "$2"; }
-VHOST="${SMARTLECT_RABBIT_VHOST:-smartlect}"
+NAMESRV_PORT="${ROCKETMQ_NAMESRV_PORT:-9876}"
 
-log "== RabbitMQ =="
-docker exec rabbit-c1 rabbitmqctl cluster_status --formatter=json > "$EV/rabbit-cluster-status.json"
-python3 - "$EV/rabbit-cluster-status.json" <<'PY'
-import json, sys
-s = json.load(open(sys.argv[1]))
-run = s["running_nodes"]
-print("running:", sorted(run if isinstance(run, list) else run.values()))
-print("partitions:", s.get("partitions") or "none")
-PY
-docker exec rabbit-c1 rabbitmqctl list_queues -p "$VHOST" --silent name messages | sort > "$EV/rabbit-queues.txt"
-echo "queues: $(wc -l < "$EV/rabbit-queues.txt")"
-echo "queued messages total: $(awk '{s+=$2} END {print s+0}' "$EV/rabbit-queues.txt")"
+log "== RocketMQ =="
+docker exec rocketmq-broker sh mqadmin clusterList -n 127.0.0.1:$NAMESRV_PORT > "$EV/rocketmq-cluster-list.txt"
+REPLICAS=$(grep -c "^broker-a" "$EV/rocketmq-cluster-list.txt" || true)
+[ "$REPLICAS" -ge 3 ] || { echo "expect 3 dledger replicas, got $REPLICAS"; exit 1; }
+echo "dledger replicas: $REPLICAS"
+docker exec rocketmq-broker sh mqadmin consumerProgress -n 127.0.0.1:$NAMESRV_PORT -g G_smartlect_pay_success > "$EV/rocketmq-consumer-progress.txt" 2>/dev/null || true
+echo "consumer progress sampled: $(head -3 "$EV/rocketmq-consumer-progress.txt" | tr '\n' ' ')"
 
 log "== Redis =="
 PW=$(grep -oP '^REDIS_PASSWORD=\K.*' "$CL/sentinel/.env")

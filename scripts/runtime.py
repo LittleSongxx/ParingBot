@@ -25,8 +25,7 @@ PROCESS_FILE = ROOT / "run/processes.json"
 PROCESS_LOCK = ROOT / "run/processes.lock"
 DATABASES = ("admin", "user", "product", "stock", "cart", "order", "pay", "coupon")
 APPS = ("assistant", "user", "product", "stock", "order", "pay", "cart", "coupon", "admin", "gateway", "web-user", "web-admin")
-PORTS = {"MYSQL": 13306, "REDIS": 16379, "RABBIT": 15672,
-         "RABBIT_MANAGEMENT": 15674, "NACOS": 18848, "ES": 9200, "QDRANT": 6333, "CANAL": 11111, "XXLJOB": 18090, "LITELLM": 14000,
+PORTS = {"MYSQL": 13306, "REDIS": 16379, "ROCKETMQ_NAMESRV": 9876, "ROCKETMQ_GRPC": 8081, "NACOS": 18848, "ES": 9200, "QDRANT": 6333, "CANAL": 11111, "XXLJOB": 18090, "LITELLM": 14000,
          "GATEWAY": 18080, "GROWTH": 18000, "DASHBOARD": 18501,
          "ADMIN": 18101, "USER": 18105, "PRODUCT": 18106, "STOCK": 18108,
          "CART": 18102, "ORDER": 18104, "PAY": 18103, "COUPON": 18107, "WEB_USER": 18180, "WEB_ADMIN": 18181}
@@ -130,8 +129,7 @@ def bootstrap():
         "SMARTLECT_MYSQL_HOST": "127.0.0.1", "SMARTLECT_MYSQL_USER": "smartlect_app",
         "SMARTLECT_FLYWAY_USER": "smartlect_flyway",
         "SMARTLECT_REDIS_HOST": "127.0.0.1", "SMARTLECT_REDIS_USERNAME": "",
-        "SMARTLECT_REDIS_DB": "0", "SMARTLECT_RABBIT_HOST": "127.0.0.1",
-        "SMARTLECT_RABBIT_USER": "smartlect", "SMARTLECT_RABBIT_VHOST": "smartlect",
+        "SMARTLECT_REDIS_DB": "0", "SMARTLECT_ROCKETMQ_ENDPOINTS": "127.0.0.1:8081",
         "SMARTLECT_NACOS_USERNAME": "nacos", "SMARTLECT_NACOS_NAMESPACE": "",
         "SMARTLECT_NACOS_GROUP": "SMARTLECT_GROUP",
         "SMARTLECT_ES_URL": "http://127.0.0.1:9200",
@@ -142,7 +140,7 @@ def bootstrap():
         "SMARTLECT_MODEL_MODE": "mock", "SMARTLECT_PAYMENT_MODE": "mock", "SMARTLECT_DEMO_ENABLED": "true",
     }
     password_keys = ["MYSQL_ROOT_PASSWORD", "MYSQL_PASSWORD", "FLYWAY_PASSWORD",
-                     "REDIS_PASSWORD", "RABBIT_PASSWORD", "NACOS_PASSWORD",
+                     "REDIS_PASSWORD", "NACOS_PASSWORD",
                      "NACOS_MYSQL_PASSWORD", "NACOS_IDENTITY",
                      "INTERNAL_TOKEN", "INTERNAL_OPS_TOKEN",
                      "GROWTH_MYSQL_PASSWORD", "CANAL_MYSQL_PASSWORD",
@@ -184,7 +182,7 @@ def compose(*args, capture=False, cluster=False):
     files = ["-f", str(ROOT / "deploy/compose.yaml")]
     override = ROOT / "deploy/cluster/compose.node1.yaml"
     if cluster and override.exists():
-        # 集群期叠加内网绑定；该文件把单机 rabbitmq/nacos 挂到 single-only profile，
+        # 集群期叠加内网绑定；该文件把单机 rocketmq/nacos 挂到 single-only profile，
         # 所以集群形态必须走这条路径，否则重启时会去拉单机容器、与集群成员抢端口。
         files += ["-f", str(override)]
     return subprocess.run(("docker", "compose", "--project-name", "smartlect", "--env-file",
@@ -307,12 +305,13 @@ def infra_up(env):
     clustered = cluster_form(env)
     # 必须与 infra_check 的期望集合一致，否则全新环境 bootstrap 后
     # canal / xxl-job-admin 从未被拉起，infra-check 必然失败。
-    services = ["mysql", "redis", "rabbitmq", "nacos", "elasticsearch", "qdrant",
-                "canal", "xxl-job-admin"]
+    services = ["mysql", "redis", "rocketmq-namesrv", "rocketmq-broker", "rocketmq-proxy",
+                "nacos", "elasticsearch", "qdrant", "canal", "xxl-job-admin"]
     if clustered:
-        # 集群期 rabbitmq/nacos 由 deploy/cluster 下的多机编排提供，本机 compose 里
-        # 这两个服务挂在 single-only profile，显式点名会报"service not enabled by profile"。
-        services = [name for name in services if name not in ("rabbitmq", "nacos")]
+        # 集群期 rocketmq/nacos 由 deploy/cluster 下的多机编排提供，本机 compose 里
+        # 这些服务挂在 single-only profile，显式点名会报 service not enabled by profile。
+        services = [name for name in services
+                    if name not in ("rocketmq-namesrv", "rocketmq-broker", "rocketmq-proxy", "nacos")]
     compose("up", "-d", "--wait", "--wait-timeout", "240", *services, cluster=clustered)
     try:
         nacos_request(env, "/nacos/v1/auth/users/admin", {"password": env["SMARTLECT_NACOS_PASSWORD"]})
@@ -339,11 +338,11 @@ def infra_check(env):
     if cluster_form(env):
         if not {"mysql", "redis"} <= healthy:
             raise RuntimeError("Middleware health check incomplete; run infra-up first")
-        # RabbitMQ 3 节点 quorum：任一 AMQP 端点可连即通过（节点级故障由演练覆盖）
-        endpoints = [ep for ep in (env.get("SPRING_RABBITMQ_ADDRESSES") or "").split(",") if ep]
+        # RocketMQ 集群：任一 proxy gRPC 端点可连即通过（节点级故障由演练覆盖）
+        endpoints = [ep for ep in (env.get("SMARTLECT_ROCKETMQ_ENDPOINTS") or "").split(",") if ep]
         if not endpoints or not any(amqp_port_open(ep) for ep in endpoints):
-            raise RuntimeError("No RabbitMQ cluster endpoint reachable")
-    elif not {"mysql", "redis", "rabbitmq", "nacos", "elasticsearch", "qdrant", "canal", "xxl-job-admin"} <= healthy:
+            raise RuntimeError("No RocketMQ cluster endpoint reachable")
+    elif not {"mysql", "redis", "rocketmq-proxy", "nacos", "elasticsearch", "qdrant", "canal", "xxl-job-admin"} <= healthy:
         raise RuntimeError("Middleware health check incomplete; run infra-up first")
     token = nacos_request(env, "/nacos/v1/auth/login", {
         "username": env["SMARTLECT_NACOS_USERNAME"], "password": env["SMARTLECT_NACOS_PASSWORD"]})["accessToken"]
@@ -373,7 +372,7 @@ def cluster_endpoint_check(env):
     """
     endpoints = [("MySQL", env["SMARTLECT_MYSQL_HOST"], int(env["SMARTLECT_MYSQL_PORT"]))]
     for name, key in (("Redis sentinel", "SPRING_DATA_REDIS_SENTINEL_NODES"),
-                      ("RabbitMQ", "SPRING_RABBITMQ_ADDRESSES")):
+                      ("RocketMQ proxy", "SMARTLECT_ROCKETMQ_ENDPOINTS")):
         for endpoint in [ep for ep in (env.get(key) or "").split(",") if ep]:
             endpoints.append((name, *endpoint.rsplit(":", 1)))
     unreachable = []

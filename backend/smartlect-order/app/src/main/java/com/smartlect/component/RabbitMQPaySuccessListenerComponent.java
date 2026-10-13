@@ -2,57 +2,54 @@ package com.smartlect.component;
 
 import com.smartlect.api.dto.PayOrderNotifyDTO;
 import com.smartlect.biz.OrderInternalService;
-import com.smartlect.constants.RabbitMQConfig;
+import com.smartlect.mq.MqSubscription;
+import com.smartlect.mq.RocketMqTopics;
+import com.smartlect.mq.SmartlectMessageListener;
+import com.smartlect.mq.SmartlectMqMessage;
 import com.smartlect.utils.StringTools;
-import com.rabbitmq.client.Channel;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
-
 /**
- * 消费 pay 服务发来的支付成功事件（Outbox → smartlect.pay.success.queue）。
+ * 消费 pay 服务发来的支付成功事件（Outbox → smartlect-pay/pay-success）。
  *
  * <p>取代 pay→order 的同步 Feign 回调。paySuccess 的推进本身是条件更新
  * （仅待付款订单可迁移），事件重投或 outbox 重放天然幂等，再叠加消费租约
- * 去重与延迟重试拓扑。</p>
+ * 去重与定时回投重试链。</p>
  */
 @Slf4j
 @Component
-public class RabbitMQPaySuccessListenerComponent {
+public class RabbitMQPaySuccessListenerComponent implements SmartlectMessageListener<PayOrderNotifyDTO> {
 
     private final OrderInternalService orderInternalService;
-    private final MqListenerHelper mqListenerHelper;
 
-    public RabbitMQPaySuccessListenerComponent(OrderInternalService orderInternalService,
-                                               MqListenerHelper mqListenerHelper) {
+    public RabbitMQPaySuccessListenerComponent(OrderInternalService orderInternalService) {
         this.orderInternalService = orderInternalService;
-        this.mqListenerHelper = mqListenerHelper;
     }
 
-    @RabbitListener(queues = RabbitMQConfig.PAY_SUCCESS_QUEUE, ackMode = "MANUAL")
-    public void handlePaySuccess(PayOrderNotifyDTO message, Channel channel, Message mqMessage) throws IOException {
-        Long deliveryTag = mqMessage.getMessageProperties().getDeliveryTag();
+    @Override
+    public MqSubscription subscription() {
+        return MqSubscription.of(RocketMqTopics.TOPIC_PAY, RocketMqTopics.TAG_PAY_SUCCESS,
+                "G_smartlect_pay_success");
+    }
+
+    @Override
+    public Class<PayOrderNotifyDTO> payloadType() {
+        return PayOrderNotifyDTO.class;
+    }
+
+    @Override
+    public long idempotencyTtlSeconds() {
+        return 7 * 24 * 3600L;
+    }
+
+    @Override
+    public void onMessage(PayOrderNotifyDTO message, SmartlectMqMessage mqMessage) {
         if (message == null || StringTools.isEmpty(message.getPayOrderId())) {
             log.error("支付成功事件缺少支付单号");
-            channel.basicAck(deliveryTag, false);
-            return;
-        }
-        if (!mqListenerHelper.tryBeginConsume(mqMessage, MqListenerHelper.CONSUME_IDEMPOTENCY_TTL_HIGH_SECONDS)) {
-            mqListenerHelper.ackCompletedOrDeferBusy(channel, deliveryTag, mqMessage, RabbitMQConfig.PAY_SUCCESS_QUEUE);
             return;
         }
         log.info("支付成功事件收到 payOrderId={}", message.getPayOrderId());
-        try {
-            orderInternalService.paySuccess(message);
-            mqListenerHelper.clearConsumeRetry(RabbitMQConfig.PAY_SUCCESS_QUEUE, mqMessage);
-            channel.basicAck(deliveryTag, false);
-        } catch (Exception e) {
-            log.error("支付成功事件处理失败 payOrderId={}", message.getPayOrderId(), e);
-            mqListenerHelper.nackWithRetryOrDlq(channel, deliveryTag, mqMessage,
-                    RabbitMQConfig.PAY_SUCCESS_QUEUE, message, e);
-        }
+        orderInternalService.paySuccess(message);
     }
 }

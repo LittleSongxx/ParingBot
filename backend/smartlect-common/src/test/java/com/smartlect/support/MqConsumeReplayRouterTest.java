@@ -1,6 +1,6 @@
 package com.smartlect.support;
 
-import com.smartlect.constants.RabbitMQConfig;
+import com.smartlect.mq.RocketMqTopics;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -9,36 +9,29 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class MqConsumeReplayRouterTest {
 
     @Test
-    void userGrowthQueueReplaysToThePrimaryExchangeRoute() {
+    void newLogicalQueueFormResolvesToTopicAndTag() {
         assertEquals(
-                new MqConsumeReplayRouter.Target(
-                        RabbitMQConfig.REFUND_EXCHANGE,
-                        RabbitMQConfig.REFUND_STOCK_KEY),
-                MqConsumeReplayRouter.resolve(RabbitMQConfig.REFUND_STOCK_QUEUE));
+                new MqConsumeReplayRouter.Target(RocketMqTopics.TOPIC_REFUND, RocketMqTopics.TAG_REFUND_STOCK),
+                MqConsumeReplayRouter.resolve("smartlect-refund:refund-stock"));
         assertEquals(
-                new MqConsumeReplayRouter.Target(
-                        RabbitMQConfig.REFUND_EXCHANGE,
-                        RabbitMQConfig.REFUND_STOCK_KEY),
-                MqConsumeReplayRouter.resolve(RabbitMQConfig.REFUND_STOCK_DEAD_QUEUE));
+                new MqConsumeReplayRouter.Target(RocketMqTopics.TOPIC_PAY, RocketMqTopics.TAG_PAY_SUCCESS),
+                MqConsumeReplayRouter.resolve("smartlect-pay:pay-success"));
     }
 
     @Test
-    void refundAndRushQueuesReplayToTheirBusinessRoutes() {
+    void legacyRabbitQueueNamesStillResolveAfterMigration() {
         assertEquals(
-                new MqConsumeReplayRouter.Target(
-                        RabbitMQConfig.REFUND_EXCHANGE,
-                        RabbitMQConfig.REFUND_STOCK_KEY),
-                MqConsumeReplayRouter.resolve(RabbitMQConfig.REFUND_STOCK_DEAD_QUEUE));
+                new MqConsumeReplayRouter.Target(RocketMqTopics.TOPIC_REFUND, RocketMqTopics.TAG_REFUND_STOCK),
+                MqConsumeReplayRouter.resolve("smartlect.refund.stock.queue"));
         assertEquals(
-                new MqConsumeReplayRouter.Target(
-                        RabbitMQConfig.REFUND_EXCHANGE,
-                        RabbitMQConfig.REFUND_RESULT_KEY),
-                MqConsumeReplayRouter.resolve(RabbitMQConfig.REFUND_RESULT_QUEUE));
+                new MqConsumeReplayRouter.Target(RocketMqTopics.TOPIC_REFUND, RocketMqTopics.TAG_REFUND_RESULT),
+                MqConsumeReplayRouter.resolve("smartlect.refund.result.queue"));
         assertEquals(
-                new MqConsumeReplayRouter.Target(
-                        RabbitMQConfig.RUSHING_EXCHANGE,
-                        RabbitMQConfig.RUSHING_ORDER_KEY),
-                MqConsumeReplayRouter.resolve(RabbitMQConfig.RUSHING_ORDER_QUEUE));
+                new MqConsumeReplayRouter.Target(RocketMqTopics.TOPIC_RUSH, RocketMqTopics.TAG_RUSH_ORDER),
+                MqConsumeReplayRouter.resolve("smartlect.rushing.order.queue"));
+        assertEquals(
+                new MqConsumeReplayRouter.Target(RocketMqTopics.TOPIC_DELAY, RocketMqTopics.TAG_TEMPBAN_EXPIRE),
+                MqConsumeReplayRouter.resolve("smartlect.user.tempban.dead.queue"));
     }
 
     @Test

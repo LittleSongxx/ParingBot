@@ -2,13 +2,11 @@ package com.smartlect.middleware;
 
 import com.smartlect.constants.Constants;
 import com.smartlect.redis.LuaScriptLoader;
-import com.rabbitmq.client.ConnectionFactory;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -57,12 +55,6 @@ class MiddlewareIT {
     static final GenericContainer<?> REDIS = new GenericContainer<>(
             DockerImageName.parse("redis:7.2-alpine"))
             .withExposedPorts(6379);
-
-    @Container
-    static final RabbitMQContainer RABBITMQ = new RabbitMQContainer(
-            DockerImageName.parse("rabbitmq:4.2-management-alpine"))
-            .withAdminUser("smartlect")
-            .withAdminPassword("smartlect");
 
     @Test
     void mysqlEnforcesIdempotencyAndAtomicStockUnderConcurrency() throws Exception {
@@ -447,32 +439,43 @@ class MiddlewareIT {
         }
     }
 
+    /**
+     * RocketMQ 真实链路（可选，本机门禁）：SMARTLECT_RUN_ROCKETMQ_INTEGRATION=1 且
+     * 本机 compose 的 rocketmq-proxy 已起时执行——Producer 发送 + PushConsumer 消费
+     * 端到端断言。RocketMQ 5.x 三容器（namesrv/broker/proxy）无官方 Testcontainers
+     * 模块，故沿用本机 broker 门禁式集成（同旧 RabbitMQ confirm 集成测试思路）。
+     */
     @Test
-    void rabbitmqPublishesAndConsumesAnActualMessage() throws Exception {
-        ConnectionFactory factory = new ConnectionFactory();
-        factory.setHost(RABBITMQ.getHost());
-        factory.setPort(RABBITMQ.getAmqpPort());
-        factory.setUsername(RABBITMQ.getAdminUsername());
-        factory.setPassword(RABBITMQ.getAdminPassword());
-        factory.setConnectionTimeout(5_000);
-
-        try (com.rabbitmq.client.Connection connection = factory.newConnection();
-             com.rabbitmq.client.Channel channel = connection.createChannel()) {
-            String queue = channel.queueDeclare().getQueue();
-            byte[] payload = "middleware-message".getBytes(StandardCharsets.UTF_8);
-            channel.basicPublish("", queue, null, payload);
-
-            com.rabbitmq.client.GetResponse response = null;
-            long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
-            while (response == null && System.nanoTime() < deadline) {
-                response = channel.basicGet(queue, true);
-                if (response == null) {
-                    Thread.sleep(50);
-                }
-            }
-            assertNotNull(response);
-            assertEquals("middleware-message",
-                    new String(response.getBody(), StandardCharsets.UTF_8));
+    void rocketmqPublishesAndConsumesAnActualMessage() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                "1".equals(System.getenv("SMARTLECT_RUN_ROCKETMQ_INTEGRATION")),
+                "set SMARTLECT_RUN_ROCKETMQ_INTEGRATION=1 with local rocketmq-proxy up");
+        com.smartlect.mq.RocketMqClientHolder holder = new com.smartlect.mq.RocketMqClientHolder();
+        org.springframework.test.util.ReflectionTestUtils.setField(holder, "endpoints", "127.0.0.1:8081");
+        org.apache.rocketmq.client.apis.ClientServiceProvider provider =
+                org.apache.rocketmq.client.apis.ClientServiceProvider.loadService();
+        java.util.concurrent.atomic.AtomicReference<String> received = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        org.apache.rocketmq.client.apis.consumer.PushConsumer consumer = provider.newPushConsumerBuilder()
+                .setClientConfiguration(holder.configuration())
+                .setConsumerGroup("G_middleware_it")
+                .setSubscriptionExpressions(java.util.Map.of(
+                        "smartlect-mw-it", new org.apache.rocketmq.client.apis.consumer.FilterExpression("*",
+                                org.apache.rocketmq.client.apis.consumer.FilterExpressionType.TAG)))
+                .setMessageListener(view -> {
+                    received.set(new String(java.nio.charset.StandardCharsets.UTF_8.decode(view.getBody()).array()));
+                    latch.countDown();
+                    return org.apache.rocketmq.client.apis.consumer.ConsumeResult.SUCCESS;
+                })
+                .build();
+        try {
+            holder.send("smartlect-mw-it", "it", "middleware-message".getBytes(StandardCharsets.UTF_8),
+                    java.util.Map.of(), null);
+            assertTrue(latch.await(10, TimeUnit.SECONDS), "message not consumed in 10s");
+            assertEquals("middleware-message", received.get());
+        } finally {
+            consumer.close();
+            holder.shutdown();
         }
     }
 

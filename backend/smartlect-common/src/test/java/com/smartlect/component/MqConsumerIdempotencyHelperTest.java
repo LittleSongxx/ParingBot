@@ -1,18 +1,19 @@
 package com.smartlect.component;
 
 import com.smartlect.constants.Constants;
+import com.smartlect.mq.RocketMqTopics;
+import com.smartlect.mq.SmartlectMqMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.core.MessageProperties;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,31 +49,30 @@ class MqConsumerIdempotencyHelperTest {
 
     @Test
     void acquiredLeaseCarriesOwnerTokenAndReleaseUsesAtomicScript() {
-        Message message = message("queue-a", "message-1");
+        SmartlectMqMessage message = message("queue-a", "message-1");
         when(redisTemplate.hasKey(any())).thenReturn(false);
         when(valueOperations.setIfAbsent(any(), any(), anyLong(), eq(TimeUnit.SECONDS)))
                 .thenReturn(true);
 
-        assertTrue(helper.tryBeginConsume(message, 3_600L));
-        String token = message.getMessageProperties()
-                .getHeader(MqConsumerIdempotencyHelper.HEADER_CONSUMER_LEASE_TOKEN);
+        assertEquals(MqConsumerIdempotencyHelper.ClaimResult.ACQUIRED, helper.claim(message, 3_600L));
+        String token = message.property(MqConsumerIdempotencyHelper.PROPERTY_CONSUMER_LEASE_TOKEN);
         assertNotNull(token);
 
-        helper.releaseConsume(message);
+        helper.release(message);
 
-        assertNull(message.getMessageProperties()
-                .getHeader(MqConsumerIdempotencyHelper.HEADER_CONSUMER_LEASE_TOKEN));
+        assertNull(message.property(MqConsumerIdempotencyHelper.PROPERTY_CONSUMER_LEASE_TOKEN));
         verify(redisTemplate).execute(any(), any(), eq(token));
     }
 
     @Test
     void completionWithoutLeaseStillWritesQueueScopedDoneMarker() {
-        Message message = message("queue-b", "message-2");
+        SmartlectMqMessage message = message("queue-b", "message-2");
 
-        helper.markCompleted("queue-b", message, 10L);
+        helper.markCompleted(message, 10L);
 
         verify(valueOperations).set(
-                eq(Constants.REDIS_KEY_MQ_CONSUME_IDEMPOTENT + "done:queue-b:message-2"),
+                eq(Constants.REDIS_KEY_MQ_CONSUME_IDEMPOTENT + "done:"
+                        + message.logicalQueue() + ":message-2"),
                 eq("1"),
                 eq(60L),
                 eq(TimeUnit.SECONDS));
@@ -93,79 +93,53 @@ class MqConsumerIdempotencyHelperTest {
     }
 
     @Test
-    void redeliveredMessageDoesNotStealAnActiveProcessingLease() {
-        Message message = message("queue-c", "message-3");
-        message.getMessageProperties().setRedelivered(true);
+    void duplicateMessageDoesNotStealAnActiveProcessingLease() {
+        SmartlectMqMessage message = message("queue-c", "message-3");
         when(redisTemplate.hasKey(any())).thenReturn(false);
         when(valueOperations.setIfAbsent(any(), any(), anyLong(), eq(TimeUnit.SECONDS)))
                 .thenReturn(false);
 
-        assertFalse(helper.tryBeginConsume(message, 3_600L));
-
-        assertEquals(
-                MqConsumerIdempotencyHelper.ClaimResult.BUSY,
-                helper.resolveClaimResult(message));
-        assertNull(message.getMessageProperties()
-                .getHeader(MqConsumerIdempotencyHelper.HEADER_CONSUMER_LEASE_TOKEN));
-    }
-
-    @Test
-    void freshDuplicateDoesNotStealAnActiveProcessingLease() {
-        Message message = message("queue-d", "message-4");
-        when(redisTemplate.hasKey(any())).thenReturn(false);
-        when(valueOperations.setIfAbsent(any(), any(), anyLong(), eq(TimeUnit.SECONDS)))
-                .thenReturn(false);
-
-        assertFalse(helper.tryBeginConsume(message, 3_600L));
-        assertEquals(
-                MqConsumerIdempotencyHelper.ClaimResult.BUSY,
-                helper.resolveClaimResult(message));
+        assertEquals(MqConsumerIdempotencyHelper.ClaimResult.BUSY, helper.claim(message, 3_600L));
+        assertNull(message.property(MqConsumerIdempotencyHelper.PROPERTY_CONSUMER_LEASE_TOKEN));
     }
 
     @Test
     void completedDuplicateIsDistinctFromAnActiveLease() {
-        Message message = message("queue-e", "message-5");
+        SmartlectMqMessage message = message("queue-e", "message-5");
         when(redisTemplate.hasKey(any())).thenReturn(true);
 
-        assertFalse(helper.tryBeginConsume(message, 3_600L));
-        assertEquals(
-                MqConsumerIdempotencyHelper.ClaimResult.COMPLETED,
-                helper.resolveClaimResult(message));
+        assertEquals(MqConsumerIdempotencyHelper.ClaimResult.COMPLETED, helper.claim(message, 3_600L));
     }
 
     @Test
     void redisClaimFailureDefersMessageInsteadOfEscapingTheListener() {
-        Message message = message("queue-f", "message-6");
+        SmartlectMqMessage message = message("queue-f", "message-6");
         when(redisTemplate.hasKey(any()))
                 .thenThrow(new IllegalStateException("redis unavailable"));
 
-        assertFalse(helper.tryBeginConsume(message, 3_600L));
-
-        assertEquals(
-                MqConsumerIdempotencyHelper.ClaimResult.BUSY,
-                helper.resolveClaimResult(message));
+        assertEquals(MqConsumerIdempotencyHelper.ClaimResult.BUSY, helper.claim(message, 3_600L));
     }
 
     @Test
-    void redisReleaseFailureDoesNotBlockRabbitRetryPublishing() {
-        Message message = message("queue-g", "message-7");
-        message.getMessageProperties().setHeader(
-                MqConsumerIdempotencyHelper.HEADER_CONSUMER_LEASE_TOKEN,
-                "lease-7");
+    void redisReleaseFailureDoesNotBlockRetryPublishing() {
+        SmartlectMqMessage message = message("queue-g", "message-7");
+        message.withProperty(MqConsumerIdempotencyHelper.PROPERTY_CONSUMER_LEASE_TOKEN, "lease-7");
         doThrow(new IllegalStateException("redis unavailable"))
                 .when(redisTemplate)
                 .execute(any(), any(), eq("lease-7"));
 
-        helper.releaseConsume(message);
+        helper.release(message);
 
-        assertNull(message.getMessageProperties()
-                .getHeader(MqConsumerIdempotencyHelper.HEADER_CONSUMER_LEASE_TOKEN));
+        assertNull(message.property(MqConsumerIdempotencyHelper.PROPERTY_CONSUMER_LEASE_TOKEN));
     }
 
-    private static Message message(String queue, String idempotencyKey) {
-        MessageProperties properties = new MessageProperties();
-        properties.setConsumerQueue(queue);
-        properties.setHeader(MqConsumerIdempotencyHelper.HEADER_IDEMPOTENCY_KEY, idempotencyKey);
-        return new Message(new byte[0], properties);
+    private static SmartlectMqMessage message(String logicalQueue, String idempotencyKey) {
+        String[] parts = logicalQueue.split(":", 2);
+        SmartlectMqMessage message = SmartlectMqMessage.of(
+                parts.length == 2 ? parts[0] : RocketMqTopics.TOPIC_PAY,
+                parts.length == 2 ? parts[1] : logicalQueue,
+                new byte[0], "msg-id-" + idempotencyKey, new HashMap<>());
+        message.withProperty(SmartlectMqMessage.PROPERTY_IDEMPOTENCY_KEY, idempotencyKey);
+        return message;
     }
 }

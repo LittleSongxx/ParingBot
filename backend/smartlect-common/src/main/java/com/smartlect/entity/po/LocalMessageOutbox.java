@@ -20,6 +20,16 @@ public class LocalMessageOutbox implements Serializable {
     private Date createTime;
     private Date updateTime;
     private Date sentTime;
+    /** 定时投递到期 epoch 毫秒，null 表示立即。 */
+    private Long deliveryExpireAt;
+
+    public Long getDeliveryExpireAt() {
+        return deliveryExpireAt;
+    }
+
+    public void setDeliveryExpireAt(Long deliveryExpireAt) {
+        this.deliveryExpireAt = deliveryExpireAt;
+    }
 
     public Long getId() {
         return id;

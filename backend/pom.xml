@@ -73,7 +73,7 @@
     <redisson.version>4.0.0</redisson.version>
     <pagehelper.version>2.1.0</pagehelper.version>
     <alipay.version>4.40.961.ALL</alipay.version>
-    <rabbitmq.version>5.22.0</rabbitmq.version>
+    <rocketmq-client-java.version>5.0.8</rocketmq-client-java.version>
     <thumbnailator.version>0.4.20</thumbnailator.version>
     <twelvemonkeys.imageio.version>3.12.0</twelvemonkeys.imageio.version>
   </properties>
@@ -269,9 +269,9 @@
         <version>${junrar.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.rabbitmq</groupId>
-        <artifactId>amqp-client</artifactId>
-        <version>${rabbitmq.version}</version>
+        <groupId>org.apache.rocketmq</groupId>
+        <artifactId>rocketmq-client-java</artifactId>
+        <version>${rocketmq-client-java.version}</version>
       </dependency>
       <dependency>
         <groupId>net.coobird</groupId>

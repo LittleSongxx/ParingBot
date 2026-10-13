@@ -1,23 +1,29 @@
 package com.smartlect.component;
 
-import com.smartlect.constants.RabbitMQConfig;
-import com.rabbitmq.client.Channel;
+import com.smartlect.mq.RocketMqClientHolder;
+import com.smartlect.mq.RocketMqTopics;
+import com.smartlect.mq.SmartlectMqMessage;
+import org.apache.rocketmq.client.apis.message.MessageId;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.core.MessageProperties;
+
+import java.time.Duration;
+import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,119 +34,78 @@ class MqListenerHelperTest {
     @Mock
     private MqConsumeFailureRecorder failureRecorder;
     @Mock
-    private MqPublisherConfirmHelper publisherConfirmHelper;
+    private RocketMqClientHolder rocketMqClientHolder;
     @Mock
-    private Channel channel;
+    private MessageId messageId;
     @InjectMocks
     private MqListenerHelper helper;
 
     @Test
-    void failedConsumePublishesConfirmedDelayedRetryBeforeAck() throws Exception {
-        Message source = message(17L, 0);
-        when(idempotencyHelper.resolveIdempotencyKey(source)).thenReturn("message-1");
+    void failedConsumePublishesDelayedRetryBackToOriginalTopic() throws Exception {
+        SmartlectMqMessage source = message(0);
+        when(rocketMqClientHolder.send(anyString(), anyString(), any(), any(), any()))
+                .thenReturn(messageId);
 
-        helper.nackWithRetryOrDlq(
-                channel, 17L, source, RabbitMQConfig.REFUND_STOCK_QUEUE,
-                "payload", new IllegalStateException("temporary"));
+        assertTrue(helper.handleFailure(source, "payload", new IllegalStateException("temporary")));
 
-        ArgumentCaptor<Message> retry = ArgumentCaptor.forClass(Message.class);
-        verify(publisherConfirmHelper).sendRawAndAwaitConfirm(
-                eq(RabbitMQConfig.MQ_RETRY_EXCHANGE),
-                eq(RabbitMQConfig.retryRoutingKey(RabbitMQConfig.REFUND_STOCK_QUEUE, 1)),
-                retry.capture(),
-                anyString());
-        assertEquals(1, ((Number) retry.getValue().getMessageProperties()
-                .getHeader(MqListenerHelper.HEADER_RETRY_ATTEMPT)).intValue());
-        assertNull(retry.getValue().getMessageProperties()
-                .getHeader(MqConsumerIdempotencyHelper.HEADER_CONSUMER_LEASE_TOKEN));
-        verify(channel).basicAck(17L, false);
-        verify(channel, never()).basicNack(17L, false, false);
+        verify(rocketMqClientHolder).send(
+                eq(RocketMqTopics.TOPIC_REFUND), eq(RocketMqTopics.TAG_REFUND_STOCK),
+                any(), any(), eq(Duration.ofMillis(RocketMqTopics.RETRY_DELAYS_MS[0])));
+        ArgumentCaptor<java.util.Map<String, String>> properties =
+                ArgumentCaptor.forClass(java.util.Map.class);
+        verify(rocketMqClientHolder).send(anyString(), anyString(), any(), properties.capture(), any());
+        assertEquals("1", properties.getValue().get(SmartlectMqMessage.PROPERTY_RETRY_ATTEMPT));
+        verify(idempotencyHelper).release(source);
+        verify(failureRecorder, never()).record(anyString(), any(), any(), any());
     }
 
     @Test
-    void retryExhaustionPublishesToFinalFailureQueue() throws Exception {
-        Message source = message(18L, 3);
-        when(idempotencyHelper.resolveIdempotencyKey(source)).thenReturn("message-2");
-        RuntimeException failure = new RuntimeException("permanent");
+    void busyClaimDefersWithThirtySeconds() throws Exception {
+        SmartlectMqMessage source = message(0);
+        when(rocketMqClientHolder.send(anyString(), anyString(), any(), any(), any()))
+                .thenReturn(messageId);
 
-        helper.nackWithRetryOrDlq(
-                channel, 18L, source, RabbitMQConfig.REFUND_RESULT_QUEUE,
-                "payload", failure);
+        assertTrue(helper.deferBusy(source));
 
-        verify(failureRecorder).record(
-                RabbitMQConfig.REFUND_RESULT_QUEUE, source, "payload", failure);
-        verify(publisherConfirmHelper).sendRawAndAwaitConfirm(
-                eq(RabbitMQConfig.MQ_FAILURE_EXCHANGE),
-                eq(RabbitMQConfig.MQ_FAILURE_KEY),
-                any(Message.class),
-                anyString());
-        verify(channel).basicAck(18L, false);
+        verify(rocketMqClientHolder).send(
+                eq(RocketMqTopics.TOPIC_REFUND), eq(RocketMqTopics.TAG_REFUND_STOCK),
+                any(), any(), eq(Duration.ofMillis(RocketMqTopics.BUSY_DEFER_MS)));
     }
 
     @Test
-    void missingIdempotencyKeyStillReachesFinalFailureQueue() throws Exception {
-        Message source = message(19L, 0);
-        when(idempotencyHelper.resolveIdempotencyKey(source)).thenReturn(null);
-        RuntimeException failure = new RuntimeException("invalid message");
+    void exhaustedRetriesFallBackToReviewLedgerAndFailureTopic() throws Exception {
+        SmartlectMqMessage source = message(RocketMqTopics.DEFAULT_MAX_CONSUME_RETRIES);
+        when(rocketMqClientHolder.send(anyString(), anyString(), any(), any(), any()))
+                .thenReturn(messageId);
 
-        helper.nackWithRetryOrDlq(
-                channel, 19L, source, RabbitMQConfig.REFUND_RESULT_QUEUE,
-                "payload", failure);
+        assertTrue(helper.handleFailure(source, "payload", new IllegalStateException("permanent")));
 
-        verify(failureRecorder).record(RabbitMQConfig.REFUND_RESULT_QUEUE, source, "payload", failure);
-        verify(publisherConfirmHelper).sendRawAndAwaitConfirm(
-                eq(RabbitMQConfig.MQ_FAILURE_EXCHANGE),
-                eq(RabbitMQConfig.MQ_FAILURE_KEY),
-                any(Message.class),
-                anyString());
-        verify(channel).basicAck(19L, false);
+        // 不再回投原 Topic，只归档统一失败 Topic
+        verify(rocketMqClientHolder).send(
+                eq(RocketMqTopics.TOPIC_MQ_FAILURE), eq(source.logicalQueue()),
+                any(), any(), isNull());
+        verify(failureRecorder).record(eq(source.logicalQueue()), eq(source), any(), any());
     }
 
     @Test
-    void activeConsumerLeaseDefersDuplicateWithoutStealingIt() throws Exception {
-        Message source = message(20L, 1);
-        when(idempotencyHelper.resolveClaimResult(source))
-                .thenReturn(MqConsumerIdempotencyHelper.ClaimResult.BUSY);
-        when(idempotencyHelper.resolveIdempotencyKey(source)).thenReturn("message-3");
+    void retryPublishFailureReturnsFalseForBrokerRedelivery() throws Exception {
+        SmartlectMqMessage source = message(0);
+        when(rocketMqClientHolder.send(anyString(), anyString(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("broker down"));
 
-        helper.ackCompletedOrDeferBusy(
-                channel, 20L, source, RabbitMQConfig.REFUND_STOCK_QUEUE);
+        assertFalse(helper.handleFailure(source, "payload", new IllegalStateException("temporary")));
 
-        ArgumentCaptor<Message> deferred = ArgumentCaptor.forClass(Message.class);
-        verify(publisherConfirmHelper).sendRawAndAwaitConfirm(
-                eq(RabbitMQConfig.MQ_RETRY_EXCHANGE),
-                eq(RabbitMQConfig.retryRoutingKey(RabbitMQConfig.REFUND_STOCK_QUEUE, 2)),
-                deferred.capture(),
-                anyString());
-        assertEquals(1, ((Number) deferred.getValue().getMessageProperties()
-                .getHeader(MqListenerHelper.HEADER_RETRY_ATTEMPT)).intValue());
-        assertNull(deferred.getValue().getMessageProperties()
-                .getHeader(MqConsumerIdempotencyHelper.HEADER_CONSUMER_LEASE_TOKEN));
-        assertNull(deferred.getValue().getMessageProperties()
-                .getHeader(MqConsumerIdempotencyHelper.HEADER_CONSUMER_CLAIM_RESULT));
-        verify(channel).basicAck(20L, false);
+        verify(failureRecorder).record(eq(source.logicalQueue()), eq(source), any(), any());
     }
 
-    @Test
-    void completedDuplicateIsAcknowledgedWithoutRepublish() throws Exception {
-        Message source = message(21L, 0);
-        when(idempotencyHelper.resolveClaimResult(source))
-                .thenReturn(MqConsumerIdempotencyHelper.ClaimResult.COMPLETED);
-
-        helper.ackCompletedOrDeferBusy(
-                channel, 21L, source, RabbitMQConfig.REFUND_RESULT_QUEUE);
-
-        verify(channel).basicAck(21L, false);
-        verify(publisherConfirmHelper, never()).sendRawAndAwaitConfirm(
-                anyString(), anyString(), any(Message.class), anyString());
-    }
-
-    private static Message message(long deliveryTag, int retryAttempt) {
-        MessageProperties properties = new MessageProperties();
-        properties.setDeliveryTag(deliveryTag);
-        properties.setHeader(MqListenerHelper.HEADER_RETRY_ATTEMPT, retryAttempt);
-        properties.setHeader(
-                MqConsumerIdempotencyHelper.HEADER_CONSUMER_LEASE_TOKEN, "stale-token");
-        return new Message("payload".getBytes(), properties);
+    private static SmartlectMqMessage message(int retryAttempt) {
+        HashMap<String, String> properties = new HashMap<>();
+        properties.put(SmartlectMqMessage.PROPERTY_IDEMPOTENCY_KEY, "message-1");
+        if (retryAttempt > 0) {
+            properties.put(SmartlectMqMessage.PROPERTY_RETRY_ATTEMPT, String.valueOf(retryAttempt));
+        }
+        return SmartlectMqMessage.of(
+                RocketMqTopics.TOPIC_REFUND, RocketMqTopics.TAG_REFUND_STOCK,
+                new byte[0], "msg-1", properties);
     }
 }

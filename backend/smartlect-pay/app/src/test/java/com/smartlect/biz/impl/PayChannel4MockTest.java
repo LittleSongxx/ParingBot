@@ -5,7 +5,7 @@ import com.smartlect.api.dto.PayUrlRequestDTO;
 import com.smartlect.api.enums.PayChannelEnum;
 import com.smartlect.biz.PayInternalService;
 import com.smartlect.biz.PayTradeRecordService;
-import com.smartlect.constants.RabbitMQConfig;
+import com.smartlect.mq.RocketMqTopics;
 import com.smartlect.constants.TransactionalMqSender;
 import com.smartlect.controller.internal.MockPaymentController;
 import com.smartlect.entity.enums.MessageReliabilityLevelEnum;
@@ -70,8 +70,8 @@ class PayChannel4MockTest {
         verify(trades, times(1)).markSuccess(anyString(), anyString());
         // 事件取代同步回调：每次 complete 都发（幂等键=payOrderId，order 侧 CAS 去重）。
         verify(transactionalMqSender, times(2)).sendAfterCommit(
-                eq(RabbitMQConfig.PAY_EXCHANGE),
-                eq(RabbitMQConfig.PAY_SUCCESS_KEY),
+                eq(RocketMqTopics.TOPIC_PAY),
+                eq(RocketMqTopics.TAG_PAY_SUCCESS),
                 argThat((PayOrderNotifyDTO dto) -> "pay-1".equals(dto.getPayOrderId())
                         && "smartlect-mock-pay-1".equals(dto.getChannelOrderId())),
                 eq("pay-success:pay-1"),

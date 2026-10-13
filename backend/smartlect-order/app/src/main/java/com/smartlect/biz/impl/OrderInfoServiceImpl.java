@@ -13,7 +13,7 @@ import com.smartlect.component.RedisComponent;
 import com.smartlect.component.PayOrderRedisComponent;
 import com.smartlect.component.RemoteCompensateRecorder;
 import com.smartlect.constants.Constants;
-import com.smartlect.constants.RabbitMQConfig;
+import com.smartlect.mq.RocketMqTopics;
 import com.smartlect.constants.ReliableMessageSender;
 import com.smartlect.constants.TransactionalMqSender;
 import com.smartlect.entity.config.AppConfig;
@@ -513,11 +513,12 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 				PayOrderMessageDTO dto = new PayOrderMessageDTO();
 				dto.setOrderId(orderInfo.getOrderId());
 				transactionalMqSender.sendAfterCommit(
-						RabbitMQConfig.PAY_EXCHANGE,
-						RabbitMQConfig.PAY_TIMEOUT_DELAY_KEY,
+						RocketMqTopics.TOPIC_DELAY,
+						RocketMqTopics.TAG_PAY_TIMEOUT_CLOSE,
 						dto,
 						MqIdempotencyKeys.payTimeout(orderInfo.getOrderId()),
-						MessageReliabilityLevelEnum.STANDARD);
+						MessageReliabilityLevelEnum.STANDARD,
+						System.currentTimeMillis() + RocketMqTopics.PAY_TIMEOUT.toMillis());
 			}
 			return payInfoDTO;
 		} catch (RuntimeException ex) {
@@ -895,11 +896,12 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 				dto.setOrderId(orderInfo.getOrderId());
 				dto.setLogisticsStep(0);
 				transactionalMqSender.sendAfterCommit(
-						RabbitMQConfig.PAY_EXCHANGE,
-						RabbitMQConfig.PAY_LOGISTICS_DELAY_KEY,
+						RocketMqTopics.TOPIC_DELAY,
+						RocketMqTopics.TAG_LOGISTICS_STEP,
 						dto,
 						MqIdempotencyKeys.payLogistics(orderInfo.getOrderId(), 0),
-						MessageReliabilityLevelEnum.STANDARD);
+						MessageReliabilityLevelEnum.STANDARD,
+						System.currentTimeMillis() + RocketMqTopics.LOGISTICS_STEP.toMillis());
 			}
 		}
 		if (updatedCount == 0) {
@@ -1214,11 +1216,12 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			PayOrderMessageDTO dto = new PayOrderMessageDTO();
 			dto.setOrderId(orderInfo.getOrderId());
 			transactionalMqSender.sendAfterCommit(
-					RabbitMQConfig.PAY_EXCHANGE,
-					RabbitMQConfig.PAY_TIMEOUT_DELAY_KEY,
+					RocketMqTopics.TOPIC_PAY,
+					RocketMqTopics.TAG_PAY_TIMEOUT_CLOSE,
 					dto,
 					MqIdempotencyKeys.payTimeout(orderInfo.getOrderId()),
-					MessageReliabilityLevelEnum.STANDARD);
+					MessageReliabilityLevelEnum.STANDARD,
+					System.currentTimeMillis() + RocketMqTopics.PAY_TIMEOUT.toMillis());
 		}
 	}
 

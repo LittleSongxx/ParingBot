@@ -5,7 +5,7 @@
 #   先建集群中间件 → 再改 runtime.env → 最后起应用。
 #   反过来先改 env 会出现"应用连不上还没建好的集群"的必然失败窗口。
 #
-# 数据安全性：单机期的三个数据卷（mysql/rabbit/redis）全程不动；RabbitMQ 成员用集群期新卷，
+# 数据安全性：单机期的数据卷（mysql/rocketmq-store/redis）全程不动；RocketMQ 成员用集群期新卷，
 # 拓扑走 defs 导入；redis 容器只是重建（卷复用，会话不丢）。
 # 回退：bash revert-cluster.sh
 set -euo pipefail
@@ -27,8 +27,8 @@ set -a; source "$CL/nodes.env"; set +a
 docker compose -p smartlect --env-file "$RT" \
   -f compose.yaml -f "$CL/compose.node1.yaml" up -d --wait --wait-timeout 300
 
-log "2) building rabbitmq 3-node quorum cluster..."
-bash "$CL/scripts/build-rabbit.sh"
+log "2) building rocketmq dledger 3-replica cluster..."
+bash "$CL/scripts/build-rocketmq.sh"
 
 log "3) building redis replicas + sentinels..."
 bash "$CL/scripts/build-redis.sh"
@@ -45,10 +45,9 @@ path, n1, n2, n3 = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 updates = {
     "SMARTLECT_CLUSTER_FORM": "cluster",
     "SMARTLECT_MYSQL_HOST": n1,
-    "SMARTLECT_RABBIT_HOST": n1,
-    "SMARTLECT_RABBIT_PORT": "5672",
+    "SMARTLECT_ROCKETMQ_ENDPOINTS": f"{n1}:8081,{n2}:8081,{n3}:8081",
     "SMARTLECT_NACOS_ADDR": f"{n1}:8848,{n2}:8848,{n3}:8848",
-    "SPRING_RABBITMQ_ADDRESSES": f"{n1}:5672,{n2}:5672,{n3}:5672",
+
     "SPRING_DATA_REDIS_SENTINEL_MASTER": "mymaster",
     "SPRING_DATA_REDIS_SENTINEL_NODES": f"{n1}:26379,{n2}:26379,{n3}:26379",
     "SMARTLECT_APP_BIND_ADDRESS": "0.0.0.0",

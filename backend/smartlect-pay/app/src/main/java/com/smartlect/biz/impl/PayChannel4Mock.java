@@ -5,7 +5,7 @@ import com.smartlect.api.dto.PayOrderNotifyDTO;
 import com.smartlect.api.enums.PayChannelEnum;
 import com.smartlect.biz.PayChannel;
 import com.smartlect.biz.PayTradeRecordService;
-import com.smartlect.constants.RabbitMQConfig;
+import com.smartlect.mq.RocketMqTopics;
 import com.smartlect.constants.TransactionalMqSender;
 import com.smartlect.entity.enums.MessageReliabilityLevelEnum;
 import com.smartlect.support.MqIdempotencyKeys;
@@ -78,8 +78,8 @@ public class PayChannel4Mock implements PayChannel {
             // 支付成功经 Outbox 事件通知 order（幂等键=payOrderId），取代同步 Feign 回调，
             // 断开 pay→order 运行时调用环；order 侧消费与重放都由同一幂等键去重。
             transactionalMqSender.sendAfterCommit(
-                    RabbitMQConfig.PAY_EXCHANGE,
-                    RabbitMQConfig.PAY_SUCCESS_KEY,
+                    RocketMqTopics.TOPIC_PAY,
+                    RocketMqTopics.TAG_PAY_SUCCESS,
                     new PayOrderNotifyDTO(record.getPayOrderId(), record.getChannelOrderId()),
                     MqIdempotencyKeys.paySuccess(record.getPayOrderId()),
                     MessageReliabilityLevelEnum.HIGH);

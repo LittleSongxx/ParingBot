@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import com.smartlect.constants.RabbitMQConfig;
+import com.smartlect.mq.RocketMqTopics;
 import com.smartlect.constants.TransactionalMqSender;
 import com.smartlect.api.dto.PayOrderMessageDTO;
 import com.smartlect.entity.enums.MessageReliabilityLevelEnum;
@@ -154,10 +154,11 @@ public class OrderLogisticsInfoServiceImpl implements OrderLogisticsInfoService 
 		orderLogisticsInfoRecordService.add(record);
 		PayOrderMessageDTO confirmDto = new PayOrderMessageDTO(orderLogisticsInfo.getOrderId());
 		transactionalMqSender.sendAfterCommit(
-				RabbitMQConfig.PAY_EXCHANGE,
-				RabbitMQConfig.PAY_CONFIRM_DELAY_KEY,
+				RocketMqTopics.TOPIC_DELAY,
+				RocketMqTopics.TAG_CONFIRM_RECEIPT,
 				confirmDto,
 				MqIdempotencyKeys.payConfirm(orderLogisticsInfo.getOrderId()),
-				MessageReliabilityLevelEnum.STANDARD);
+				MessageReliabilityLevelEnum.STANDARD,
+				System.currentTimeMillis() + RocketMqTopics.CONFIRM_RECEIPT.toMillis());
 	}
 }

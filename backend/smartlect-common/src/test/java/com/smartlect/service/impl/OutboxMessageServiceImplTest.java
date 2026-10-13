@@ -67,7 +67,8 @@ class OutboxMessageServiceImplTest {
         service.tryDispatch(7L);
 
         verify(sender).replaySend(
-                eq("test.exchange"), eq("test.key"), any(), eq("test:7"));
+                eq("test.exchange"), eq("test.key"), any(), eq("test:7"),
+                org.mockito.ArgumentMatchers.isNull());
         verify(mapper).markSent(
                 eq(7L), eq(OutboxMessageStatusEnum.SENDING.getStatus()),
                 eq(OutboxMessageStatusEnum.SENT.getStatus()), anyString(), any(Date.class));
@@ -137,7 +138,8 @@ class OutboxMessageServiceImplTest {
         assertEquals(true, service.replayExhausted(12L));
 
         verify(sender).replaySend(
-                eq("test.exchange"), eq("test.key"), any(), eq("test:12"));
+                eq("test.exchange"), eq("test.key"), any(), eq("test:12"),
+                org.mockito.ArgumentMatchers.isNull());
     }
 
     @Test

@@ -71,21 +71,6 @@ spring:
       database: ${SMARTLECT_REDIS_DB:0}
       ssl:
         enabled: ${SMARTLECT_REDIS_SSL_ENABLED:false}
-  rabbitmq:
-    host: ${SMARTLECT_RABBIT_HOST:127.0.0.1}
-    port: ${SMARTLECT_RABBIT_PORT:15672}
-    username: ${SMARTLECT_RABBIT_USER:smartlect}
-    password: ${SMARTLECT_RABBIT_PASSWORD:}
-    virtual-host: ${SMARTLECT_RABBIT_VHOST:smartlect}
-    publisher-confirm-type: correlated
-    publisher-returns: true
-    template:
-      mandatory: true
-    listener:
-      simple:
-        acknowledge-mode: manual
-        prefetch: 1
-        default-requeue-rejected: false
 
 mybatis:
   mapper-locations: classpath*:com/smartlect/mappers/*.xml
@@ -111,6 +96,8 @@ mq:
     auto-replay-enabled: true
 
 smartlect:
+  rocketmq:
+    endpoints: ${SMARTLECT_ROCKETMQ_ENDPOINTS:127.0.0.1:8081}
   internal:
     token: ${SMARTLECT_INTERNAL_TOKEN:}
     auth-enabled: true

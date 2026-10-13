@@ -18,7 +18,7 @@ import com.smartlect.biz.CouponRushOrderService;
 import com.smartlect.biz.OrderRequestIdempotencyService;
 import com.smartlect.component.CouponRushRedisComponent;
 import com.smartlect.constants.Constants;
-import com.smartlect.constants.RabbitMQConfig;
+import com.smartlect.mq.RocketMqTopics;
 import com.smartlect.constants.TransactionalMqSender;
 import com.smartlect.entity.config.AppConfig;
 import com.smartlect.entity.enums.MessageReliabilityLevelEnum;
@@ -305,11 +305,12 @@ private CouponRushRedisComponent couponRushRedisComponent;
 		PayOrderMessageDTO payTimeoutDto = new PayOrderMessageDTO();
 		payTimeoutDto.setOrderId(orderId);
 		transactionalMqSender.sendAfterCommit(
-				RabbitMQConfig.PAY_EXCHANGE,
-				RabbitMQConfig.PAY_TIMEOUT_DELAY_KEY,
+				RocketMqTopics.TOPIC_DELAY,
+				RocketMqTopics.TAG_RUSH_TIMEOUT,
 				payTimeoutDto,
 				MqIdempotencyKeys.payTimeout(orderId),
-				MessageReliabilityLevelEnum.STANDARD);
+				MessageReliabilityLevelEnum.STANDARD,
+				System.currentTimeMillis() + RocketMqTopics.RUSH_EXPIRE.toMillis());
 		log.info("优惠券秒杀订单已创建 orderId={}, payOrderId={}", orderId, payOrderId);
 		return orderInfo;
 	}

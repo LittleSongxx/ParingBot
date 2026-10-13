@@ -73,6 +73,33 @@ public class TransactionalMqSender {
         dispatchAsync(id);
     }
 
+    /**
+     * 定时投递版本（RocketMQ 任意精度定时消息，取代原 TTL+死信延迟队列）：
+     * deliveryExpireAt 为绝对到期时间（epoch 毫秒），事务提交后经 Outbox 投递，
+     * 补发时按当前时间折算剩余延迟。
+     */
+    public void sendAfterCommit(String exchange, String routingKey, Object message,
+                                String idempotencyKey, MessageReliabilityLevelEnum reliabilityLevel,
+                                Long deliveryExpireAt) {
+        MessageReliabilityLevelEnum level = reliabilityLevel == null
+                ? MessageReliabilityLevelEnum.STANDARD : reliabilityLevel;
+        Long id = outboxMessageService.savePending(
+                exchange, routingKey, message, idempotencyKey, level, deliveryExpireAt);
+        if (id == null) {
+            return;
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    dispatchAsync(id);
+                }
+            });
+            return;
+        }
+        dispatchAsync(id);
+    }
+
     public void sendAfterCommit(Runnable sendAction) {
         if (sendAction == null) {
             return;

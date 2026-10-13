@@ -2,19 +2,18 @@ package com.smartlect.component;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smartlect.constants.RabbitMQConfig;
 import com.smartlect.entity.po.ProductInfo;
+import com.smartlect.mq.MqSubscription;
+import com.smartlect.mq.RocketMqTopics;
+import com.smartlect.mq.SmartlectMessageListener;
+import com.smartlect.mq.SmartlectMqMessage;
 import com.smartlect.search.ProductIndexService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import com.rabbitmq.client.Channel;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -22,45 +21,50 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * Canal CDC 消费者：binlog（flat JSON）→ 商品索引增量同步。
+ * Canal CDC 消费者：binlog（flat JSON，canal.serverMode=rocketMQ 直投 Topic）→
+ * 商品索引增量同步。
  *
- * <p>单队列单消费者保序：canal 对同一行的变更按 binlog 顺序投递，逐条覆盖索引
- * 即为最终一致（无版本列，乱序风险由顺序消费消除；全量重建由初始化器兜底）。
- * 消息内按表名过滤（当前仅 product_info），非目标表直接 ACK 丢弃。
- * 失败走既有延迟重试 → 死信补偿拓扑。</p>
+ * <p>同一 Topic 单消费组保序：canal 对同一行的变更按 binlog 顺序投递，逐条覆盖
+ * 索引即为最终一致（无版本列，乱序风险由顺序消费消除；全量重建由初始化器兜底）。
+ * 消息内按表名过滤（当前仅 product_info），非目标表直接丢弃。CDC 消费是幂等
+ * upsert，跳过 Redis 租约；失败由容器统一延迟重试并归档审查表。</p>
  */
 @Slf4j
 @Component
 @ConditionalOnProperty(name = "smartlect.canal.index-enabled", havingValue = "true", matchIfMissing = true)
-public class ProductIndexConsumer {
+public class ProductIndexConsumer implements SmartlectMessageListener<String> {
 
     private final ProductIndexService indexService;
-    private final MqListenerHelper mqListenerHelper;
     private final ObjectMapper objectMapper;
     private final ProductCacheService cacheService;
 
     public ProductIndexConsumer(ProductIndexService indexService,
-                                MqListenerHelper mqListenerHelper,
                                 ObjectMapper objectMapper,
                                 ProductCacheService cacheService) {
         this.indexService = indexService;
-        this.mqListenerHelper = mqListenerHelper;
         this.objectMapper = objectMapper;
         this.cacheService = cacheService;
     }
 
-    @RabbitListener(queues = RabbitMQConfig.CANAL_PRODUCT_QUEUE, ackMode = "MANUAL")
-    public void handleCanalMessage(Message message, Channel channel) throws IOException {
-        long deliveryTag = message.getMessageProperties().getDeliveryTag();
-        String payload = new String(message.getBody(), StandardCharsets.UTF_8);
-        try {
-            consume(payload);
-            channel.basicAck(deliveryTag, false);
-        } catch (Exception error) {
-            log.warn("canal 商品索引消费失败，转入重试/死信：{}", error.getMessage());
-            mqListenerHelper.nackWithRetryOrDlq(channel, deliveryTag, message,
-                    RabbitMQConfig.CANAL_PRODUCT_QUEUE, payload, error);
-        }
+    @Override
+    public MqSubscription subscription() {
+        // tag 为 null：canal 直投无 Tag，订阅 Topic 全量
+        return MqSubscription.of(RocketMqTopics.TOPIC_CANAL, null, "G_smartlect_canal_product");
+    }
+
+    @Override
+    public Class<String> payloadType() {
+        return String.class;
+    }
+
+    @Override
+    public long idempotencyTtlSeconds() {
+        return 0;
+    }
+
+    @Override
+    public void onMessage(String payload, SmartlectMqMessage message) throws IOException {
+        consume(payload);
     }
 
     public void consume(String payload) throws IOException {

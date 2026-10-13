@@ -3,7 +3,7 @@ package com.smartlect.component;
 import com.smartlect.api.dto.UserTempBanDTO;
 import com.smartlect.api.enums.UserStatusEnum;
 import com.smartlect.constants.Constants;
-import com.smartlect.constants.RabbitMQConfig;
+import com.smartlect.mq.RocketMqTopics;
 import com.smartlect.constants.TransactionalMqSender;
 import com.smartlect.entity.enums.MessageReliabilityLevelEnum;
 import com.smartlect.entity.po.UserInfo;
@@ -58,11 +58,12 @@ public class UserTempBanService {
             throw new BusinessException("用户不存在");
         }
         transactionalMqSender.sendAfterCommit(
-                RabbitMQConfig.USER_TEMP_BAN_EXCHANGE,
-                RabbitMQConfig.USER_TEMP_BAN_DELAY_KEY,
+                RocketMqTopics.TOPIC_DELAY,
+                RocketMqTopics.TAG_TEMPBAN_EXPIRE,
                 new UserTempBanDTO(userId, unbanAtMs),
                 MqIdempotencyKeys.tempBanUnban(userId, unbanAtMs),
-                MessageReliabilityLevelEnum.STANDARD);
+                MessageReliabilityLevelEnum.STANDARD,
+                unbanAtMs);
         runAfterCommit(() -> {
             cleanTokensBestEffort(userId);
             cacheTempBanBestEffort(userId, unbanAtMs);

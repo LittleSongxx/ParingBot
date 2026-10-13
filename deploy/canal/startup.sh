@@ -5,7 +5,7 @@ set -e
 TPL=/smartlect-canal-template.properties
 DST=/home/admin/canal-server/conf/canal.properties
 cp "$TPL" /tmp/canal.properties
-for key in CANAL_RABBIT_HOST CANAL_RABBIT_PORT CANAL_RABBIT_VHOST CANAL_RABBIT_USER CANAL_RABBIT_PASSWORD CANAL_MYSQL_ADDRESS CANAL_MYSQL_USER CANAL_MYSQL_PASSWORD; do
+for key in CANAL_ROCKETMQ_NAMESRV CANAL_MYSQL_ADDRESS CANAL_MYSQL_USER CANAL_MYSQL_PASSWORD; do
   value=$(printenv "$key")
   sed -i "s/\${$key}/$value/g" /tmp/canal.properties
 done
@@ -18,21 +18,19 @@ for key in CANAL_MYSQL_ADDRESS CANAL_MYSQL_USER CANAL_MYSQL_PASSWORD; do
 done
 cat /tmp/instance.properties > /home/admin/canal-server/conf/example/instance.properties
 
-# 预声明交换机（幂等）：canal 只 publish 不 declare，Java 侧 RabbitAdmin 声明可能晚于
-# canal 启动（首次部署鸡蛋顺序），404 会杀死 channel。用 bash /dev/tcp 探活 + HTTP PUT。
-declare_exchange() {
-  # 主机名跟随 CANAL_RABBIT_HOST：单机形态是 compose 服务名 rabbitmq，
-  # 集群形态由 runtime.env 指向集群成员（写死 rabbitmq 会在集群下解析失败）。
-  local host="${CANAL_RABBIT_HOST:-rabbitmq}"
-  local mgmt_port="${CANAL_RABBIT_MGMT_PORT:-15672}"
-  local vhost="$CANAL_RABBIT_VHOST" user="$CANAL_RABBIT_USER" pass="$CANAL_RABBIT_PASSWORD"
-  local auth=$(printf '%s:%s' "$user" "$pass" | base64 2>/dev/null || echo "")
-  [ -z "$auth" ] && return 0
-  exec 3<>/dev/tcp/"$host"/"$mgmt_port" 2>/dev/null || return 0
-  printf 'PUT /api/exchanges/%s/smartlect-canal HTTP/1.1\r\nHost: %s:%s\r\nAuthorization: Basic %s\r\nContent-Type: application/json\r\nContent-Length: 76\r\nConnection: close\r\n\r\n{"type":"topic","durable":true,"auto_delete":false,"internal":false,"arguments":{}}' "$vhost" "$host" "$mgmt_port" "$auth" >&3
-  cat <&3 >/dev/null 2>&1
-  exec 3<&- 3>&-
-}
-declare_exchange
+# 等 namesrv 端口可达（compose depends_on 只保证 namesrv 进程健康检查通过，
+# canal 的 producer 启动早一拍会因路由信息不全反复重试，这里最多等 30 秒）。
+namesrv="${CANAL_ROCKETMQ_NAMESRV:-rocketmq-namesrv:9876}"
+host="${namesrv%%:*}"
+port="${namesrv##*:}"
+for i in $(seq 1 30); do
+  if (echo > /dev/tcp/"$host"/"$port") 2>/dev/null; then
+    break
+  fi
+  sleep 1
+done
+
+# Topic 由 broker autoCreateTopicEnable 兜底创建，无需预声明（RabbitMQ 时代的
+# 交换机预声明鸡蛋顺序问题在 RocketMQ 下不存在）。
 
 exec /home/admin/app.sh

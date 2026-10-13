@@ -10,13 +10,6 @@ spring:
       validation-timeout: ${SMARTLECT_DB_POOL_VALIDATION_TIMEOUT_MS:3000}
       idle-timeout: ${SMARTLECT_DB_POOL_IDLE_TIMEOUT_MS:300000}
       max-lifetime: ${SMARTLECT_DB_POOL_MAX_LIFETIME_MS:1800000}
-  rabbitmq:
-    connection-timeout: ${SMARTLECT_RABBIT_CONNECTION_TIMEOUT_MS:5000}
-    requested-heartbeat: ${SMARTLECT_RABBIT_REQUESTED_HEARTBEAT_SECONDS:30s}
-    listener:
-      simple:
-        concurrency: ${SMARTLECT_RABBIT_LISTENER_CONCURRENCY:1}
-        max-concurrency: ${SMARTLECT_RABBIT_LISTENER_MAX_CONCURRENCY:4}
   flyway:
     enabled: ${SMARTLECT_FLYWAY_ENABLED:true}
     baseline-on-migrate: true
