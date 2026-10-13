@@ -1,6 +1,6 @@
 package com.smartlect.api.support;
 
-import com.smartlect.api.OrderFeignClient;
+import com.smartlect.api.dubbo.OrderDubboService;
 import com.smartlect.api.dto.CouponRushPayRequestDTO;
 import com.smartlect.api.dto.CouponRushPrepareRequestDTO;
 import com.smartlect.api.dto.OrderIdDTO;
@@ -13,6 +13,7 @@ import com.smartlect.api.dto.CouponRushPrepareDTO;
 import com.smartlect.api.dto.PayInfoDTO;
 import com.smartlect.api.dto.PayOrderNotifyDTO;
 import jakarta.annotation.Resource;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
@@ -21,8 +22,8 @@ import java.util.List;
 @Component
 public class OrderFeignSupport {
 
-    @Resource
-    private OrderFeignClient orderFeignClient;
+    @DubboReference
+    private OrderDubboService orderFeignClient;
     @Resource
     private FeignResponseSupport feignResponseSupport;
 

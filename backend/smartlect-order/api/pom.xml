@@ -18,8 +18,8 @@
       <artifactId>smartlect-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.springframework.cloud</groupId>
-      <artifactId>spring-cloud-starter-openfeign</artifactId>
+      <groupId>org.apache.dubbo</groupId>
+      <artifactId>dubbo-spring-boot-starter</artifactId>
     </dependency>
     <dependency>
       <groupId>com.alibaba.cloud</groupId>

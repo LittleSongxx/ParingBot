@@ -2,7 +2,8 @@ package com.smartlect.api.vo;
 
 import jakarta.validation.constraints.NotEmpty;
 
-public class PropertyData {
+public class PropertyData implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
     @NotEmpty
     private String propertyName;
 

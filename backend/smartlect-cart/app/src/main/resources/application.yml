@@ -99,4 +99,27 @@ smartlect:
     connect-timeout-ms: 3000
     read-timeout-ms: 10000
   security:
-
+dubbo:
+  application:
+    name: smartlect-cart
+    qos-enable: false
+  registry:
+    address: nacos://${SMARTLECT_NACOS_ADDR:127.0.0.1:18848}?username=${SMARTLECT_NACOS_USERNAME:nacos}&password=${SMARTLECT_NACOS_PASSWORD:}&use-as-config-center=false&use-as-metadata-center=false
+    group: ${SMARTLECT_NACOS_GROUP:SMARTLECT_GROUP}
+    parameters:
+      namespace: ${SMARTLECT_NACOS_NAMESPACE:}
+    register-mode: interface
+    # Dubbo 默认把注册中心复用为配置/元数据中心，其 nacos 客户端握手与 server 2.5
+    # 不兼容（status check failed）；本项目配置中心已由 Spring Cloud Nacos 承担，
+    # 显式关闭两个复用，Dubbo 只做服务注册发现。
+    use-as-config-center: false
+    use-as-metadata-center: false
+  protocol:
+    name: dubbo
+    port: -1
+  consumer:
+    timeout: 10000
+    retries: 0
+    check: false
+  provider:
+    timeout: 10000

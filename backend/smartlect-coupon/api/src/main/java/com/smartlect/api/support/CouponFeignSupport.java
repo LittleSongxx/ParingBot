@@ -1,6 +1,6 @@
 package com.smartlect.api.support;
 
-import com.smartlect.api.CouponFeignClient;
+import com.smartlect.api.dubbo.CouponDubboService;
 import com.smartlect.api.dto.CouponIdDTO;
 import com.smartlect.api.dto.CouponRushOpsDTO;
 import com.smartlect.api.dto.CouponValidateAndLockDTO;
@@ -15,6 +15,7 @@ import com.smartlect.api.vo.StockChangeResultVO;
 import com.smartlect.api.vo.UserCouponVO;
 import com.smartlect.compensation.UserCouponStatusCompensatePort;
 import jakarta.annotation.Resource;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -23,8 +24,8 @@ import java.util.Date;
 @Component
 public class CouponFeignSupport implements UserCouponStatusCompensatePort {
 
-    @Resource
-    private CouponFeignClient couponFeignClient;
+    @DubboReference
+    private CouponDubboService couponFeignClient;
     @Resource
     private FeignResponseSupport feignResponseSupport;
 

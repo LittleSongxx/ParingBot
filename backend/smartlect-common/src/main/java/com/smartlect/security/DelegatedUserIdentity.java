@@ -27,6 +27,20 @@ public final class DelegatedUserIdentity {
     public static final String MISSING_MESSAGE = "缺少委托用户身份 X-Smartlect-User-Id";
     public static final String MISMATCH_MESSAGE = "委托身份与请求体身份不一致";
 
+    /**
+     * Dubbo 通道的委托用户：Dubbo 线程无 HTTP 上下文，由 provider 实现把显式
+     * userId 参数绑定到 ThreadLocal（语义与 HTTP 委托头一致）。
+     */
+    private static final ThreadLocal<String> DUBBO_DELEGATED = new ThreadLocal<>();
+
+    public static void setDubboDelegated(String userId) {
+        DUBBO_DELEGATED.set(userId);
+    }
+
+    public static void clearDubboDelegated() {
+        DUBBO_DELEGATED.remove();
+    }
+
     private DelegatedUserIdentity() {
     }
 
@@ -44,6 +58,10 @@ public final class DelegatedUserIdentity {
         ServletRequestAttributes attributes =
                 (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attributes == null) {
+            String dubboDelegated = DUBBO_DELEGATED.get();
+            if (dubboDelegated != null && !dubboDelegated.isBlank()) {
+                return dubboDelegated;
+            }
             throw new HttpBusinessException(401, MISSING_MESSAGE);
         }
         return requireHeader(attributes.getRequest());

@@ -1,6 +1,6 @@
 package com.smartlect.api.support;
 
-import com.smartlect.api.UserFeignClient;
+import com.smartlect.api.dubbo.UserDubboService;
 import com.smartlect.api.dto.UserAddressQueryDTO;
 import com.smartlect.api.dto.UserIdsDTO;
 import com.smartlect.api.dto.UserJoinCountDTO;
@@ -8,6 +8,7 @@ import com.smartlect.api.vo.UserAddressVO;
 import com.smartlect.api.vo.UserBriefVO;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
@@ -21,21 +22,21 @@ import java.util.stream.Collectors;
 @Component
 public class UserFeignSupport {
 
-    @Resource
-    private UserFeignClient userFeignClient;
+    @DubboReference
+    private UserDubboService userDubboService;
     @Resource
     private FeignResponseSupport feignResponseSupport;
 
     public UserAddressVO getAddress(String addressId, String userId) {
         return feignResponseSupport.call(
-                () -> userFeignClient.getAddress(new UserAddressQueryDTO(addressId, userId), userId),
+                () -> userDubboService.getAddress(new UserAddressQueryDTO(addressId, userId), userId),
                 "查询收货地址失败");
     }
 
     public List<String> listAllUserIds() {
         try {
             List<String> ids = feignResponseSupport.call(
-                    () -> userFeignClient.listAllUserIds(),
+                    () -> userDubboService.listAllUserIds(),
                     "查询用户列表失败");
             return ids == null ? Collections.emptyList() : ids;
         } catch (Exception e) {
@@ -50,7 +51,7 @@ public class UserFeignSupport {
         }
         try {
             List<UserBriefVO> list = feignResponseSupport.call(
-                    () -> userFeignClient.listBriefByUserIds(new UserIdsDTO(userIds)),
+                    () -> userDubboService.listBriefByUserIds(new UserIdsDTO(userIds)),
                     "批量查询用户信息失败");
             if (list == null || list.isEmpty()) {
                 return Collections.emptyMap();
@@ -66,7 +67,7 @@ public class UserFeignSupport {
 
     public Integer countByJoinDate(String joinDateStart, String joinDateEnd) {
         Integer count = feignResponseSupport.call(
-                () -> userFeignClient.countByJoinDate(new UserJoinCountDTO(joinDateStart, joinDateEnd)),
+                () -> userDubboService.countByJoinDate(new UserJoinCountDTO(joinDateStart, joinDateEnd)),
                 "统计新用户失败");
         return count == null ? 0 : count;
     }

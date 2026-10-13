@@ -7,7 +7,8 @@ import java.math.BigDecimal;
 @Data
 
 
-public class ProductInfoDTO {
+public class ProductInfoDTO implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
 
 
     private String productId;

@@ -4,7 +4,8 @@ import jakarta.validation.constraints.NotEmpty;
 
 import java.math.BigDecimal;
 
-public class DiscountCouponDTO {
+public class DiscountCouponDTO implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
     private String couponId;
     @NotEmpty
     private String couponName;

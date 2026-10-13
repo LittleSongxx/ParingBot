@@ -1,6 +1,7 @@
 package com.smartlect.api.dto;
 
-public class PayOrderMessageDTO {
+public class PayOrderMessageDTO implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
 
     public PayOrderMessageDTO(String orderId) {
         this.orderId = orderId;

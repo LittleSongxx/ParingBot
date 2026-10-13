@@ -579,6 +579,10 @@ def java_launch_args(service, env):
                "-Xmx" + jvm("SMARTLECT_JAVA_XMX", "256m"),
                "-XX:MaxMetaspaceSize=192m", "-XX:MaxDirectMemorySize=64m",
                "-XX:ActiveProcessorCount=" + jvm("SMARTLECT_JAVA_PROCESSORS", "2"),
+               # Dubbo 会把双栈机器的 IPv6 地址注册进 provider URL，WSL2 下 v6 转发
+               # 不通导致 consumer 连接挂起；强制 IPv4（Spring Cloud Nacos 已用
+               # prefer-ip-address + 127.0.0.1 不受影响）。
+               "-Djava.net.preferIPv4Stack=true",
                f"-Dcsp.sentinel.log.dir={ROOT}/run/logs/sentinel/{service}",
                f"-DJM.LOG.PATH={ROOT}/run/logs/{service}",
                f"-DJM.SNAPSHOT.PATH={ROOT}/run/cache/{service}",

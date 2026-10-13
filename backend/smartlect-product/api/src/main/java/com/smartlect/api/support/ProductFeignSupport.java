@@ -2,7 +2,7 @@ package com.smartlect.api.support;
 
 
 
-import com.smartlect.api.ProductFeignClient;
+import com.smartlect.api.dubbo.ProductDubboService;
 
 import com.smartlect.api.dto.LessStockPageDTO;
 import com.smartlect.api.dto.ProductIdDTO;
@@ -16,6 +16,7 @@ import com.smartlect.entity.vo.PaginationResultVO;
 import com.smartlect.api.vo.ProductSkuListVO;
 import jakarta.annotation.Resource;
 
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Component;
 
 
@@ -42,9 +43,9 @@ public class ProductFeignSupport {
 
 
 
-    @Resource
+    @DubboReference
 
-    private ProductFeignClient productFeignClient;
+    private ProductDubboService productFeignClient;
 
     @Resource
 

@@ -1,9 +1,10 @@
 package com.smartlect.api.support;
 
-import com.smartlect.api.CartFeignClient;
+import com.smartlect.api.dubbo.CartDubboService;
 import com.smartlect.api.dto.CartDeleteBatchDTO;
 import com.smartlect.api.dto.CartDeleteItemDTO;
 import jakarta.annotation.Resource;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -11,8 +12,8 @@ import java.util.List;
 @Component
 public class CartFeignSupport {
 
-    @Resource
-    private CartFeignClient cartFeignClient;
+    @DubboReference
+    private CartDubboService cartFeignClient;
     @Resource
     private FeignResponseSupport feignResponseSupport;
 

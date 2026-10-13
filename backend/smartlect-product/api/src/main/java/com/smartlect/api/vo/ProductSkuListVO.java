@@ -3,7 +3,8 @@ package com.smartlect.api.vo;
 import java.math.BigDecimal;
 import java.util.List;
 
-public class ProductSkuListVO {
+public class ProductSkuListVO implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
 
     private String productId;
     private String productName;

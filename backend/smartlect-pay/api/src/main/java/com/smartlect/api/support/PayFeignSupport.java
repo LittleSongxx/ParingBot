@@ -1,6 +1,6 @@
 package com.smartlect.api.support;
 
-import com.smartlect.api.PayFeignClient;
+import com.smartlect.api.dubbo.PayDubboService;
 import com.smartlect.api.dto.PayCloseDTO;
 import com.smartlect.api.dto.PayQueryDTO;
 import com.smartlect.api.dto.PayRefundDTO;
@@ -10,6 +10,7 @@ import com.smartlect.api.dto.PayUrlRequestDTO;
 import com.smartlect.api.dto.PayInfoDTO;
 import com.smartlect.api.dto.PayOrderNotifyDTO;
 import jakarta.annotation.Resource;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -17,8 +18,8 @@ import java.math.BigDecimal;
 @Component
 public class PayFeignSupport {
 
-    @Resource
-    private PayFeignClient payFeignClient;
+    @DubboReference
+    private PayDubboService payFeignClient;
     @Resource
     private FeignResponseSupport feignResponseSupport;
 

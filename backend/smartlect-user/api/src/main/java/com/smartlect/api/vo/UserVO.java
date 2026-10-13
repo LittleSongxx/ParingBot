@@ -1,6 +1,7 @@
 package com.smartlect.api.vo;
 
-public class UserVO {
+public class UserVO implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
     private String userId;
 
     private String email;

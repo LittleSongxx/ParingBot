@@ -5,7 +5,8 @@ import com.smartlect.component.ImageCensorRateLimitService;
 import com.smartlect.component.UserTempBanService;
 import com.smartlect.entity.dto.BaiduImageCensorResultDTO;
 import com.smartlect.api.dto.ImageUploadResultDTO;
-import com.smartlect.api.OrderFeignClient;
+import com.smartlect.api.dubbo.OrderDubboService;
+import org.apache.dubbo.config.annotation.DubboReference;
 import com.smartlect.api.dto.OrderIdDTO;
 import com.smartlect.api.support.FeignResponseSupport;
 import com.smartlect.api.vo.OrderBriefVO;
@@ -51,8 +52,8 @@ public class ImageModerationServiceImpl implements ImageModerationService {
     private UserTempBanService userTempBanService;
     @Resource
     private ImageModerationRecordMapper<ImageModerationRecord, ImageModerationRecordQuery> imageModerationRecordMapper;
-    @Resource
-    private OrderFeignClient orderFeignClient;
+    @DubboReference
+    private OrderDubboService orderFeignClient;
     @Resource
     private FeignResponseSupport feignResponseSupport;
     @Value("${image-moderation.orphan-upload-hours:24}")

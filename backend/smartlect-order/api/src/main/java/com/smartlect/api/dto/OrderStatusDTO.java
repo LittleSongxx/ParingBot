@@ -2,7 +2,8 @@ package com.smartlect.api.dto;
 
 import com.smartlect.api.enums.OrderStatusEnum;
 
-public class OrderStatusDTO {
+public class OrderStatusDTO implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
     private Integer status;
     private String desc;
 

@@ -2,7 +2,8 @@ package com.smartlect.api.vo;
 
 import java.util.List;
 
-public class ProductPropertyVO {
+public class ProductPropertyVO implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
     private String propertyId;
 
     private String propertyName;

@@ -9,7 +9,8 @@ import org.springframework.validation.annotation.Validated;
 import java.util.List;
 
 @Validated
-public class PostOrderDTO {
+public class PostOrderDTO implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
     @NotEmpty
     private String payMethod;
     @NotEmpty

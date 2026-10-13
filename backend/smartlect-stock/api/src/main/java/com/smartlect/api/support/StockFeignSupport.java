@@ -1,6 +1,6 @@
 package com.smartlect.api.support;
 
-import com.smartlect.api.StockFeignClient;
+import com.smartlect.api.dubbo.StockDubboService;
 import com.smartlect.api.dto.LessStockPageDTO;
 import com.smartlect.api.dto.OrderStockRestoreDTO;
 import com.smartlect.api.dto.ProductIdDTO;
@@ -18,6 +18,7 @@ import com.smartlect.entity.vo.PaginationResultVO;
 import com.smartlect.exception.BusinessException;
 import com.smartlect.utils.StringTools;
 import jakarta.annotation.Resource;
+import org.apache.dubbo.config.annotation.DubboReference;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -29,8 +30,8 @@ import java.util.Map;
 @Component
 public class StockFeignSupport implements StockBatchCompensatePort {
 
-    @Resource
-    private StockFeignClient stockFeignClient;
+    @DubboReference
+    private StockDubboService stockFeignClient;
     @Resource
     private FeignResponseSupport feignResponseSupport;
 

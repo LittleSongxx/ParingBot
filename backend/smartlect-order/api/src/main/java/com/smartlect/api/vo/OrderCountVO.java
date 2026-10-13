@@ -1,6 +1,7 @@
 package com.smartlect.api.vo;
 
-public class OrderCountVO {
+public class OrderCountVO implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
     private String code;
     private Integer count;
 
