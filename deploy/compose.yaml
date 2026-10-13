@@ -196,8 +196,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-      rocketmq-namesrv:
-        condition: service_healthy
+    # 不依赖 compose 内 rocketmq-namesrv：集群态 namesrv 在 host 网络（/opt/cluster），
+    # 该依赖会因 profile 未启用而报错；namesrv 可达性由 startup.sh 的等待循环保证。
     environment:
       canal.serverMode: rocketMQ
       CANAL_MYSQL_ADDRESS: "mysql:3306"
