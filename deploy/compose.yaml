@@ -114,7 +114,8 @@ services:
     command: sh mqproxy -n rocketmq-namesrv:9876
     depends_on:
       rocketmq-broker: {condition: service_healthy}
-      rocketmq-topic-init: {condition: service_completed_successfully}
+      # 不依赖 topic-init（其挂 single-only profile，跨 profile 依赖会让不带该 profile 的
+      # 任意 compose 命令判 invalid project）；gRPC 客户端对 topic 尚未就绪有重试。
     ports:
       - "127.0.0.1:${SMARTLECT_ROCKETMQ_GRPC_PORT:?run bootstrap}:8081"
     environment:
