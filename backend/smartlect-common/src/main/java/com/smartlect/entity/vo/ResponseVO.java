@@ -1,7 +1,8 @@
 package com.smartlect.entity.vo;
 
 
-public class ResponseVO<T> {
+public class ResponseVO<T> implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
     private String status;
     private Integer code;
     private String info;
