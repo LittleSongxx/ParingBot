@@ -58,11 +58,16 @@ cp conf/dledger-node1.conf conf/smartlect-dledger.conf
 log "stopping single-node rocketmq (containers kept for rollback)..."
 docker stop smartlect-rocketmq-proxy-1 smartlect-rocketmq-broker-1 smartlect-rocketmq-namesrv-1 >/dev/null 2>&1 || true
 
-# 4) 三节点拉起（每节点 namesrv + broker-DLedger + proxy，host 网络）
+# 4) 三节点拉起（每节点 namesrv + broker-DLedger + proxy，host 网络）；node1 本地执行
+#    （本机 ssh 自身无密钥时 remote 会 Permission denied）
 for n in 1 2 3; do
   eval "ip=\$NODE${n}_IP"
-  log "starting rocketmq on node${n} ($ip)..."
-  remote "$ip" "cd $CL/rocketmq && docker compose -f compose.c${n}.yaml --env-file .env up -d --wait --wait-timeout 300"
+  log "starting rocketmq on node${n} (${ip})..."
+  if [ "$n" = "1" ]; then
+    (cd "$CL/rocketmq" && docker compose -f compose.c1.yaml --env-file .env up -d --wait --wait-timeout 300)
+  else
+    remote "$ip" "cd $CL/rocketmq && docker compose -f compose.c${n}.yaml --env-file .env up -d --wait --wait-timeout 300"
+  fi
 done
 
 # 5) 集群断言：DLedger 3 副本、leader 存在（mqadmin 走 node1 namesrv）
