@@ -62,15 +62,26 @@ cp conf/dledger-node1.conf conf/smartlect-dledger.conf
 log "stopping single-node rocketmq (containers kept for rollback)..."
 docker stop smartlect-rocketmq-proxy-1 smartlect-rocketmq-broker-1 smartlect-rocketmq-namesrv-1 >/dev/null 2>&1 || true
 
-# 4) 三节点拉起（每节点 namesrv + broker-DLedger + proxy，host 网络）；node1 本地执行
-#    （本机 ssh 自身无密钥时 remote 会 Permission denied）
+# 4) 两阶段拉起：DLedger 需要多数派才能选主——先起三节点 namesrv+broker（阶段一），
+#    多数派形成、broker 可写之后再起 proxy（阶段二；单节点先起 proxy 会因系统
+#    topic 创建失败而重启循环）。
 for n in 1 2 3; do
   eval "ip=\$NODE${n}_IP"
-  log "starting rocketmq on node${n} (${ip})..."
+  log "stage1 broker on node${n} (${ip})..."
   if [ "$n" = "1" ]; then
-    (cd "$CL/rocketmq" && docker compose -f compose.c1.yaml --env-file .env up -d --wait --wait-timeout 300)
+    (cd "$CL/rocketmq" && docker compose -f compose.c1.yaml --env-file .env up -d --wait --wait-timeout 300 rocketmq-namesrv rocketmq-broker)
   else
-    remote "$ip" "cd $CL/rocketmq && docker compose -f compose.c${n}.yaml --env-file .env up -d --wait --wait-timeout 300"
+    remote "$ip" "cd $CL/rocketmq && docker compose -f compose.c${n}.yaml --env-file .env up -d --wait --wait-timeout 300 rocketmq-namesrv rocketmq-broker"
+  fi
+done
+log "stage1 done (3 brokers up, raft majority formed)"
+for n in 1 2 3; do
+  eval "ip=\$NODE${n}_IP"
+  log "stage2 proxy on node${n} (${ip})..."
+  if [ "$n" = "1" ]; then
+    (cd "$CL/rocketmq" && docker compose -f compose.c1.yaml --env-file .env up -d --wait --wait-timeout 300 rocketmq-proxy)
+  else
+    remote "$ip" "cd $CL/rocketmq && docker compose -f compose.c${n}.yaml --env-file .env up -d --wait --wait-timeout 300 rocketmq-proxy"
   fi
 done
 
