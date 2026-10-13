@@ -82,6 +82,9 @@ services:
   # 即校验路由（No topic route info 会让消费者启动直接 FAILED），必须显式建。
   rocketmq-topic-init:
     image: apache/rocketmq:5.3.2
+    # 单机形态专属（集群态 Topic 由 build-rocketmq.sh 预建），随 broker 一起挂 single-only，
+    # 否则集群态下它依赖的 broker 未激活会被 compose 判为 invalid project。
+    profiles: ["single-only"]
     depends_on:
       rocketmq-broker: {condition: service_healthy}
     entrypoint: [sh, -ec]
