@@ -87,7 +87,7 @@ system 只承载会话内逐字恒定的五段（角色契约 + 冻结策略 + S
 ```
 知识发布流：DRAFT → 异步索引任务 → PUBLISHED → 才可检索
              ↓
-双写：ES 文档（smartcn BM25）+ Qdrant point（1024 维 HNSW）
+双写：ES 文档（IK BM25）+ Qdrant point（1024 维 HNSW）
              ↓
 检索：ES BM25 top50 ‖ Qdrant dense top50
       → RRF 融合（k=60）

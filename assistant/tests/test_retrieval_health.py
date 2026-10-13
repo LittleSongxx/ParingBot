@@ -84,7 +84,7 @@ class ParallelRecallTests(unittest.TestCase):
             return [{'doc_id': 'd', 'version': 1, 'chunk_id': 'c1', 'score': 0.9}], 'qdrant_hnsw'
 
         async def fake_bm25(query, scope, extra_queries=None):
-            return [(('d', 1, 'c1'), 3.2)], 'es_bm25_smartcn'
+            return [(('d', 1, 'c1'), 3.2)], 'es_bm25_ik'
 
         with patch('smartlect.hybrid_search.ann_search', fake_ann), \
              patch('smartlect.hybrid_search.bm25_search', fake_bm25), \
@@ -94,7 +94,7 @@ class ParallelRecallTests(unittest.TestCase):
                 'scope', [0.1, 0.2], 'text-embedding-v4', 'v1', '键盘', None, None)
         self.assertEqual(dense[0]['chunk_id'], 'c1')
         self.assertEqual(vector_backend, 'qdrant_hnsw')
-        self.assertEqual(es_backend, 'es_bm25_smartcn')
+        self.assertEqual(es_backend, 'es_bm25_ik')
         self.assertIn('es_bm25', health)
         self.assertIn('qdrant_ann', health)
 
@@ -107,7 +107,7 @@ class ParallelRecallTests(unittest.TestCase):
 
         async def fake_bm25(*args, **kwargs):
             calls.append('bm25')
-            return None, 'es_bm25_smartcn'
+            return None, 'es_bm25_ik'
 
         with patch.object(self._fresh, 'should_skip',
                           side_effect=lambda name, now=None: name == 'es_bm25'), \

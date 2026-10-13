@@ -48,7 +48,11 @@ public class ProductIndexService {
     /** ES 检索命中的 id 上限：约束单次回表批量，DB 侧分页在其子集上进行。 */
     public static final int SEARCH_ID_CAP = 500;
 
-    /** 建索引 mapping：productName 双字段（smartcn 文本 + raw keyword 供短语 wildcard）。 */
+    /**
+     * 建索引 mapping：productName 双字段（IK 文本快照 + raw keyword 供短语 wildcard）。
+     * text 字段仅冗余商品快照、当前不参与检索谓词；检索语义始终由 raw keyword 的
+     * wildcard 保证（与 SQL LIKE 逐字等价）。
+     */
 
     private final ElasticsearchClient client;
     private final ProductInfoMapper productInfoMapper;
@@ -63,43 +67,70 @@ public class ProductIndexService {
             boolean exists = client.indices()
                     .exists(ExistsRequest.of(b -> b.index(INDEX))).value();
             if (!exists) {
-                try {
-                    // 显式 Java API 构建 mapping（withJson 会被动态映射覆盖）
-                    client.indices().create(c -> c
-                            .index(INDEX)
-                            .settings(se -> se
-                                    .analysis(a -> a
-                                            .analyzer("smartcn_zh", an -> an
-                                                    .custom(z -> z
-                                                            .tokenizer("standard"))))  )
-                            .mappings(m -> m
-                                    .properties("productId", p -> p.keyword(k -> k))
-                                    .properties("productName", p -> p.text(t -> t
-                                            .analyzer("smartcn_zh")
-                                            .fields("raw", f -> f.keyword(k -> k))))
-                                    .properties("productDesc", p -> p.text(t -> t.analyzer("smartcn_zh")))
-                                    .properties("brand", p -> p.keyword(k -> k))
-                                    .properties("categoryId", p -> p.keyword(k -> k))
-                                    .properties("pCategoryId", p -> p.keyword(k -> k))
-                                    .properties("cover", p -> p.keyword(k -> k.index(false).docValues(false)))
-                                    .properties("status", p -> p.integer(i -> i))
-                                    .properties("minPriceCents", p -> p.long_(l -> l))
-                                    .properties("maxPriceCents", p -> p.long_(l -> l))
-                                    .properties("totalSale", p -> p.integer(i -> i))
-                                    .properties("commendType", p -> p.integer(i -> i))
-                                    .properties("catalogScope", p -> p.keyword(k -> k))
-                                    .properties("createTimeMillis", p -> p.long_(l -> l))));
-                    log.info("商品索引 {} 已创建（含 smartcn 分析与 raw keyword 子字段）", INDEX);
-                } catch (co.elastic.clients.elasticsearch._types.ElasticsearchException already) {
-                    if (!"resource_already_exists_exception".equals(already.error().type())) {
-                        throw already;
-                    }
+                boolean created = tryCreateIndex("ik_max_word");
+                if (!created) {
+                    // IK 插件缺失时（unknown analyzer 400）降级重建：text 字段仅冗余
+                    // 快照不参与检索，分词器缺失不影响 wildcard 检索语义。
+                    tryCreateIndex(null);
+                    log.warn("商品索引 {} 已创建（未装 IK 插件，text 快照走 standard 分词；检索谓词不受影响）", INDEX);
                 }
             }
             return true;
         } catch (IOException e) {
             log.warn("商品索引 ensure 失败（ES 不可达将回退 SQL）：{}", e.getMessage());
             return false;
+        }
+    }
+
+    /**
+     * 用指定 analyzer（null 表示不指定）创建索引；IK 缺失返回 false 由调用方降级，
+     * 索引已存在视为成功（并发/重复初始化）。
+     */
+    private boolean tryCreateIndex(String analyzer) {
+        try {
+            String effective = analyzer != null ? analyzer : "standard";
+            // 显式 Java API 构建 mapping（withJson 会被动态映射覆盖）
+            client.indices().create(c -> c
+                    .index(INDEX)
+                    .settings(se -> se
+                            .analysis(a -> a
+                                    .analyzer("zh_text", an -> an
+                                            .custom(z -> z
+                                                    .tokenizer(effective))))  )
+                    .mappings(m -> m
+                            .properties("productId", p -> p.keyword(k -> k))
+                            .properties("productName", p -> p.text(t -> t
+                                    .analyzer("zh_text")
+                                    .fields("raw", f -> f.keyword(k -> k))))
+                            .properties("productDesc", p -> p.text(t -> t.analyzer("zh_text")))
+                            .properties("brand", p -> p.keyword(k -> k))
+                            .properties("categoryId", p -> p.keyword(k -> k))
+                            .properties("pCategoryId", p -> p.keyword(k -> k))
+                            .properties("cover", p -> p.keyword(k -> k.index(false).docValues(false)))
+                            .properties("status", p -> p.integer(i -> i))
+                            .properties("minPriceCents", p -> p.long_(l -> l))
+                            .properties("maxPriceCents", p -> p.long_(l -> l))
+                            .properties("totalSale", p -> p.integer(i -> i))
+                            .properties("commendType", p -> p.integer(i -> i))
+                            .properties("catalogScope", p -> p.keyword(k -> k))
+                            .properties("createTimeMillis", p -> p.long_(l -> l))));
+            if (analyzer != null) {
+                log.info("商品索引 {} 已创建（{} 分词快照与 raw keyword 子字段）", INDEX, analyzer);
+            }
+            return true;
+        } catch (co.elastic.clients.elasticsearch._types.ElasticsearchException e) {
+            if ("resource_already_exists_exception".equals(e.error().type())) {
+                return true;
+            }
+            // 未装 IK 插件时引用 ik_max_word tokenizer 建索引 400（Unknown xxx）
+            if (analyzer != null && e.getMessage() != null
+                    && e.getMessage().contains("nknown")
+                    && e.getMessage().contains(analyzer)) {
+                return false;
+            }
+            throw e;
+        } catch (IOException io) {
+            throw new java.io.UncheckedIOException(io);
         }
     }
 

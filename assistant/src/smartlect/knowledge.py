@@ -376,7 +376,7 @@ def rank_chunks(rows, query, *, query_vector=None, embedding_model=None, index_v
         lexical = extra_lex + [(key, score * 0.9) for key, score in lexical]
         lexical.sort(key=lambda item: (-item[1], item[0]))
     if es_hits:
-        # ES 是服务端 BM25（smartcn 分词）；分数域与内存 BM25 不同，只取序参与 RRF。
+        # ES 是服务端 BM25（IK 分词）；分数域与内存 BM25 不同，只取序参与 RRF。
         seen = set()
         ordered = []
         for key, _score in es_hits:

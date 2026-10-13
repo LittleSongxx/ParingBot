@@ -48,7 +48,7 @@
 | 为什么手写 ReAct 不用 create_react_agent | 27 版评测合同锁定节点语义；持久化提案 HITL 优于进程内 interrupt（ADR-0009） |
 | 子智能体怎么工作 | `task_dispatch` 工具 → 1–3 个 `create_react_agent` 子智能体并发，各自独立上下文/预算，只回传结论（ADR-0010） |
 | 模型怎么防幻觉成交 | 无成交工具；`propose_order` 只生成待确认提案（DB 落库 + version 乐观锁），确认走独立 HTTP 端点 |
-| RAG 怎么做 | ES smartcn BM25 top50 ‖ Qdrant dense top50 → RRF → gte-rerank → top8；未配置回退内存 BM25（ADR-0007） |
+| RAG 怎么做 | ES IK BM25 top50 ‖ Qdrant dense top50 → RRF → gte-rerank → top8；未配置回退内存 BM25（ADR-0007） |
 | 上下文怎么管理 | `langchain_core.trim_messages`（strategy=last, start_on=human），14400 token 硬界 + fail-closed |
 
 ## 电商核心设计保留清单
@@ -72,7 +72,7 @@
 | ADR | 问题 | 决策 | 关键理由 |
 |---|---|---|---|
 | [0006](adr/0006-remove-seata.md) | Seata AT 与手工补偿并存 | 删 Seata，统一本地事务+Outbox | 双轨使回滚边界不可推理 |
-| [0007](adr/0007-hybrid-retrieval-es-qdrant.md) | 自研 jieba BM25 + pgvector | ES smartcn + Qdrant + RRF | 2026 生产默认检索管线 |
+| [0007](adr/0007-hybrid-retrieval-es-qdrant.md) | 自研 jieba BM25 + pgvector | ES smartcn + Qdrant + RRF（2026-10-13 起分词器为 IK） | 2026 生产默认检索管线 |
 | [0008](adr/0008-retire-recommendation-line.md) | 推荐/归因/worker 稀释主线 | 整体退役（−4300 行） | 项目聚焦 Agent+RAG+提案 |
 | [0009](adr/0009-agent-runtime-choices.md) | openai SDK / 手写 ReAct / 守卫 | SDK 替换 httpx；ReAct 暂缓；守卫保留 | 评测合同锚定 + 测试锁定 |
 | [0010](adr/0010-subagent-dispatch.md) | 多 Agent / 并行 | SubAgent-as-Tool + create_react_agent | 单干优先，按判据派发 |

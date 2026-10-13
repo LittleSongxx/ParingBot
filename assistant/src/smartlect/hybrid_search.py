@@ -1,4 +1,4 @@
-"""混合检索后端：Elasticsearch(BM25, smartcn) + Qdrant(dense ANN)。
+"""混合检索后端：Elasticsearch(BM25, IK 分词) + Qdrant(dense ANN)。
 
 2026-10 收敛重构：取代自研 jieba 内存 BM25 与 pgvector 双写。两个后端都懒加载，
 未配置或不可达时返回各自的 unavailable 信号——调用方沿用既有降级链
@@ -58,10 +58,12 @@ def qdrant_client():
     return _qdrant
 
 
-# 中文默认分析器的候选：smartcn 需要插件（随镜像分发），cjk 是 ES 内置的中日韩
-# bigram 分析器。写死 smartcn 会在没装插件的 ES 上让建索引直接 400，索引只能由
-# dynamic mapping 兜底、中文按 standard 切分（2026-10-08 线上就是这个后果）。
-ANALYZER_CANDIDATES = ("smartcn", "cjk")
+# 中文默认分析器的候选：ik_max_word 最细粒度切分（IK 插件随自建镜像预装，
+# 支持自定义词典，国内电商搜索主流）；smartcn/cjk 作为未装 IK 时的回退，
+# cjk 是 ES 内置的中日韩 bigram 分析器。逐个探测而不是写死，避免在没装
+# 对应插件的 ES 上让建索引直接 400、索引只能由 dynamic mapping 兜底、
+# 中文按 standard 切分（2026-10-08 线上就是这个后果）。
+ANALYZER_CANDIDATES = ("ik_max_word", "smartcn", "cjk")
 
 
 async def _default_analyzer(es):

@@ -52,7 +52,7 @@
 
 首页、分类、搜索、商品详情都是一家真店的皮。货架来自 Java 目录，不是为聊天临时拼的卡片。
 
-搜索走 ES 的 smartcn 分词，索引由 Canal 从 MySQL binlog 增量同步——查询链路不依赖同步链路。
+搜索走 ES 的 IK 分词，索引由 Canal 从 MySQL binlog 增量同步——查询链路不依赖同步链路。
 
 </td>
 <td width="33%" valign="top">
@@ -169,7 +169,7 @@ flowchart LR
 | **交易** | Java 17 · Spring Boot 3.5 · Spring Cloud 2025 · 9 个服务 · MyBatis + PageHelper |
 | **鉴权** | Sa-Token 1.39（网关统一校验 + 服务端 `@SaCheckLogin` / `@SaCheckPermission`） |
 | **Agent** | Python 3.11 · FastAPI · LangGraph 1.2 · openai SDK（兼容模式端点白名单） |
-| **检索** | Elasticsearch 8.19（smartcn BM25 + 商品索引）· Qdrant 1.15（HNSW dense）→ RRF → gte-rerank |
+| **检索** | Elasticsearch 8.19（IK BM25 + 商品索引）· Qdrant 1.15（HNSW dense）→ RRF → gte-rerank |
 | **缓存** | Caffeine L1 + Redis L2 + pub/sub 失效 + Canal 兜底 |
 | **消息** | RabbitMQ 4.2（Outbox 可靠投递 · 延迟队列 · 秒杀削峰） |
 | **变更捕获** | Canal 1.1.8（MySQL binlog → RabbitMQ → ES 商品索引与缓存失效） |

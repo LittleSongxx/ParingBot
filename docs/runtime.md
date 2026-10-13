@@ -10,7 +10,7 @@
 | Redis 7.4 | 16379 | Sa-Token 会话 + Redisson 锁/限流 |
 | RabbitMQ 4.2 | 15672/15674 | Outbox 可靠消息 + 延迟队列 |
 | Nacos v2.5 | 18848 | 服务发现 + 配置中心（`SMARTLECT_GROUP` 下 `smartlect-common.yml` 与 `smartlect-{服务}.yml`） |
-| Elasticsearch 8.19 | 9200 | smartcn 中文分词（需 build Dockerfile） |
+| Elasticsearch 8.19 | 9200 | IK 中文分词（自建镜像预装，compose 已指向 build） |
 | Qdrant 1.15 | 6333 | 1024 维 HNSW 向量检索 |
 | Canal 1.1.8 | 11111 | 伪装 MySQL 从库解析 binlog 直投 RabbitMQ，驱动商品索引增量同步与缓存失效 |
 | xxl-job-admin 2.5 | 18090 | 调度中心（九个定时任务由 `@Scheduled` 迁移而来，表结构见 `deploy/sql/16-xxljob.sql`） |
