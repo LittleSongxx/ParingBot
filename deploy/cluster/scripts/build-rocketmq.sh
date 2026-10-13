@@ -87,18 +87,22 @@ done
 
 # 5) 集群断言：DLedger 3 副本、leader 存在（mqadmin 走 node1 namesrv）
 log "asserting dledger cluster..."
-docker exec rocketmq-broker sh mqadmin clusterList -n 127.0.0.1:${ROCKETMQ_NAMESRV_PORT:-9876} \
+docker run --rm --network host apache/rocketmq:5.3.2 sh -c \
+  "JAVA_OPT_EXT='-Xms128m -Xmx256m' sh mqadmin clusterList -n 127.0.0.1:${ROCKETMQ_NAMESRV_PORT:-9876}" \
   | tee "$CL/evidence/rocketmq-cluster-list.txt"
 REPLICAS=$(grep -c "^broker-a" "$CL/evidence/rocketmq-cluster-list.txt" || true)
 [ "$REPLICAS" -ge 3 ] || { echo "expect 3 dledger replicas, got $REPLICAS"; exit 1; }
 grep -q "rocketmq cluster READY" /dev/null 2>&1 || true
 # 6) Topic 预建（订阅侧校验路由；message.type 必须显式单值——坑见 compose 注释；
 #    放在三节点拉起之后，broker 未就绪时 updateTopic 会失败，循环重试 30 次）
+MQADMIN="docker run --rm --network host apache/rocketmq:5.3.2 sh -c"
 for spec in "smartlect-delay DELAY" "smartlect-pay NORMAL" "smartlect-refund NORMAL" \
             "smartlect-rush NORMAL" "smartlect-canal NORMAL" "smartlect-mq-failure NORMAL"; do
   set -- ${spec}
+  # 独立临时容器跑 mqadmin：broker 容器 mem_limit 已贴顶，内嵌第二个 JVM 会被 OOM 杀(137)
   for i in $(seq 1 30); do
-    remote "$NODE1_IP" "docker exec rocketmq-broker sh mqadmin updateTopic -n 127.0.0.1:9876 -c DefaultCluster -t $1 -a '+message.type=$2' >/dev/null 2>&1" && break
+    docker run --rm --network host apache/rocketmq:5.3.2 sh -c \
+      "JAVA_OPT_EXT='-Xms128m -Xmx256m' sh mqadmin updateTopic -n 127.0.0.1:9876 -c DefaultCluster -t $1 -a '+message.type=$2'" >/dev/null 2>&1 && break
     sleep 2
   done
 done
