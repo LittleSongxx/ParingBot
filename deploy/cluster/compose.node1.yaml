@@ -33,7 +33,7 @@ services:
   rocketmq-proxy:
     profiles: ["single-only"]
     ports:
-      - "${NODE1_IP:?source deploy/cluster/nodes.env}:${SMARTLECT_ROCKETMQ_GRPC_PORT:-8081}:8081"
+      - "${NODE1_IP:-0.0.0.0}:${SMARTLECT_ROCKETMQ_GRPC_PORT:-8081}:8081"
 
   nacos:
     profiles: ["single-only"]
