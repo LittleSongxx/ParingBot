@@ -28,17 +28,14 @@ public class DubboInternalAuthFilter implements Filter {
             String incomingTrace = invocation.getAttachment("X-Trace-Id");
             if (incomingTrace != null && !incomingTrace.isBlank()) {
                 org.slf4j.MDC.put("traceId", incomingTrace);
+                try {
+                    return authorizeAndInvoke(invoker, invocation);
+                } finally {
+                    // Dubbo 线程池复用线程，不清理会把上一个请求的 traceId 串到下一个
+                    org.slf4j.MDC.remove("traceId");
+                }
             }
-            String provided = invocation.getAttachment(TOKEN_KEY);
-            String expected = TokenHolder.get();
-            if (expected == null || expected.isBlank()
-                    || provided == null || !MessageDigest.isEqual(
-                            expected.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-                            provided.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
-                throw new RpcException(RpcException.FORBIDDEN_EXCEPTION,
-                        "非法内部 Dubbo 调用: " + invocation.getServiceName());
-            }
-            return invoker.invoke(invocation);
+            return authorizeAndInvoke(invoker, invocation);
         }
         // 直接写 invocation attachment：RpcContext clientAttachment 在自定义 Filter 与
         // ConsumerContextFilter 的执行顺序上存在被覆盖的时序问题（实测丢附件）。
@@ -50,6 +47,19 @@ public class DubboInternalAuthFilter implements Filter {
         String traceId = org.slf4j.MDC.get("traceId");
         if (traceId != null && !traceId.isBlank()) {
             invocation.setAttachment("X-Trace-Id", traceId);
+        }
+        return invoker.invoke(invocation);
+    }
+
+    private Result authorizeAndInvoke(Invoker<?> invoker, Invocation invocation) {
+        String provided = invocation.getAttachment(TOKEN_KEY);
+        String expected = TokenHolder.get();
+        if (expected == null || expected.isBlank()
+                || provided == null || !MessageDigest.isEqual(
+                        expected.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        provided.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+            throw new RpcException(RpcException.FORBIDDEN_EXCEPTION,
+                    "非法内部 Dubbo 调用: " + invocation.getServiceName());
         }
         return invoker.invoke(invocation);
     }

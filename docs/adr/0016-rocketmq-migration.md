@@ -34,4 +34,12 @@
 - 代价：内存占用 +384m（namesrv+proxy）；5.0.8 客户端无 Spring starter，生产消费封装为
   自研薄层（本就有 ReliableMessageSender 封装传统）。
 
+## 已知边界
+
+- **补偿重放不携带定时语义**：mq_compensation_log 的重放走 replaySend 立即投递。
+  当前所有定时消息都经 Outbox（有 delivery_expire_at 列，补发折算剩余延迟）且级别为
+  STANDARD，HIGH 级别仅用于即时事件，因此现状安全；若未来出现「HIGH + 定时」组合，
+  需给 MqCompensationRecord 增加到期字段。
+- %RETRY% broker 原生重试组未使用（消费重试由容器定时回投自管节奏）。
+
 实施记录与端到端证据：`docs/改动记录/2026-10-13/RabbitMQ迁移RocketMQ.md`。

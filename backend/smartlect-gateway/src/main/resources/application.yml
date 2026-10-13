@@ -24,9 +24,6 @@ spring:
       ssl:
         enabled: ${SMARTLECT_REDIS_SSL_ENABLED:false}
   cloud:
-    openfeign:
-      sentinel:
-        enabled: true
     nacos:
       config:
         server-addr: ${SMARTLECT_NACOS_ADDR:127.0.0.1:18848}

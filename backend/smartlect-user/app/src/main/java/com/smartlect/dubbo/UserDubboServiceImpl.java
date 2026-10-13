@@ -6,7 +6,6 @@ import com.smartlect.api.dto.UserJoinCountDTO;
 import com.smartlect.api.dubbo.UserDubboService;
 import com.smartlect.api.vo.UserAddressVO;
 import com.smartlect.api.vo.UserBriefVO;
-import com.smartlect.biz.UserInternalService;
 import com.smartlect.controller.internal.UserInternalController;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.api.dto.*;
@@ -18,7 +17,7 @@ import org.apache.dubbo.config.annotation.DubboService;
 import java.util.List;
 
 /**
- * 用户域 Dubbo provider：与 UserInternalController 共用 UserInternalService。
+ * 用户域 Dubbo provider：与 UserInternalController 共用同一 Service 层。
  * 委托用户一致性校验沿用 HTTP 通道 DelegatedUserIdentity 的语义（显式参数
  * 替代请求头，Dubbo 调用无 HTTP 上下文）。
  */

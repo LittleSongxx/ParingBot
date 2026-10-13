@@ -15,9 +15,6 @@ spring:
   application:
     name: smartlect-product
   cloud:
-    openfeign:
-      sentinel:
-        enabled: true
     loadbalancer:
       cache:
         enabled: true

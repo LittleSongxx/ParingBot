@@ -41,11 +41,6 @@ brokerIP1 = ${ip}
 listenPort = ${ROCKETMQ_BROKER_PORT:-10911}
 EOF
 done
-# 集群同样必须显式建 Topic（订阅侧校验路由；message.type 必须单值——见 compose 注释）
-for i in \$(seq 1 30); do remote "\$NODE1_IP" "docker exec rocketmq-broker sh mqadmin updateTopic -n 127.0.0.1:9876 -c DefaultCluster -t smartlect-delay -a '+message.type=DELAY' >/dev/null 2>&1" && break; sleep 2; done
-for topic in smartlect-pay smartlect-refund smartlect-rush smartlect-canal smartlect-mq-failure; do
-  for i in \$(seq 1 30); do remote "\$NODE1_IP" "docker exec rocketmq-broker sh mqadmin updateTopic -n 127.0.0.1:9876 -c DefaultCluster -t \$topic -a '+message.type=NORMAL' >/dev/null 2>&1" && break; sleep 2; done
-done
 log "generated dledger configs (peers=${PEERS})"
 
 # 2) 分发编排与配置到 node2/3
@@ -77,4 +72,15 @@ docker exec rocketmq-broker sh mqadmin clusterList -n 127.0.0.1:${ROCKETMQ_NAMES
 REPLICAS=$(grep -c "^broker-a" "$CL/evidence/rocketmq-cluster-list.txt" || true)
 [ "$REPLICAS" -ge 3 ] || { echo "expect 3 dledger replicas, got $REPLICAS"; exit 1; }
 grep -q "rocketmq cluster READY" /dev/null 2>&1 || true
+# 6) Topic 预建（订阅侧校验路由；message.type 必须显式单值——坑见 compose 注释；
+#    放在三节点拉起之后，broker 未就绪时 updateTopic 会失败，循环重试 30 次）
+for spec in "smartlect-delay DELAY" "smartlect-pay NORMAL" "smartlect-refund NORMAL" \
+            "smartlect-rush NORMAL" "smartlect-canal NORMAL" "smartlect-mq-failure NORMAL"; do
+  set -- ${spec}
+  for i in $(seq 1 30); do
+    remote "$NODE1_IP" "docker exec rocketmq-broker sh mqadmin updateTopic -n 127.0.0.1:9876 -c DefaultCluster -t $1 -a '+message.type=$2' >/dev/null 2>&1" && break
+    sleep 2
+  done
+done
+log "topics ready (6)"
 log "rocketmq cluster READY (3 dledger replicas, brokers on ${ROCKETMQ_BROKER_PORT:-10911})"
