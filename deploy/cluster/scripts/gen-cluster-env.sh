@@ -16,11 +16,6 @@ get() { grep -oP "^$1=\K.*" "$SRC" | head -1; }
 mkdir -p "$CL"/{rocketmq,nacos,redis,sentinel,evidence}
 chmod 700 "$CL"/{rocketmq,nacos,redis,sentinel}
 
-# erlang cookie 是集群身份，一旦生成必须跨重跑稳定，否则 c2/c3 会被拒绝加入
-else
-  COOKIE=$(openssl rand -hex 16)
-fi
-
 topology() {
   cat <<EOF
 NODE1_IP=$NODE1_IP
