@@ -19,7 +19,9 @@ mkdir -p "$CL/evidence"
 # 1) 按 nodes.env 生成各节点 DLedger broker 配置（peers 全量、selfId 按节点）
 cd "$CL/rocketmq"
 mkdir -p conf
-PEERS="n0-${NODE1_NAME}:${ROCKETMQ_DLEDGER_PORT:-40911};n1-${NODE2_NAME}:${ROCKETMQ_DLEDGER_PORT:-40911};n2-${NODE3_NAME}:${ROCKETMQ_DLEDGER_PORT:-40911}"
+# peers 必须用 IP：node2/3 的 hostname 是克隆残留的 smartlect-node1（解析歧义），
+# DLedger 按「selfId-host:port」的第一个连字符拆分，host 段用 IP 不依赖系统主机名。
+PEERS="n0-${NODE1_IP}:${ROCKETMQ_DLEDGER_PORT:-40911};n1-${NODE2_IP}:${ROCKETMQ_DLEDGER_PORT:-40911};n2-${NODE3_IP}:${ROCKETMQ_DLEDGER_PORT:-40911}"
 for n in 1 2 3; do
   eval "name=\$NODE${n}_NAME"
   eval "ip=\$NODE${n}_IP"
