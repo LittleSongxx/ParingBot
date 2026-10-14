@@ -81,8 +81,15 @@ private CouponRushRedisComponent couponRushRedisComponent;
 	@Resource
 	private OrderRequestIdempotencyService orderRequestIdempotencyService;
 
+	@Resource
+	private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+
+	// 事务模型（ADR-0019，对齐 postOrder 三阶段）：旧实现两个入口整体 @Transactional，
+	// 把 Lua 预占/远程锁资源/建支付意图等远程调用全部包进本地事务（普通下单路径已修掉的
+	// RPC-in-TX 反模式）。现改为：只读校验在事务外 → Redis/远程预占在事务外 →
+	// 订单/关系/明细 + RUSH_TIMEOUT Outbox 消息收进 TransactionTemplate 短本地事务 →
+	// 创建占位券等远程写在事务外，失败走 releaseRush* 补偿或由超时关单收敛。
 	@Override
-	@Transactional(rollbackFor = Exception.class)
 	public CouponRushPrepareDTO prepareCouponRush(String userId, String couponId, String idempotencyKey) {
 		return orderRequestIdempotencyService.execute(
 				userId,
@@ -94,7 +101,6 @@ private CouponRushRedisComponent couponRushRedisComponent;
 	}
 
 	@Override
-	@Transactional(rollbackFor = Exception.class)
 	public PayInfoDTO postCouponRushOrder(String userId, String couponId, String payMethod, String idempotencyKey) {
 		return orderRequestIdempotencyService.execute(
 				userId,
@@ -106,10 +112,12 @@ private CouponRushRedisComponent couponRushRedisComponent;
 	}
 
 	private CouponRushPrepareDTO createCouponRushReservation(String userId, String couponId) {
+		// Phase 1: 只读校验（远程，不占本地连接）
 		DiscountCouponVO discountCoupon = validateCouponRush(couponId);
 		String userCouponId = StringTools.createUserCouponId();
 		BigDecimal payAmount = new BigDecimal(Constants.RUSHING_COUPON_PAY_AMOUNT);
 
+		// Phase 2: Redis 预占 + 远程库存扣减（各自事务，本地不持连接）
 		int rushCode = couponRushRedisComponent.rushingCoupon(couponId, userId, userCouponId);
 		if (rushCode == 1) {
 			couponFeignSupport.syncRushStockFromDbIfRedisZero(couponId);
@@ -133,15 +141,36 @@ private CouponRushRedisComponent couponRushRedisComponent;
 			}
 			couponFeignSupport.invalidateCouponCache(couponId);
 
+			// Phase 3: 短本地事务建单（order + rel + item + RUSH_TIMEOUT Outbox 原子落库，零远程调用）。
+			// 曾经的 @Transactional 整体包裹既占连接又把远程调用卷进本地事务；
+			// 关单消息必须与订单同事务（ADR-0018 同款约束），否则会重演孤儿订单窗口。
 			OrderInfo orderInfo;
 			try {
-				orderInfo = createCouponRushOrder(userId, couponId, userCouponId, discountCoupon);
+				orderInfo = transactionTemplate.execute(status ->
+						insertCouponRushOrder(userId, couponId, userCouponId, discountCoupon, payAmount));
 			} catch (Exception e) {
 				couponFeignSupport.releaseRushCouponReserve(couponId, userId);
-				if (e instanceof BusinessException) {
-					throw (BusinessException) e;
+				if (e instanceof BusinessException businessException) {
+					throw businessException;
 				}
 				log.error("优惠券秒杀建单失败 couponId={}, userId={}", couponId, userId, e);
+				throw new BusinessException("下单失败，请稍后重试");
+			}
+
+			// Phase 4: 事务外远程写——创建占位券（CANT，支付成功才激活）。
+			// 失败时订单已带 RUSH_TIMEOUT 消息：15 分钟超时关单会释放预占并关闭订单，自动收敛；
+			// 这里同步补偿 release 加速收敛，不留下挂着预占的僵尸资格。
+			try {
+				UserCouponCreateDTO createDTO = new UserCouponCreateDTO();
+				createDTO.setUserCouponId(userCouponId);
+				createDTO.setUserId(userId);
+				createDTO.setCouponId(couponId);
+				createDTO.setStatus(UserCouponStatusEnum.CANT.getStatus());
+				couponFeignSupport.createUserCoupon(createDTO);
+			} catch (Exception e) {
+				couponFeignSupport.releaseRushCouponReserve(couponId, userId);
+				log.error("优惠券秒杀创建占位券失败，订单交由超时关单收敛 couponId={}, orderId={}",
+						couponId, orderInfo.getOrderId(), e);
 				throw new BusinessException("下单失败，请稍后重试");
 			}
 
@@ -163,6 +192,7 @@ private CouponRushRedisComponent couponRushRedisComponent;
 	}
 
 	private PayInfoDTO createCouponRushPayment(String userId, String couponId, String payMethod) {
+		// 只读校验（远程/Redis/DB 读）全程无事务
 		PayChannelEnum payChannelEnum = PayChannelEnum.resolve(payMethod);
 		if (payChannelEnum == null) {
 			throw new BusinessException("支付方式无效");
@@ -191,6 +221,7 @@ private CouponRushRedisComponent couponRushRedisComponent;
 			throw new BusinessException("当前订单已支付");
 		}
 
+		// 唯一本地写：待付款条件更新支付渠道（单条条件 UPDATE 自身原子，无需外层事务）
 		OrderInfo updatePay = new OrderInfo();
 		updatePay.setPayChannel(payMethod);
 		OrderInfoQuery payUpdateQuery = new OrderInfoQuery();
@@ -198,6 +229,7 @@ private CouponRushRedisComponent couponRushRedisComponent;
 		payUpdateQuery.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
 		orderInfoMapper.updateByParam(updatePay, payUpdateQuery);
 
+		// 事务外远程写（幂等）
 		orderInfo.setPayChannel(payMethod);
 		BigDecimal payAmount = OrderPayAmountUtil.normalizeChannelPayAmount(orderInfo.getAmount());
 		PayInfoDTO payInfoDTO = payFeignSupport.getPayUrl(
@@ -254,12 +286,16 @@ private CouponRushRedisComponent couponRushRedisComponent;
 		return Constants.COUPON_RUSH_ORDER_SUBJECT_PREFIX + name;
 	}
 
-	private OrderInfo createCouponRushOrder(String userId, String couponId, String userCouponId,
-			DiscountCouponVO discountCoupon) {
+	/**
+	 * 短本地事务内的纯 DB 写（由调用方的 TransactionTemplate 包裹执行）：
+	 * order_info + order_coupon_rel + order_item + RUSH_TIMEOUT Outbox 消息原子落库。
+	 * 零远程调用——创建占位券（远程）已移至事务外的 Phase 4。
+	 */
+	private OrderInfo insertCouponRushOrder(String userId, String couponId, String userCouponId,
+			DiscountCouponVO discountCoupon, BigDecimal payAmount) {
 		Date now = new Date();
 		String orderId = StringTools.createOrderId();
 		String payOrderId = StringTools.createPayOrderId();
-		BigDecimal payAmount = new BigDecimal(Constants.RUSHING_COUPON_PAY_AMOUNT);
 
 		OrderInfo orderInfo = new OrderInfo();
 		orderInfo.setOrderId(orderId);
@@ -272,14 +308,6 @@ private CouponRushRedisComponent couponRushRedisComponent;
 		orderInfo.setPayOrderId(payOrderId);
 		orderInfo.setSubject(buildCouponRushOrderSubject(discountCoupon.getCouponName()));
 		orderInfoMapper.insert(orderInfo);
-
-		// 券先建成"不可用"，支付成功后才激活成"未使用"，避免没付钱就能用。
-		UserCouponCreateDTO createDTO = new UserCouponCreateDTO();
-		createDTO.setUserCouponId(userCouponId);
-		createDTO.setUserId(userId);
-		createDTO.setCouponId(couponId);
-		createDTO.setStatus(UserCouponStatusEnum.CANT.getStatus());
-		couponFeignSupport.createUserCoupon(createDTO);
 
 		OrderCouponRel rel = new OrderCouponRel();
 		rel.setOrderId(orderId);
@@ -302,6 +330,8 @@ private CouponRushRedisComponent couponRushRedisComponent;
 		orderItem.setCover("");
 		orderItemMapper.insert(orderItem);
 
+		// RUSH_TIMEOUT 关单消息与订单同事务写入 Outbox（对齐普通下单 Phase 3，ADR-0018/0019）：
+		// 订单存在则必然有关单收敛路径，占位券失败也不会留下永久挂起的待付款单。
 		PayOrderMessageDTO payTimeoutDto = new PayOrderMessageDTO();
 		payTimeoutDto.setOrderId(orderId);
 		transactionalMqSender.sendAfterCommit(

@@ -193,8 +193,10 @@ class OrderMoneyPersistenceIT {
     }
 
     private static void allocate(SqlSession session, OrderInfo order) {
-        var service = new OrderInfoServiceImpl();
-        ReflectionTestUtils.setField(service, "orderItemMapper", session.getMapper(OrderItemMapper.class));
+        // recordPaymentOutcomes 已随批次二拆分移入 OrderPaymentService；该方法只依赖 orderItemMapper（构造器第 2 参）
+        var service = new com.smartlect.biz.impl.OrderPaymentService(
+                null, session.getMapper(OrderItemMapper.class), null, null, null,
+                null, null, null, null, null, null, null);
         ReflectionTestUtils.invokeMethod(service, "recordPaymentOutcomes", List.of(order), order.getPayOrderId());
     }
 

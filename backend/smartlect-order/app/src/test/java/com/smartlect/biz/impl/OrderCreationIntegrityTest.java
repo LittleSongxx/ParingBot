@@ -77,6 +77,8 @@ class OrderCreationIntegrityTest {
     @Mock
     private com.smartlect.api.support.CouponFeignSupport couponFeignSupport;
     @Mock
+    private com.smartlect.api.support.CartFeignSupport cartFeignSupport;
+    @Mock
     private com.smartlect.mappers.OrderCouponRelMapper<com.smartlect.entity.po.OrderCouponRel,
             com.smartlect.entity.query.OrderCouponRelQuery> orderCouponRelMapper;
     @Mock
@@ -85,8 +87,9 @@ class OrderCreationIntegrityTest {
     @Mock
     private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
+    // 下单域已拆分为 OrderCreationService（ADR-0019）；构造器注入由 @InjectMocks 完成
     @InjectMocks
-    private OrderInfoServiceImpl service;
+    private OrderCreationService service;
 
     @org.junit.jupiter.api.BeforeEach
     void setUpTransactionTemplate() {

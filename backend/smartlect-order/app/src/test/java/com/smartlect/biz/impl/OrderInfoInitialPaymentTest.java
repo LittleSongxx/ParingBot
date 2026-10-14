@@ -23,12 +23,14 @@ class OrderInfoInitialPaymentTest {
     @Mock
     private PayFeignSupport payFeignSupport;
 
-    private OrderInfoServiceImpl service;
+    private OrderCreationService service;
 
     @BeforeEach
     void setUp() {
-        service = new OrderInfoServiceImpl();
-        ReflectionTestUtils.setField(service, "payFeignSupport", payFeignSupport);
+        // requestInitialPayInfoBestEffort 已随批次二拆分移入 OrderCreationService；
+        // 该方法只依赖 payFeignSupport，其余依赖传 null 即可。
+        service = new OrderCreationService(null, null, null, null, null,
+                null, null, null, null, null, payFeignSupport, null, null, null, null, null);
     }
 
     @Test

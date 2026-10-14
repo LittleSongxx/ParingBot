@@ -59,14 +59,22 @@ class OrderAggregateCancellationTest {
     private CouponFeignSupport couponFeignSupport;
     @Mock
     private RemoteCompensateRecorder remoteCompensateRecorder;
-    @InjectMocks
-    private OrderInfoServiceImpl service;
+    @Mock
+    private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+    private OrderCancellationService service;
 
     @org.junit.jupiter.api.BeforeEach
-    void wireStateMachine() {
+    void wireService() {
+        // 真实状态机 + mock mapper（CAS 语义必须是真的）；短事务模板透传执行回调
         com.smartlect.state.OrderStateMachine machine = new com.smartlect.state.OrderStateMachine();
-        org.springframework.test.util.ReflectionTestUtils.setField(machine, "orderInfoMapper", orderInfoMapper);
-        org.springframework.test.util.ReflectionTestUtils.setField(this.service, "orderStateMachine", machine);
+        ReflectionTestUtils.setField(machine, "orderInfoMapper", orderInfoMapper);
+        org.mockito.Mockito.lenient().when(transactionTemplate.execute(
+                        org.mockito.ArgumentMatchers.<org.springframework.transaction.support.TransactionCallback<Object>>any()))
+                .thenAnswer(call -> call.<org.springframework.transaction.support.TransactionCallback<Object>>getArgument(0)
+                        .doInTransaction(null));
+        this.service = new OrderCancellationService(orderInfoMapper, orderItemMapper, orderCouponRelMapper,
+                transactionTemplate, machine, payOrderRedisComponent, payFeignSupport, stockFeignSupport,
+                couponFeignSupport, remoteCompensateRecorder);
     }
 
     @BeforeEach
@@ -170,9 +178,13 @@ class OrderAggregateCancellationTest {
         OrderInfo waiting = order("order-1", "pay-1", OrderStatusEnum.WAIT_PAYMENT);
         when(orderInfoMapper.selectList(any(OrderInfoQuery.class))).thenReturn(List.of(waiting));
         PayOrderNotifyDTO notification = new PayOrderNotifyDTO("pay-1", "channel-1");
+        // 支付冲突处理已随批次二拆分移入 OrderPaymentService
+        OrderPaymentService paymentService = new OrderPaymentService(orderInfoMapper, orderItemMapper,
+                null, null, transactionTemplate, null, null, payOrderRedisComponent,
+                payFeignSupport, null, null, null);
 
         assertThrows(RuntimeException.class, () -> ReflectionTestUtils.invokeMethod(
-                service, "handlePaySuccessConflict", "pay-1", notification));
+                paymentService, "handlePaySuccessConflict", "pay-1", notification));
 
         verify(payOrderRedisComponent, never()).isPayOrderCloseMarked(anyString());
         verify(payFeignSupport, never()).markRefunded(anyString());

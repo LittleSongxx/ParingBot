@@ -31,9 +31,10 @@ import static org.mockito.Mockito.*;
 class ShopMoneyContractProbeTest {
     @Test
     void equalPriceSkuLinesReceiveEqualPaidAmounts() {
-        var service = new OrderInfoServiceImpl();
+        // recordPaymentOutcomes 已随批次二拆分移入 OrderPaymentService；该方法只依赖 orderItemMapper（构造器第 2 参）
         OrderItemMapper<OrderItem, OrderItemQuery> items = mock(OrderItemMapper.class);
-        ReflectionTestUtils.setField(service, "orderItemMapper", items);
+        var service = new OrderPaymentService(null, items, null, null, null,
+                null, null, null, null, null, null, null);
         when(items.selectList(any(OrderItemQuery.class))).thenReturn(List.of(item("1"), item("2"), item("3")));
         when(items.recordPaidAmount(anyString(), any())).thenReturn(1);
 
@@ -73,9 +74,9 @@ class ShopMoneyContractProbeTest {
 
     @Test
     void manyTinyLinesAndZeroPriceLinesStayBoundedAndConserveEveryCent() {
-        var service = new OrderInfoServiceImpl();
         OrderItemMapper<OrderItem, OrderItemQuery> items = mock(OrderItemMapper.class);
-        ReflectionTestUtils.setField(service, "orderItemMapper", items);
+        var service = new OrderPaymentService(null, items, null, null, null,
+                null, null, null, null, null, null, null);
         List<OrderItem> lines = new ArrayList<>();
         for (int index = 0; index < 100; index++) {
             OrderItem line = item(String.format("%03d", index));
