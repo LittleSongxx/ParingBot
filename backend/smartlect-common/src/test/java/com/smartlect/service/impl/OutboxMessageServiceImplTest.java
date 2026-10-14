@@ -80,14 +80,12 @@ class OutboxMessageServiceImplTest {
                 eq(OutboxMessageStatusEnum.FAILED.getStatus()),
                 eq(OutboxMessageStatusEnum.SENDING.getStatus()),
                 eq(OutboxMessageStatusEnum.EXHAUSTED.getStatus()),
-                eq(10),
-                any(Date.class)))
+                eq(10)))
                 .thenReturn(0);
         when(mapper.selectDispatchBatch(
                 eq(OutboxMessageStatusEnum.PENDING.getStatus()),
                 eq(OutboxMessageStatusEnum.FAILED.getStatus()),
                 eq(OutboxMessageStatusEnum.SENDING.getStatus()),
-                any(Date.class),
                 any(Date.class),
                 eq(10),
                 eq(20)))
@@ -99,13 +97,11 @@ class OutboxMessageServiceImplTest {
                 eq(OutboxMessageStatusEnum.FAILED.getStatus()),
                 eq(OutboxMessageStatusEnum.SENDING.getStatus()),
                 eq(OutboxMessageStatusEnum.EXHAUSTED.getStatus()),
-                eq(10),
-                any(Date.class));
+                eq(10));
         verify(mapper).selectDispatchBatch(
                 eq(OutboxMessageStatusEnum.PENDING.getStatus()),
                 eq(OutboxMessageStatusEnum.FAILED.getStatus()),
                 eq(OutboxMessageStatusEnum.SENDING.getStatus()),
-                any(Date.class),
                 any(Date.class),
                 eq(10),
                 eq(20));

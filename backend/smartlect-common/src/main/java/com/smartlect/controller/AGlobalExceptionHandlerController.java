@@ -32,7 +32,7 @@ public class AGlobalExceptionHandlerController extends ABaseController {
             logger.debug("请求资源不存在, url={}, message={}", request.getRequestURL(), e.getMessage());
             ajaxResponse.setCode(ResponseCodeEnum.CODE_404.getCode());
             ajaxResponse.setInfo(ResponseCodeEnum.CODE_404.getMsg());
-            ajaxResponse.setStatus(STATUC_ERROR);
+            ajaxResponse.setStatus(STATUS_ERROR);
         } else if (e instanceof BusinessException) {
             //业务错误
             BusinessException biz = (BusinessException) e;
@@ -52,7 +52,7 @@ public class AGlobalExceptionHandlerController extends ABaseController {
             ajaxResponse.setCode(biz.getCode() == null ? ResponseCodeEnum.CODE_600.getCode() : biz.getCode());
             ajaxResponse.setInfo(biz.getMessage());
             ajaxResponse.setData(biz.getData());
-            ajaxResponse.setStatus(STATUC_ERROR);
+            ajaxResponse.setStatus(STATUS_ERROR);
         } else if (e instanceof BindException || e instanceof MethodArgumentTypeMismatchException
                 || e instanceof HandlerMethodValidationException) {
             //参数类型错误 / 字段校验失败：此前吞成 CODE_600 通用文案，前端拿不到字段级提示
@@ -71,18 +71,18 @@ public class AGlobalExceptionHandlerController extends ABaseController {
                             .toList());
                 }
             }
-            ajaxResponse.setStatus(STATUC_ERROR);
+            ajaxResponse.setStatus(STATUS_ERROR);
         } else if (e instanceof DuplicateKeyException) {
             //主键冲突
             logger.warn("请求触发唯一键冲突, url={}, message={}", request.getRequestURL(), e.getMessage());
             ajaxResponse.setCode(ResponseCodeEnum.CODE_601.getCode());
             ajaxResponse.setInfo(ResponseCodeEnum.CODE_601.getMsg());
-            ajaxResponse.setStatus(STATUC_ERROR);
+            ajaxResponse.setStatus(STATUS_ERROR);
         } else {
             logger.error("请求处理异常, url={}", request.getRequestURL(), e);
             ajaxResponse.setCode(ResponseCodeEnum.CODE_500.getCode());
             ajaxResponse.setInfo(ResponseCodeEnum.CODE_500.getMsg());
-            ajaxResponse.setStatus(STATUC_ERROR);
+            ajaxResponse.setStatus(STATUS_ERROR);
         }
         return ajaxResponse;
     }

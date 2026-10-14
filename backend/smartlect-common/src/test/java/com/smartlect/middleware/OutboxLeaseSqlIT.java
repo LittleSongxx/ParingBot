@@ -72,7 +72,7 @@ class OutboxLeaseSqlIT {
             // 失败：退避由 DATE_ADD(NOW(), INTERVAL ... SECOND) 计算
             assertEquals(1, mapper.markFailed(row.getId(), 1, 2, "worker-a", "boom", 60L));
             // 批量选取：next_retry_time 在未来 → 不入选
-            assertEquals(0, mapper.selectDispatchBatch(0, 2, 1, new Date(), new Date(), 10, 10).size());
+            assertEquals(0, mapper.selectDispatchBatch(0, 2, 1, new Date(), 10, 10).size());
             assertNotNull(mapper.selectByIdempotencyKey("lease-sql-it-1"));
         }
     }

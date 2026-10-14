@@ -152,13 +152,11 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
         }
         // 避开刚写入、即将由 afterCommit 处理的记录
         Date before = new Date(System.currentTimeMillis() - 3000L);
-        Date now = new Date();
         Integer exhausted = localMessageOutboxMapper.markRetriesExhausted(
                 OutboxMessageStatusEnum.FAILED.getStatus(),
                 OutboxMessageStatusEnum.SENDING.getStatus(),
                 OutboxMessageStatusEnum.EXHAUSTED.getStatus(),
-                maxRetries,
-                now);
+                maxRetries);
         if (exhausted != null && exhausted > 0) {
             log.error("Outbox 有 {} 条消息重试耗尽，已转入 EXHAUSTED 等待人工处理", exhausted);
         }
@@ -167,7 +165,6 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
                 OutboxMessageStatusEnum.FAILED.getStatus(),
                 OutboxMessageStatusEnum.SENDING.getStatus(),
                 before,
-                now,
                 maxRetries,
                 batchSize);
         if (list == null || list.isEmpty()) {

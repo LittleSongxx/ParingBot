@@ -37,8 +37,7 @@ public interface LocalMessageOutboxMapper {
     Integer markRetriesExhausted(@Param("failedStatus") Integer failedStatus,
                                  @Param("sendingStatus") Integer sendingStatus,
                                  @Param("exhaustedStatus") Integer exhaustedStatus,
-                                 @Param("maxRetries") int maxRetries,
-                                 @Param("now") Date now);
+                                 @Param("maxRetries") int maxRetries);
 
     Integer requeueExhausted(@Param("id") Long id,
                              @Param("exhaustedStatus") Integer exhaustedStatus,
@@ -53,7 +52,6 @@ public interface LocalMessageOutboxMapper {
                                                  @Param("failedStatus") Integer failedStatus,
                                                  @Param("sendingStatus") Integer sendingStatus,
                                                  @Param("beforeTime") Date beforeTime,
-                                                 @Param("now") Date now,
                                                  @Param("maxRetries") int maxRetries,
                                                  @Param("limit") int limit);
 }
