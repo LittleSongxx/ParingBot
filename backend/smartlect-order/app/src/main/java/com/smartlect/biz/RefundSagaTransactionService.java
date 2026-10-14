@@ -1,5 +1,6 @@
 package com.smartlect.biz;
 
+import com.smartlect.api.dto.RefundCouponReturnDTO;
 import com.smartlect.api.dto.RefundStockRestoreDTO;
 import com.smartlect.api.enums.OrderItemStatusEnum;
 import com.smartlect.api.enums.OrderStatusEnum;
@@ -9,11 +10,13 @@ import com.smartlect.entity.enums.MessageReliabilityLevelEnum;
 import com.smartlect.entity.enums.RefundSagaStatus;
 import com.smartlect.entity.po.OrderInfo;
 import com.smartlect.entity.po.OrderItem;
+import com.smartlect.entity.po.OrderCouponRel;
 import com.smartlect.entity.po.RefundRequest;
 import com.smartlect.exception.BusinessException;
 import com.smartlect.mappers.OrderInfoMapper;
 import com.smartlect.mappers.OrderItemMapper;
 import com.smartlect.mappers.RefundRequestMapper;
+import com.smartlect.entity.query.OrderCouponRelQuery;
 import com.smartlect.state.OrderStateEvent;
 import com.smartlect.state.OrderStateMachine;
 import com.smartlect.support.MqIdempotencyKeys;
@@ -29,6 +32,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import com.smartlect.utils.StringTools;
 
 @Service
 @Slf4j
@@ -44,6 +48,10 @@ public class RefundSagaTransactionService {
     private TransactionalMqSender transactionalMqSender;
     @Resource
     private OrderStateMachine orderStateMachine;
+    @Resource
+    private com.smartlect.mappers.OrderCouponRelMapper<
+            com.smartlect.entity.po.OrderCouponRel,
+            com.smartlect.entity.query.OrderCouponRelQuery> orderCouponRelMapper;
 
     @Value("${refund.saga.retry-seconds:60}")
     private int retrySeconds;
@@ -245,6 +253,61 @@ public class RefundSagaTransactionService {
                 aggregateEvent, order) == 0) {
             log.info("退款聚合状态已被并发推进 orderId={}，跳过", order.getOrderId());
         }
+        // 退款全额还券（ADR-0020）：整单全额退（无剩余正常明细）时，把核销的券经 Outbox
+        // 事件返还（USED→NOUSE，券过期由消费端跳过）。事件与退款收尾同事务落库，
+        // 消费端幂等（容器租约 + 条件更新双保险）。部分退款不还券。
+        if (aggregateEvent == OrderStateEvent.FULL_REFUND && (normalCount == null || normalCount == 0)) {
+            issueCouponReturnIfPresent(order);
+        }
+    }
+
+    /** 全额退款时查找本单（或聚合内首单）的用券关系并发出还券事件；无券/秒杀单则跳过。 */
+    private void issueCouponReturnIfPresent(OrderInfo order) {
+        OrderCouponRel rel = findCouponRel(order);
+        if (rel == null || StringTools.isEmpty(rel.getUserCouponId())) {
+            return;
+        }
+        transactionalMqSender.sendAfterCommit(
+                RocketMqTopics.TOPIC_REFUND,
+                RocketMqTopics.TAG_REFUND_COUPON_RETURN,
+                new RefundCouponReturnDTO(order.getOrderId(), order.getPayOrderId(),
+                        rel.getUserCouponId(), rel.getCouponId()),
+                "refund-return-coupon:" + (StringTools.isEmpty(order.getPayOrderId())
+                        ? order.getOrderId() : order.getPayOrderId()),
+                MessageReliabilityLevelEnum.STANDARD,
+                null);
+    }
+
+    private OrderCouponRel findCouponRel(OrderInfo order) {
+        OrderCouponRelQuery relQuery = new OrderCouponRelQuery();
+        relQuery.setOrderId(order.getOrderId());
+        List<OrderCouponRel> rels = orderCouponRelMapper.selectList(relQuery);
+        if (rels != null && !rels.isEmpty()) {
+            return rels.get(0);
+        }
+        // 用券关系挂在聚合首单上：本单无关系时回看同支付单的兄弟订单
+        if (order.getPayOrderId() == null || order.getPayOrderId().isBlank()) {
+            return null;
+        }
+        com.smartlect.entity.query.OrderInfoQuery siblingQuery = new com.smartlect.entity.query.OrderInfoQuery();
+        siblingQuery.setPayOrderId(order.getPayOrderId());
+        // 字段声明为通配符泛型（OrderInfoMapper<OrderInfo, ?>），此处需要按具体查询类型调用
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        List<OrderInfo> siblings = ((OrderInfoMapper) orderInfoMapper).selectList(siblingQuery);
+        if (siblings == null) {
+            return null;
+        }
+        for (OrderInfo sibling : siblings) {
+            if (sibling == null || order.getOrderId().equals(sibling.getOrderId())) {
+                continue;
+            }
+            relQuery.setOrderId(sibling.getOrderId());
+            rels = orderCouponRelMapper.selectList(relQuery);
+            if (rels != null && !rels.isEmpty()) {
+                return rels.get(0);
+            }
+        }
+        return null;
     }
 
     private static void validateRefundable(OrderInfo order, OrderItem item) {

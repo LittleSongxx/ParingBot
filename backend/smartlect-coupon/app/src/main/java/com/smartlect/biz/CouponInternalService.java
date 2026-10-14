@@ -140,6 +140,61 @@ public class CouponInternalService {
         return vo;
     }
 
+
+    /**
+     * 退款全额还券（ADR-0020）：USED→NOUSE 条件更新，幂等可重放。
+     * 返回 true 表示终态成功（已还/无需还/券过期跳过），消费端据此确认；
+     * false 仅在数据缺失时返回（同样按终态处理并留痕，不无限重投）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean returnCouponForRefund(com.smartlect.api.dto.RefundCouponReturnDTO dto) {
+        if (dto == null || StringTools.isEmpty(dto.getUserCouponId())) {
+            log.warn("退款还券消息字段不完整，跳过 dto={}", dto);
+            return false;
+        }
+        UserCoupon userCoupon = userCouponMapper.selectByUserCouponId(dto.getUserCouponId());
+        if (userCoupon == null) {
+            log.warn("退款还券：用户券不存在，跳过 userCouponId={}", dto.getUserCouponId());
+            return false;
+        }
+        if (UserCouponStatusEnum.NOUSE.getStatus().equals(userCoupon.getStatus())) {
+            // 已返还（重放）或从未核销——幂等成功
+            return true;
+        }
+        if (!UserCouponStatusEnum.USED.getStatus().equals(userCoupon.getStatus())) {
+            // CANT 等其它状态不是退款还券的语义范围（如秒杀占位券走独立的激活/释放链）
+            log.info("退款还券：用户券状态非已使用，跳过 userCouponId={}, status={}",
+                    dto.getUserCouponId(), userCoupon.getStatus());
+            return true;
+        }
+        DiscountCoupon coupon = discountCouponMapper.selectByCouponId(userCoupon.getCouponId());
+        Date now = new Date();
+        if (coupon != null && coupon.getValidEndTime() != null && now.after(coupon.getValidEndTime())) {
+            // 券已过期：还了也用不了，按终态跳过（行业惯例：过期券不返还可用状态）
+            log.info("退款还券：券模板已过期，跳过 userCouponId={}, couponId={}",
+                    dto.getUserCouponId(), userCoupon.getCouponId());
+            return true;
+        }
+        UserCoupon bean = new UserCoupon();
+        bean.setStatus(UserCouponStatusEnum.NOUSE.getStatus());
+        bean.setUseTime(null);
+        UserCouponQuery query = new UserCouponQuery();
+        query.setUserCouponId(userCoupon.getUserCouponId());
+        query.setUserId(userCoupon.getUserId());
+        query.setStatus(UserCouponStatusEnum.USED.getStatus());
+        int updated = userCouponMapper.updateByParam(bean, query);
+        if (updated < 1) {
+            // 并发下已被他人推进（重放/人工），重读确认幂等
+            UserCoupon latest = userCouponMapper.selectByUserCouponId(userCoupon.getUserCouponId());
+            if (latest != null && UserCouponStatusEnum.NOUSE.getStatus().equals(latest.getStatus())) {
+                return true;
+            }
+            throw new BusinessException("退款还券失败：用户券状态变化");
+        }
+        log.info("退款全额还券成功 orderId={}, userCouponId={}", dto.getOrderId(), userCoupon.getUserCouponId());
+        return true;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public void changeUserCouponStatus(UserCouponStatusChangeDTO dto) {
         UserCoupon bean = new UserCoupon();

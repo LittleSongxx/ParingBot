@@ -42,6 +42,7 @@ public final class RocketMqTopics {
     public static final String TAG_CONFIRM_RECEIPT = "confirm-receipt";
     public static final String TAG_REFUND_STOCK = "refund-stock";
     public static final String TAG_REFUND_RESULT = "refund-result";
+    public static final String TAG_REFUND_COUPON_RETURN = "refund-coupon-return";
     public static final String TAG_RUSH_ORDER = "rush-order";
     public static final String TAG_RUSH_TIMEOUT = "rush-timeout";
     public static final String TAG_TEMPBAN_EXPIRE = "tempban-expire";
