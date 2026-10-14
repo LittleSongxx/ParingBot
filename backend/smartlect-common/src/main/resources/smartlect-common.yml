@@ -80,7 +80,11 @@ smartlect:
     connect-timeout-ms: ${SMARTLECT_FEIGN_CONNECT_TIMEOUT_MS:3000}
     read-timeout-ms: ${SMARTLECT_FEIGN_READ_TIMEOUT_MS:10000}
   sentinel:
-    feign-rules-enabled: ${SMARTLECT_SENTINEL_FEIGN_RULES:true}
+    # 键名曾为 feign-rules-enabled，与 Java 读取的 dubbo-rules-enabled 不一致（开关永不生效），
+    # 已修复对齐（ADR-0023）
+    dubbo-rules-enabled: ${SMARTLECT_SENTINEL_DUBBO_RULES:true}
+    # 可选：Dubbo 熔断规则上 Nacos 动态数据源（配置 data-id 后热更生效，代码规则降级为兜底）
+    # dubbo-rules-data-id: smartlect-sentinel-dubbo-rules.json
 
 # /actuator/prometheus 无鉴权，会暴露 URI 模板、SQL、线程池等内部细节。
 # 这里沿用既有做法：actuator 留在业务端口，由 Nginx / 网关不对外反代 /actuator 来隔离

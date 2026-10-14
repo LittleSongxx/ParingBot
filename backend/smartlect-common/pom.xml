@@ -145,6 +145,11 @@
       <groupId>com.alibaba.csp</groupId>
       <artifactId>sentinel-apache-dubbo-adapter</artifactId>
     </dependency>
+        <!-- Sentinel 规则 Nacos 动态数据源（ADR-0023，可选启用） -->
+        <dependency>
+            <groupId>com.alibaba.csp</groupId>
+            <artifactId>sentinel-datasource-nacos</artifactId>
+        </dependency>
     <dependency>
       <groupId>org.springframework.cloud</groupId>
       <artifactId>spring-cloud-starter-loadbalancer</artifactId>

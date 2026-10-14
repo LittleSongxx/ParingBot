@@ -19,8 +19,7 @@ public interface LocalMessageOutboxMapper {
                              @Param("failedStatus") Integer failedStatus,
                              @Param("sendingStatus") Integer sendingStatus,
                              @Param("leaseOwner") String leaseOwner,
-                             @Param("leaseUntil") Date leaseUntil,
-                             @Param("now") Date now);
+                             @Param("leaseMillis") long leaseMillis);
 
     Integer markSent(@Param("id") Long id,
                      @Param("sendingStatus") Integer sendingStatus,
@@ -33,7 +32,7 @@ public interface LocalMessageOutboxMapper {
                        @Param("failedStatus") Integer failedStatus,
                        @Param("leaseOwner") String leaseOwner,
                        @Param("errorMessage") String errorMessage,
-                       @Param("nextRetryTime") Date nextRetryTime);
+                       @Param("backoffSeconds") long backoffSeconds);
 
     Integer markRetriesExhausted(@Param("failedStatus") Integer failedStatus,
                                  @Param("sendingStatus") Integer sendingStatus,

@@ -489,6 +489,8 @@ public class OrderCreationService {
     }
 
     void distributeCouponDiscount(List<OrderInfo> orderInfoList, BigDecimal discount) {
+        // 分摊顺序确定化（ADR-0023）：按 orderId 排序，避免 HashMap 迭代序导致同输入不同分摊
+        orderInfoList.sort(java.util.Comparator.comparing(OrderInfo::getOrderId));
         BigDecimal remaining = discount;
         for (OrderInfo order : orderInfoList) {
             if (remaining.compareTo(BigDecimal.ZERO) <= 0) {

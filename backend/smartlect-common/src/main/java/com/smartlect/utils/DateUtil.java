@@ -11,13 +11,15 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 
 @Slf4j
 public class DateUtil {
 
     private static final Object lockObj = new Object();
-    private static Map<String, ThreadLocal<SimpleDateFormat>> sdfMap = new HashMap<String, ThreadLocal<SimpleDateFormat>>();
+    // ADR-0023：读在锁外的 HashMap 存在理论竞态，换 ConcurrentHashMap（双检锁保留可简化为 computeIfAbsent）
+    private static final Map<String, ThreadLocal<SimpleDateFormat>> sdfMap = new ConcurrentHashMap<>();
 
     private static SimpleDateFormat getSdf(final String pattern) {
         ThreadLocal<SimpleDateFormat> tl = sdfMap.get(pattern);
@@ -44,13 +46,13 @@ public class DateUtil {
     }
 
     public static Date parse(String dateStr, String pattern) {
+        // ADR-0023：旧兜底"解析失败回退当前时间"是危险语义（坏输入变合法时间）。
+        // 现调用方均为自格式化字符串回读（format→parse 闭环），解析失败按程序错误抛出。
         try {
             return getSdf(pattern).parse(dateStr);
         } catch (ParseException e) {
-            // 保持原兜底行为（返回当前时间），但走日志而不是 stderr
-            log.warn("日期解析失败，回退为当前时间：dateStr={}, pattern={}", dateStr, pattern, e);
+            throw new IllegalArgumentException("日期解析失败：dateStr=" + dateStr + ", pattern=" + pattern, e);
         }
-        return new Date();
     }
     public static String getMinAfter(Integer afterMinute, String pattern) {
         // 获取当前时间

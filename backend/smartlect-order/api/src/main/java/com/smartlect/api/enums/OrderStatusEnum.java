@@ -32,7 +32,11 @@ public enum OrderStatusEnum {
 
 
     public static OrderStatusEnum getByStatus(Integer status) {
-        Optional<OrderStatusEnum> typeEnum = Arrays.stream(OrderStatusEnum.values()).filter(value -> value.getStatus().equals(status)).findFirst();
-        return typeEnum == null ? null : typeEnum.get();
+        // 修复（ADR-0023）：旧写法 typeEnum == null 永假（Optional 不会为 null），
+        // 未知状态会 .get() 抛 NoSuchElementException 而非返回 null
+        return Arrays.stream(OrderStatusEnum.values())
+                .filter(value -> value.getStatus().equals(status))
+                .findFirst()
+                .orElse(null);
     }
 }

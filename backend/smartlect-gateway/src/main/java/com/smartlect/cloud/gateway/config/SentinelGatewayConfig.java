@@ -30,6 +30,20 @@ import java.util.Set;
 @Configuration
 public class SentinelGatewayConfig {
 
+    // 网关模块未引入 lombok，手写 Logger
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(SentinelGatewayConfig.class);
+
+    // ADR-0023：可选 Nacos 动态数据源——配置 smartlect.sentinel.gateway-rules-data-id 后，
+    // 网关流控规则由配置中心热更（JSON 数组，字段同 GatewayFlowRule），代码注册的规则仅作兜底。
+    @org.springframework.beans.factory.annotation.Value("${smartlect.sentinel.gateway-rules-data-id:}")
+    private String gatewayRulesDataId;
+    @org.springframework.beans.factory.annotation.Value("${spring.cloud.nacos.config.server-addr:}")
+    private String nacosServerAddr;
+    @org.springframework.beans.factory.annotation.Value("${spring.cloud.nacos.config.group:DEFAULT_GROUP}")
+    private String nacosGroup;
+
+
     private final GatewayRateLimitProperties rateLimitProperties;
 
     public SentinelGatewayConfig(GatewayRateLimitProperties rateLimitProperties) {
@@ -38,6 +52,36 @@ public class SentinelGatewayConfig {
 
     @PostConstruct
     public void init() {
+        attachNacosDataSourceIfConfigured();
+    }
+
+    private void attachNacosDataSourceIfConfigured() {
+        if (gatewayRulesDataId == null || gatewayRulesDataId.isBlank() || nacosServerAddr == null || nacosServerAddr.isBlank()) {
+            return;
+        }
+        try {
+            com.fasterxml.jackson.core.type.TypeReference<java.util.List<com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayFlowRule>> ruleType =
+                    new com.fasterxml.jackson.core.type.TypeReference<>() {
+                    };
+            // GatewayRuleManager 的 property 类型是 Set<GatewayFlowRule>
+            com.alibaba.csp.sentinel.datasource.nacos.NacosDataSource<java.util.Set<com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayFlowRule>> source =
+                    new com.alibaba.csp.sentinel.datasource.nacos.NacosDataSource<>(
+                            nacosServerAddr, nacosGroup, gatewayRulesDataId,
+                            json -> {
+                                try {
+                                    return new java.util.HashSet<>(new com.fasterxml.jackson.databind.ObjectMapper()
+                                            .readValue(json == null ? "[]" : json, ruleType));
+                                } catch (com.fasterxml.jackson.core.JsonProcessingException parseError) {
+                                    log.warn("网关流控规则 JSON 解析失败，忽略本次更新 dataId={}", gatewayRulesDataId, parseError);
+                                    return java.util.Collections.emptySet();
+                                }
+                            });
+            com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayRuleManager.register2Property(source.getProperty());
+            log.info("Sentinel 网关流控规则已挂接 Nacos 数据源 dataId={}", gatewayRulesDataId);
+        } catch (Exception e) {
+            log.warn("网关流控 Nacos 数据源挂接失败，回退代码兜底规则 dataId={}", gatewayRulesDataId, e);
+        }
+
         initBlockHandler();
         if (!rateLimitProperties.isEnabled()) {
             return;

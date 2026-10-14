@@ -211,6 +211,11 @@ class OrderMoneyPersistenceIT {
         var machine = new com.smartlect.state.OrderStateMachine();
         ReflectionTestUtils.setField(machine, "orderInfoMapper", session.getMapper(OrderInfoMapper.class));
         ReflectionTestUtils.setField(service, "orderStateMachine", machine);
+        // 批次三新增的还券钩子依赖；本 IT 数据无用券关系，mock 空列表即可
+        var relMapper = org.mockito.Mockito.mock(com.smartlect.mappers.OrderCouponRelMapper.class);
+        org.mockito.Mockito.lenient().when(relMapper.selectList(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.Collections.emptyList());
+        ReflectionTestUtils.setField(service, "orderCouponRelMapper", relMapper);
         return service;
     }
 }

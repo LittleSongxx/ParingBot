@@ -58,7 +58,7 @@ class OutboxMessageServiceImplTest {
 
         when(mapper.selectById(7L)).thenReturn(row);
         when(mapper.claimForDispatch(
-                eq(7L), anyInt(), anyInt(), anyInt(), anyString(), any(Date.class), any(Date.class)))
+                eq(7L), anyInt(), anyInt(), anyInt(), anyString(), anyLong()))
                 .thenReturn(1);
         when(mapper.markSent(
                 eq(7L), anyInt(), anyInt(), anyString(), any(Date.class)))
@@ -129,7 +129,7 @@ class OutboxMessageServiceImplTest {
                 .thenReturn(1);
         when(mapper.selectById(12L)).thenReturn(row);
         when(mapper.claimForDispatch(
-                eq(12L), anyInt(), anyInt(), anyInt(), anyString(), any(Date.class), any(Date.class)))
+                eq(12L), anyInt(), anyInt(), anyInt(), anyString(), anyLong()))
                 .thenReturn(1);
         when(mapper.markSent(
                 eq(12L), anyInt(), anyInt(), anyString(), any(Date.class)))

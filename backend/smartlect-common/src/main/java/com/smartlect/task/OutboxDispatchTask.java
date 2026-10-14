@@ -27,8 +27,13 @@ public class OutboxDispatchTask {
     @Resource
     private RedisComponent redisComponent;
 
-    @Value("${mq.outbox.dispatch-batch-size:30}")
+    @Value("${mq.outbox.dispatch-batch-size:10}")
     private int batchSize;
+
+    // ADR-0023：锁只是防抖（互斥由 DB 租约保证），TTL 可配——默认 4s 略短于串行批量耗时，
+    // 默认批量同时降到 10 缩短单轮时长
+    @Value("${mq.outbox.dispatch-lock-ttl-seconds:4}")
+    private int dispatchLockTtlSeconds;
 
     @Value("${mq.outbox.dispatch-max-retries:10}")
     private int maxRetries;
@@ -57,7 +62,7 @@ public class OutboxDispatchTask {
         refreshExhaustedGauge();
         String lockKey = Constants.REDIS_KEY_MQ_COMPENSATE
                 + "outbox:dispatch:lock:" + applicationName;
-        if (!redisComponent.setIfAbsent(lockKey, "1", 4, TimeUnit.SECONDS)) {
+        if (!redisComponent.setIfAbsent(lockKey, "1", dispatchLockTtlSeconds, TimeUnit.SECONDS)) {
             return;
         }
         try {

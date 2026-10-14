@@ -44,18 +44,18 @@
         set status = #{sendingStatus},
             update_time = now(),
             lease_owner = #{leaseOwner},
-            lease_until = #{leaseUntil},
+            lease_until = DATE_ADD(NOW(), INTERVAL #{leaseMillis} MILLISECOND),
             error_message = null
         where id = #{id}
           and (
             (
               status in (#{pendingStatus}, #{failedStatus})
-              and (next_retry_time is null or next_retry_time &lt;= #{now})
+              and (next_retry_time is null or next_retry_time &lt;= NOW())
             )
             or
             (
               status = #{sendingStatus}
-              and (lease_until is null or lease_until &lt;= #{now})
+              and (lease_until is null or lease_until &lt;= NOW())
             )
           )
     </update>
@@ -80,7 +80,7 @@
             update_time = now(),
             retry_count = ifnull(retry_count, 0) + 1,
             error_message = #{errorMessage},
-            next_retry_time = #{nextRetryTime},
+            next_retry_time = DATE_ADD(NOW(), INTERVAL #{backoffSeconds} SECOND),
             lease_owner = null,
             lease_until = null
         where id = #{id}
@@ -100,7 +100,7 @@
             status = #{failedStatus}
             or (
               status = #{sendingStatus}
-              and (lease_until is null or lease_until &lt;= #{now})
+              and (lease_until is null or lease_until &lt;= NOW())
             )
           )
     </update>
@@ -137,12 +137,12 @@
           and (
             (
               status in (#{pendingStatus}, #{failedStatus})
-              and (next_retry_time is null or next_retry_time &lt;= #{now})
+              and (next_retry_time is null or next_retry_time &lt;= NOW())
             )
             or
             (
               status = #{sendingStatus}
-              and (lease_until is null or lease_until &lt;= #{now})
+              and (lease_until is null or lease_until &lt;= NOW())
             )
           )
         order by id asc

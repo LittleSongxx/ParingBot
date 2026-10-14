@@ -1,0 +1,6 @@
+[INFO] Running com.smartlect.middleware.MiddlewareIT
+[INFO] Running com.smartlect.integration.TransactionPersistenceIT
+[INFO] Running com.smartlect.integration.CoPurchasePersistenceIT
+[INFO] Running com.smartlect.integration.OrderMoneyPersistenceIT
+[INFO] Running com.smartlect.integration.OrderConsistencyFixIT
+[INFO] BUILD SUCCESS

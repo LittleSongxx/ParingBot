@@ -95,16 +95,16 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
         if (OutboxMessageStatusEnum.SENT.getStatus().equals(beforeClaim.getStatus())) {
             return;
         }
+        // ADR-0023：租约与退避时间全部由数据库 NOW() 推导（SQL 侧 DATE_ADD），
+        // 消除跨实例应用时钟漂移超过租约期导致的双重投递窗口
         Date now = new Date();
-        Date leaseUntil = new Date(now.getTime() + Math.max(leaseMs, 5000L));
         Integer claimed = localMessageOutboxMapper.claimForDispatch(
                 id,
                 OutboxMessageStatusEnum.PENDING.getStatus(),
                 OutboxMessageStatusEnum.FAILED.getStatus(),
                 OutboxMessageStatusEnum.SENDING.getStatus(),
                 dispatcherId,
-                leaseUntil,
-                now);
+                Math.max(leaseMs, 5000L));
         if (claimed == null || claimed != 1) {
             return;
         }
@@ -137,7 +137,7 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
                     OutboxMessageStatusEnum.FAILED.getStatus(),
                     dispatcherId,
                     truncate(e.getMessage()),
-                    nextRetryTime(row.getRetryCount()));
+                    nextRetryBackoffSeconds(row.getRetryCount()));
         }
     }
 
@@ -231,13 +231,14 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
         return msg.length() > 500 ? msg.substring(0, 500) : msg;
     }
 
-    private Date nextRetryTime(Integer retryCount) {
+    /** 退避秒数（DB NOW() + INTERVAL 在 SQL 侧计算重试时间）；带抖动、封顶 5 分钟。 */
+    private long nextRetryBackoffSeconds(Integer retryCount) {
         int retry = retryCount == null ? 0 : Math.max(0, retryCount);
         int exponent = Math.min(retry, 8);
         long base = Math.max(retryBaseMs, 500L);
         long backoff = Math.min(base * (1L << exponent), 5 * 60_000L);
         long jitter = ThreadLocalRandom.current().nextLong(Math.max(1L, base));
-        return new Date(System.currentTimeMillis() + backoff + jitter);
+        return Math.max(1L, (backoff + jitter) / 1000L);
     }
 
     private void assertSameMessage(
