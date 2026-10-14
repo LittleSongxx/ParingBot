@@ -22,6 +22,16 @@ services:
     ports:
       - "${NODE1_IP:?source deploy/cluster/nodes.env}:${REDIS_PORT:-6379}:6379"
 
+  # 副本节点跨网访问的中间件统一叠加内网绑定（基线均为 127.0.0.1）：
+  # ES/Qdrant 由 product/assistant 的 health 与检索使用。
+  elasticsearch:
+    ports:
+      - "${NODE1_IP:-0.0.0.0}:${SMARTLECT_ES_PORT:-9200}:9200"
+
+  qdrant:
+    ports:
+      - "${NODE1_IP:-0.0.0.0}:${SMARTLECT_QDRANT_PORT:-6333}:6333"
+
   # 应用副本（node2/3）的 xxl-job 执行器要连调度中心——基线绑定 127.0.0.1，叠加内网绑定。
   xxl-job-admin:
     ports:
