@@ -1,0 +1,40 @@
+# node1 根分区满 — 事故证据（2026-10-15）
+# 原始来源：node1 (39.96.202.14) 现场命令输出 / GitHub Actions deploy job 日志
+
+== 一、部署被取消（deploy job 撞 30 分钟超时）==
+run 38619095642 deploy job 日志（gh api .../jobs/116044149754/logs）：
+  18:59:41 deploy: bundle archived as /opt/releases/20261015-025941.bundle
+  18:59:44 deploy: 9b1c47a -> 28624bf
+  18:59:44 deploy: backend/ changed, packaging jars
+  19:00:26 deploy: smoke-testing jars（装配期错误在此快速失败）
+  19:29:31 ##[error]The operation was canceled.        ← 29 分钟无输出，job timeout-minutes:30 取消
+
+== 二、挂起冒烟 JVM 的 jstack（主线程，节选）==
+  "main" RUNNABLE elapsed=1624.25s
+    at java.net.Socket$SocketInputStream.read
+    at com.mysql.cj.protocol.ReadAheadInputStream...
+    at com.mysql.cj.jdbc.ClientPreparedStatement.executeUpdateInternal
+    ...
+    at com.smartlect.biz.TrialCouponSeedService.seedPublishedShopperCoupons(TrialCouponSeedService.java:26)
+    at ...InitDestroyAnnotationBeanPostProcessor...（@PostConstruct 装配期）
+
+== 三、MySQL 直接证据：临时表分配失败 ==
+  mysql> SELECT ... FROM information_schema.processlist ...;
+  ERROR 1114 (HY000): The table '/tmp/#sql1_7cb9_0' is full
+
+== 四、磁盘实况与清理 ==
+  root@smartlect-node1:~# df -h /
+  /dev/vda3        40G   38G     0 100% /
+  root@smartlect-node1:~# du -sh /opt/smartlect/run/apps
+  14G     /opt/smartlect/run/apps
+  （构成：9 服务 × ~160MB × 多日多轮部署的历史哈希暂存副本，immutable_jar 按构建哈希落盘、从不回收）
+
+  清理（保留台账引用 + 10 分钟宽限）后：
+  removed=95 files, freed=13.2 GB, kept=9
+  /dev/vda3        40G   26G   12G  68% /
+  随后：MySQL SELECT 1 恢复；9 服务健康全 200（admin/cart/pay/order/user/product/coupon/stock/gateway）
+
+== 五、修复提交 ==
+  bf0fb14 fix(runtime): 暂存 JAR 自动回收 + 冒烟读循环截止强制 + 部署磁盘门禁
+  （prune_staged_artifacts 挂 apps_up/smoke 收尾；smoke 读线程+截止；ci-deploy.sh 5G 门禁；
+   deploy job 30→40 分钟）

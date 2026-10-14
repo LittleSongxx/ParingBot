@@ -1,0 +1,40 @@
+# CI 解锁与部署运行记录（2026-10-15）
+# 来源：gh run view / gh api job logs（关键行摘录，run id 可复查）
+
+== 一、CI 红灯根因（自 2026-10-10 起 assistant job 一直红）==
+run 38049183483（10-10） assistant job：
+  smartlect-assistant 0.1.0 requires aiohttp, which is not installed.   ← pip check 红
+  （pip check 之后的 MySQL 契约测试当时根本没跑；其真实红点被掩盖）
+
+run 38602789365（本次首跑） assistant job：
+  458: smartlect-assistant 0.1.0 requires aiohttp, which is not installed.
+修复后 run 38603434865 / 38603826199：
+  assistant: unittest（真实 MySQL 契约测试）→ failure:
+  FAIL: test_six_actual_attempts_include_retries_and_fallback_does_not_reset_budget
+  AssertionError: 8 != 6      ← 10-10 提交 43c23eb 调预算默认 6→8 漏同步测试
+修两处后 run 38606412151：三栈测试全绿（backend/assistant/web 均 success）
+
+== 二、部署运行（workflow_dispatch）==
+run 38606412151  deploy: failure（coupon 装配缺陷拦截）
+  Job for smartlect-apps.service failed because the control process exited with error code.
+  coupon 日志：A component required a bean of type 'java.util.concurrent.ExecutorService'
+  that could not be found（DiscountCouponCacheComponent 仍按旧类型注入）
+
+run 38609295717  deploy: success
+  deploy: smoke-testing jars（装配期错误在此快速失败）
+  smoke: user ok (35s) / product ok (35s) / stock ok (33s) / order ok (37s) / pay ok (31s)
+       / cart ok (30s) / coupon ok (35s) / admin ok (29s) / gateway ok (12s)
+  Application checks passed: 12 owned healthy processes, 9 Nacos registrations at 172.21.131.151.
+  DEPLOY-OK 15726ac -> b6706f4
+
+run 38613848008  deploy: success
+  smoke 9 服务 ok；DEPLOY-OK b6706f4 -> 9b1c47a
+  （Sentinel 数据源鉴权修复随本版上线）
+
+run 38619095642  deploy: cancelled（缺陷 E：磁盘满，见 disk-full-incident.txt）
+
+== 三、部署窗口内修复提交链 ==
+dc5e726 测试对齐预算默认 8 → 82e0f18 代码卫生（STATUC_* 改名 + outbox 死参）→
+232070a Sentinel 启用通道 env 占位 → b6706f4 coupon 注入类型 + ci-deploy 冒烟 →
+9b1c47a Sentinel 数据源鉴权（Properties 构造）→ b6a2fe1 xxl-job-admin 堆上限/自愈 →
+28624bf outbox 时间轮驻留 → bf0fb14 runtime 回收/冒烟截止/磁盘门禁

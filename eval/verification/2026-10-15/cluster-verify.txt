@@ -1,0 +1,62 @@
+# 三机终态验证证据（2026-10-15 05:0x CST）
+# 来源：node1 现场命令输出；run 38631119067 deploy job 日志
+
+== 一、node1 部署（run 38631119067，success）==
+  deploy: bf0fb14 -> 8234d2f
+  deploy: smoke-testing jars（装配期错误在此快速失败）
+  smoke: user ok (36s) / product ok (36s) / stock ok (34s) / order ok (37s) / pay ok (32s)
+       / cart ok (31s) / coupon ok (38s) / admin ok (29s) / gateway ok (12s)
+  pruned staged artifacts: 1336 MB（历史版本快照，不影响运行中进程）
+  deploy: restarting apps（健康门禁内置）
+  Application checks passed: 12 owned healthy processes, 9 Nacos registrations at 172.21.131.151.
+  DEPLOY-OK bf0fb141 -> 8234d2f2
+
+== 二、三机服务健康 ==
+node1: admin/cart/pay/order/user/product/coupon/stock/gateway 全 200 + assistant/web
+node2: gw/user/product/order/cart 全 200（unit active）
+node3: gw/user/product/order/cart 全 200（unit active）
+
+== 三、Nacos 注册拓扑（健康实例，IP 末三位）==
+providers:CartDubboService 3 [151,202,203]; CouponDubboService 1 [151]; OrderDubboService 3 [151,202,203]
+providers:PayDubboService 1 [151]; ProductDubboService 3 [151,202,203]; StockDubboService 1 [151]
+providers:UserDubboService 3 [151,202,203]
+smartlect-cart 3 / gateway 3 / order 3 / product 3 / user 3（三机）
+smartlect-admin 1 / coupon 1 / pay 1 / stock 1（node1）
+
+== 四、xxl-job 执行器注册（缺陷 F 修复后）==
+smartlect-cart   [151:10004, 202:10002, 203:10002]
+smartlect-order  [151:10002, 202:10001, 203:10001]
+smartlect-product[151:10000, 202:10000, 203:10000]
+smartlect-user   [151:9999,  202:9999,  203:9999]
+smartlect-admin/coupon/pay/stock 仅 151（服务仅在 node1）
+任务定义 10 个 cron 在位；调度由 group FIRST 路由到首个注册实例
+
+== 五、Flyway（8 库全 success）==
+order=5  pay=4  coupon=2  product=3  user=4  stock=1  cart=2  admin=3
+
+== 六、查询索引（13 个全部存在）==
+order: idx_order_user_time/idx_order_status_time/idx_order_pay_order/idx_item_order/idx_rel_user_coupon/idx_record_order
+pay:   idx_trade_status_time/idx_trade_user_time
+coupon: idx_uc_user_status/idx_uc_status
+product: idx_product_category/idx_product_pcategory/idx_product_status
+
+== 七、站点与观测 ==
+https://smartlect.cn/ 200；/admin/ 200
+/api/discountCoupon/loadDiscountCoupon 200，响应头 x-trace-id: a606025b...（同值两行，观察项）
+
+== 八、定时消息驻留生产验证（缺陷 D 修复的行为验收）==
+POST /internal/mq/outbox/18037/replay（X-Internal-Token + X-Internal-Ops-Token）
+  → {"status":"success","data":true}
+  表状态：status 0(PENDING), retry_count 0, next_retry_time = 2026-10-20 07:34:50
+  （= 送达时刻 10-21 07:33:50 − 24h + 60s 安全余量；不再产生 40012，重试计数不再消耗）
+订单 202610140633202302Ugu1bnqEpluHtf 当前状态 2（已发货）；
+按设计 7 天档：驻留在 10-20 唤醒投递 → 10-21 自动确认收货 → 状态 3（未来验收）
+
+== 九、磁盘 ==
+node1 71%（清理后稳定；自动回收已在 up/smoke 收尾生效）
+node2 33% / node3 24%（重启时各自回收历史快照）
+
+== 十、业务对账（business-check.sh，只读）==
+order_info 行数=3585（待付款=0 已付款=1346 已发货=1）
+order_item 行数=3585；pay_trade_record 行数=3585
+— 订单/明细/支付单三表行数一致；已发货 1 即驻留验证中的演示订单
