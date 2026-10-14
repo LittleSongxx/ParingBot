@@ -719,15 +719,26 @@ def smoke_apps(env, timeout=180):
                         process.wait(timeout=3)
                 outcome = "failed" if process.poll() not in (None, 0) else "timeout"
         finally:
-            for reader in (process.stdout, process.stderr):
-                if reader is not None:
-                    reader.close()
+            # 先杀进程再关流（顺序不能互换）：读线程阻塞在空管道 read() 时持有缓冲锁，
+            # close() 会等这把锁——close-before-terminate 实测永久挂起（2026-10-15
+            # gateway 冒烟 29 分钟不动，见 docs/改动记录/2026-10-15）。进程终止后
+            # 写端关闭、读线程收到 EOF 释放锁，close() 立即返回。
             process.terminate()
+            killed = False
             try:
                 process.wait(timeout=15)
+                killed = True
             except subprocess.TimeoutExpired:
                 process.kill()
-                process.wait(timeout=15)
+                try:
+                    process.wait(timeout=15)
+                    killed = True
+                except subprocess.TimeoutExpired:
+                    pass
+            if killed:
+                for reader in (process.stdout, process.stderr):
+                    if reader is not None:
+                        reader.close()
         elapsed = time.monotonic() - started
         if outcome == "ok":
             print(f"smoke: {service} ok ({elapsed:.0f}s)")
