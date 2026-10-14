@@ -1,6 +1,7 @@
 package com.smartlect.controller.admin;
 
 import com.smartlect.entity.query.StatisticsInfoQuery;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.biz.StatisticsInfoService;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,6 +12,7 @@ import jakarta.annotation.Resource;
 
 @RestController("statisticsInfoController")
 @RequestMapping("/admin/statisticsInfo")
+@SaCheckPermission(value = {"analytics:read"}, orRole = "SUPER_ADMIN", type = "admin")
 public class StatisticsInfoController extends com.smartlect.controller.admin.ABaseController {
 
 	@Resource

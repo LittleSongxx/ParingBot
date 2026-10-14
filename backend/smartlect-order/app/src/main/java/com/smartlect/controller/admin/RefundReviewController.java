@@ -1,6 +1,7 @@
 package com.smartlect.controller.admin;
 
 import com.smartlect.biz.RefundReviewService;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.smartlect.entity.po.RefundRequest;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.exception.BusinessException;
@@ -20,6 +21,7 @@ import java.util.List;
  */
 @RestController("adminRefundReviewController")
 @RequestMapping("/admin/refundReview")
+@SaCheckPermission(value = {"order:manage"}, orRole = "SUPER_ADMIN", type = "admin")
 public class RefundReviewController extends com.smartlect.controller.admin.ABaseController {
 
     @Resource

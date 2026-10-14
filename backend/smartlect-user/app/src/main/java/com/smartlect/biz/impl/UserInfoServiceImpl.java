@@ -162,7 +162,7 @@ public class UserInfoServiceImpl implements UserInfoService {
 		}
 		UserInfo userInfo = this.getUserInfoByEmail(email);
 		if (userInfo != null) {
-			throw new BusinessException("该用户已经存在");
+			throw new BusinessException("注册失败：请检查输入或稍后重试");  // 邮箱枚举缓解：不暴露账号存在性
 		}
 		userInfo = new UserInfo();
 		userInfo.setEmail(email);
@@ -217,7 +217,7 @@ public class UserInfoServiceImpl implements UserInfoService {
 		}
 		// 判断当前用户是否已注册
 		if (this.getUserInfoByEmail(email) == null) {
-			throw new BusinessException("该用户未注册");
+			throw new BusinessException("如该邮箱已注册，重置邮件已发送");  // 邮箱枚举缓解：不暴露账号不存在
 		}
 		// 从redis中读取验证码
 		String trueCode = redisComponent.getEmailCode(email);

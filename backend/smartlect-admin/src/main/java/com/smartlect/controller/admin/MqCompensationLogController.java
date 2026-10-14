@@ -1,6 +1,7 @@
 package com.smartlect.controller.admin;
 
 import com.smartlect.entity.query.MqCompensationLogQuery;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.service.MqCompensationLogService;
 import jakarta.annotation.Resource;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/admin/mqCompensationLog")
+@SaCheckPermission(value = {"ops:compensation-read"}, orRole = "SUPER_ADMIN", type = "admin")
 public class MqCompensationLogController extends com.smartlect.controller.admin.ABaseController {
 
     @Resource

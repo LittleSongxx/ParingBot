@@ -74,6 +74,8 @@ public class AccountController extends ABaseController{
 
     @Resource
     private PasswordService passwordService;
+    @Resource
+    private com.smartlect.component.UserLoginLockService userLoginLockService;
 
     private UserInfo refreshDisabledAccount(UserInfo userInfo) {
         Long unbanAt = userTempBanService.getUnbanAtMs(userInfo.getUserId());
@@ -155,6 +157,8 @@ public class AccountController extends ABaseController{
                             String checkCodeKey,
                             String checkCode
                             ){
+        String clientIp = getClientIp();
+        userLoginLockService.ensureNotLocked(email, clientIp);
         try {
             if (!TrialIdentities.skipLoginCaptcha(email)
                     && (StringTools.isEmpty(checkCode)
@@ -166,8 +170,10 @@ public class AccountController extends ABaseController{
             // 查询UserInfo
             UserInfo userInfo = userInfoService.getUserInfoByEmail(email);
             if (userInfo == null || !passwordService.matches(password, userInfo.getPassword())){
+                userLoginLockService.recordFailure(email, clientIp);
                 throw new BusinessException("账号或密码错误！");
             }
+            userLoginLockService.clearFailures(email, clientIp);
             if (!passwordService.isBcrypt(userInfo.getPassword())) {
                 UserInfo upgrade = new UserInfo();
                 upgrade.setPassword(passwordService.encode(password));

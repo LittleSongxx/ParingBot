@@ -1,6 +1,7 @@
 package com.smartlect.controller.admin;
 
 import com.smartlect.api.support.OrderFeignSupport;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.biz.StatisticsInfoService;
 import jakarta.annotation.Resource;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/admin/tool")
 @RestController
 @Slf4j
+@SaCheckPermission(value = {"ops:tool"}, orRole = "SUPER_ADMIN", type = "admin")
 public class ToolController extends com.smartlect.controller.admin.ABaseController {
 
     @Resource

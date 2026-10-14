@@ -95,6 +95,9 @@ public class Constants {
 
     public static final String REDIS_KEY_ADMIN_LOGIN_FAIL = REDIS_KEY_PREFIX + "admin:login:fail:";
 
+    // 用户端登录失败锁定（ADR-0022）：邮箱+IP 维度，键式 .../fail 与 .../locked 由组件拼装
+    public static final String REDIS_KEY_USER_LOGIN_FAIL = REDIS_KEY_PREFIX + "user:login:";
+
     public static final String REDIS_KEY_ADMIN_LOGIN_LOCK = REDIS_KEY_PREFIX + "admin:login:lock:";
 
     public static final String REDIS_KEY_CHECK_CODE = REDIS_KEY_PREFIX + "checkcode:";

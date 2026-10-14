@@ -5,6 +5,7 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -13,9 +14,30 @@ public class ProductionSafetyValidator {
     private static final Logger log = LoggerFactory.getLogger(ProductionSafetyValidator.class);
     private static final String WEAK_INTERNAL = "your-token";
     private static final String WEAK_ADMIN_PWD = "admin123456";
+    private static final int MIN_TOKEN_LENGTH = 24;
 
     @Value("${smartlect.production-ready:false}")
     private boolean productionReady;
+
+    private final org.springframework.core.env.Environment environment;
+
+    // ADR-0022：prod profile 自动启用校验（忘设开关的生产部署不再裸奔）；本地默认仍仅告警
+    public ProductionSafetyValidator(Environment environment) {
+        this.environment = environment;
+    }
+
+    private boolean enforced() {
+        if (productionReady) {
+            return true;
+        }
+        String[] active = environment.getActiveProfiles();
+        for (String profile : active) {
+            if ("prod".equals(profile) || "production".equals(profile)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     @Value("${smartlect.internal.token:}")
     private String internalToken;
@@ -49,18 +71,22 @@ public class ProductionSafetyValidator {
 
     @PostConstruct
     public void validate() {
-        if (!productionReady) {
+        if (!enforced()) {
             log.warn("smartlect.production-ready=false：当前为开发/联调模式，上线前请设为 true 并配置强密钥");
             return;
         }
         StringBuilder errors = new StringBuilder();
-        if (StringTools.isEmpty(internalToken) || WEAK_INTERNAL.equals(internalToken)) {
-            errors.append("SMARTLECT_INTERNAL_TOKEN 未设置或仍为开发默认值; ");
+        // ADR-0022：弱值检查升级——除已知字面量外，长度下限 24（内部/运维令牌均为 48-hex 运行时生成）
+        if (StringTools.isEmpty(internalToken)
+                || WEAK_INTERNAL.equals(internalToken)
+                || internalToken.length() < MIN_TOKEN_LENGTH) {
+            errors.append("SMARTLECT_INTERNAL_TOKEN 未设置、过弱或长度不足 " + MIN_TOKEN_LENGTH + "; ");
         }
         if (StringTools.isEmpty(internalOpsToken)
                 || WEAK_INTERNAL.equals(internalOpsToken)
-                || internalOpsToken.equals(internalToken)) {
-            errors.append("SMARTLECT_INTERNAL_OPS_TOKEN 未设置、过弱或与内部调用令牌复用; ");
+                || internalOpsToken.equals(internalToken)
+                || internalOpsToken.length() < MIN_TOKEN_LENGTH) {
+            errors.append("SMARTLECT_INTERNAL_OPS_TOKEN 未设置、过弱、长度不足或与内部调用令牌复用; ");
         }
         if (StringTools.isEmpty(adminPassword) || WEAK_ADMIN_PWD.equals(adminPassword)) {
             errors.append("ADMIN_PASSWORD 未设置或仍为默认 admin123456; ");

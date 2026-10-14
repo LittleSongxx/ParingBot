@@ -65,7 +65,7 @@ smartlect:
     password: ${SMARTLECT_DEMO_PASSWORD:}
   trial:
     enabled: ${SMARTLECT_TRIAL_ENABLED:true}
-    password: ${SMARTLECT_TRIAL_PASSWORD:Visit-Smartlect-2026}
+    password: ${SMARTLECT_TRIAL_PASSWORD:}
     lock-public-register: ${SMARTLECT_TRIAL_LOCK_PUBLIC_REGISTER:true}
   payment:
     mode: ${SMARTLECT_PAYMENT_MODE:mock}

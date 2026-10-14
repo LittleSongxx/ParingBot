@@ -284,6 +284,8 @@ public class RedisComponent {
             }
             return list.isArray() ? list : null;
         } catch (Exception e) {
+            // ADR-0022：解析失败此前静默 null（故障不可观测），升级为 warn 留痕
+            log.warn("解析 Sa-Token 账号会话失败：{}", e.getMessage());
             return null;
         }
     }

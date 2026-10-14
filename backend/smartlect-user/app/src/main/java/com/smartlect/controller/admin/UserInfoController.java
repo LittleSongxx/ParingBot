@@ -1,6 +1,7 @@
 package com.smartlect.controller.admin;
 
 import com.smartlect.entity.query.UserInfoQuery;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.biz.UserInfoService;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -11,6 +12,7 @@ import jakarta.annotation.Resource;
 
 @RestController("userInfoController")
 @RequestMapping("/admin/userInfo")
+@SaCheckPermission(value = {"user:manage-read"}, orRole = "SUPER_ADMIN", type = "admin")
 public class UserInfoController extends com.smartlect.controller.admin.ABaseController{
 
 	@Resource

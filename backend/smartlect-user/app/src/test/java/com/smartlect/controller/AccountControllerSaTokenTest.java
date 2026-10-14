@@ -78,6 +78,8 @@ class AccountControllerSaTokenTest {
     @BeforeEach
     void setUp() {
         AccountController controller = new AccountController();
+        org.springframework.test.util.ReflectionTestUtils.setField(controller, "userLoginLockService",
+                org.mockito.Mockito.mock(com.smartlect.component.UserLoginLockService.class));
         AuthCookieHelper authCookieHelper = new AuthCookieHelper();
         ReflectionTestUtils.setField(controller, "redisComponent", redisComponent);
         ReflectionTestUtils.setField(controller, "userInfoService", userInfoService);

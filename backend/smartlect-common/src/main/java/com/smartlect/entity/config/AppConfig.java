@@ -28,7 +28,7 @@ public class AppConfig {
     @Value("${smartlect.trial.enabled:true}")
     private boolean trialEnabled;
 
-    @Value("${smartlect.trial.password:Visit-Smartlect-2026}")
+    @Value("${smartlect.trial.password:}")
     private String trialPassword;
 
     @Value("${smartlect.trial.lock-public-register:true}")
@@ -48,10 +48,15 @@ public class AppConfig {
         } else {
             adminPasswordHash = passwordService.encode(adminPassword);
         }
-        if (trialPassword != null && trialPassword.startsWith("$2")) {
-            trialPasswordHash = trialPassword;
+        // ADR-0022：yml 已去掉公开演示密码的明文默认值（改为空默认），
+        // 未显式配置时回退到 TrialIdentities 公布的演示值——演示账号行为不变，
+        // 仓库 yml 不再携带"看似可改密"的默认凭据。
+        String effectiveTrialPassword = (trialPassword == null || trialPassword.isBlank())
+                ? com.smartlect.constants.TrialIdentities.PUBLISHED_PASSWORD : trialPassword;
+        if (effectiveTrialPassword.startsWith("$2")) {
+            trialPasswordHash = effectiveTrialPassword;
         } else {
-            trialPasswordHash = passwordService.encode(trialPassword);
+            trialPasswordHash = passwordService.encode(effectiveTrialPassword);
         }
     }
 

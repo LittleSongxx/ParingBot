@@ -156,6 +156,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public void saveProduct(ProductSaveDTO productSaveDTO) {
+		normalizeSkuHashes(productSaveDTO);
 		ProductInfo productInfo = productSaveDTO.getProductInfo();
 		List<ProductPropertyValue> productPropertyList = productSaveDTO.getProductPropertyList();
 		List<ProductSku> productSkuList = productSaveDTO.getSkuList();
@@ -397,8 +398,37 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 		throw new BusinessException("请使用 productId + propertyValueIdHash 调整库存");
 	}
 
+	/**
+	 * 服务端权威重算 SKU 指纹（ADR-0022）：此前 hash 由管理端前端计算后直接提交，
+	 * 后端从不校验——异常客户端可用同一组属性值配不同 hash 制造重复 SKU。
+	 * 现以 md5(propertyValueIds) 重算覆写，并拒绝同商品内重复指纹。
+	 */
+	private void normalizeSkuHashes(ProductSaveDTO productSaveDTO) {
+		java.util.List<ProductSku> skuList = productSaveDTO.getSkuList();
+		if (skuList == null || skuList.isEmpty()) {
+			return;
+		}
+		java.util.Set<String> seen = new java.util.HashSet<>();
+		for (ProductSku sku : skuList) {
+			if (StringTools.isEmpty(sku.getPropertyValueIds())) {
+				throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "SKU 规格属性不能为空");
+			}
+			String authoritative = StringTools.encodeByMD5(sku.getPropertyValueIds());
+			if (authoritative == null) {
+				throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "SKU 规格指纹计算失败");
+			}
+			if (!authoritative.equals(sku.getPropertyValueIdHash())) {
+				log.warn("SKU 指纹与属性不一致，已按服务端重算覆写 productId={}, submitted={}, expected={}",
+						productSaveDTO.getProductInfo() == null ? null : productSaveDTO.getProductInfo().getProductId(), sku.getPropertyValueIdHash(), authoritative);
+				sku.setPropertyValueIdHash(authoritative);
+			}
+			if (!seen.add(authoritative)) {
+				throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "存在重复的 SKU 规格组合");
+			}
+		}
+	}
+
 	@Override
-	@Transactional(rollbackFor = Exception.class)
 	public void updateProductStatus(String productId, Integer status) {
 		ProductStatusEnum statusEnum = ProductStatusEnum.getByStatus(status);
 		if (statusEnum == null || statusEnum == ProductStatusEnum.DELETE ) {
@@ -413,9 +443,19 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 				throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "请先取消推荐后再下架");
 			}
 		}
+		// ADR-0022：check-then-update 改条件更新（CAS），两个管理员并发操作不再越权覆盖
+		ProductInfo existing = productInfoMapper.selectByProductId(productId);
+		if (existing == null) {
+			throw new BusinessException(ResponseCodeEnum.CODE_600);
+		}
 		ProductInfo productInfo = new ProductInfo();
 		productInfo.setStatus(status);
-		productInfoMapper.updateByProductId(productInfo, productId);
+		ProductInfoQuery casQuery = new ProductInfoQuery();
+		casQuery.setProductId(productId);
+		casQuery.setStatus(existing.getStatus());
+		if (productInfoMapper.updateByParam(productInfo, casQuery) != 1) {
+			throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "商品状态已变化，请刷新后重试");
+		}
 	}
 
 	@Override
@@ -433,7 +473,13 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 		}
 		ProductInfo productInfo = new ProductInfo();
 		productInfo.setStatus(ProductStatusEnum.DELETE.getStatus());
-		productInfoMapper.updateByProductId(productInfo, productId);
+		// ADR-0022：删除也走条件更新——仅下架态可删，并发窗口内被重新上架则失败重试
+		ProductInfoQuery casQuery = new ProductInfoQuery();
+		casQuery.setProductId(productId);
+		casQuery.setStatus(ProductStatusEnum.OFF_SALE.getStatus());
+		if (productInfoMapper.updateByParam(productInfo, casQuery) != 1) {
+			throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "商品状态已变化，请刷新后重试");
+		}
 	}
 
 	@Override

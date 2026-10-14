@@ -1,6 +1,7 @@
 package com.smartlect.controller.admin;
 
 import com.smartlect.component.CouponRushStockService;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.smartlect.api.dto.CouponRushStockReconcileDTO;
 import com.smartlect.annotation.AdminSensitiveConfirm;
 import com.smartlect.api.dto.DiscountCouponDTO;
@@ -18,6 +19,7 @@ import java.util.List;
 
 @RequestMapping("/admin/discountCoupon")
 @RestController("adminDiscountCouponController")
+@SaCheckPermission(value = {"coupon:manage"}, orRole = "SUPER_ADMIN", type = "admin")
 public class DiscountCouponController extends com.smartlect.controller.admin.ABaseController{
 
     @Resource

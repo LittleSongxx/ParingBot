@@ -25,7 +25,7 @@ class ProductionSafetyValidatorTest {
     @Test
     void productionRejectsReusedInternalToken() {
         ProductionSafetyValidator validator = validator(true);
-        ReflectionTestUtils.setField(validator, "internalOpsToken", "internal-secret");
+        ReflectionTestUtils.setField(validator, "internalOpsToken", "internal-secret-0123456789abcdef");
 
         assertThrows(IllegalStateException.class, validator::validate);
     }
@@ -74,11 +74,33 @@ class ProductionSafetyValidatorTest {
         assertDoesNotThrow(() -> validator(false).validate());
     }
 
+    @Test
+    void prodProfileEnforcesValidationEvenWithoutSwitch() {
+        // ADR-0022：忘设 smartlect.production-ready 的 prod 部署不再裸奔
+        org.springframework.mock.env.MockEnvironment env = new org.springframework.mock.env.MockEnvironment();
+        env.setActiveProfiles("prod");
+        ProductionSafetyValidator bare = new ProductionSafetyValidator(env);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, bare::validate);
+    }
+
+    @Test
+    void shortTokensAreRejectedWhenEnforced() {
+        ProductionSafetyValidator validator = validator(true);
+        ReflectionTestUtils.setField(validator, "internalToken", "short-token");
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, validator::validate);
+    }
+
     private static ProductionSafetyValidator validator(boolean productionReady) {
-        ProductionSafetyValidator validator = new ProductionSafetyValidator();
+        return validator(productionReady, new String[0]);
+    }
+
+    private static ProductionSafetyValidator validator(boolean productionReady, String... activeProfiles) {
+        org.springframework.mock.env.MockEnvironment env = new org.springframework.mock.env.MockEnvironment();
+        env.setActiveProfiles(activeProfiles);
+        ProductionSafetyValidator validator = new ProductionSafetyValidator(env);
         ReflectionTestUtils.setField(validator, "productionReady", productionReady);
-        ReflectionTestUtils.setField(validator, "internalToken", "internal-secret");
-        ReflectionTestUtils.setField(validator, "internalOpsToken", "ops-secret");
+        ReflectionTestUtils.setField(validator, "internalToken", "internal-secret-0123456789abcdef");
+        ReflectionTestUtils.setField(validator, "internalOpsToken", "ops-secret-0123456789abcdef");
         ReflectionTestUtils.setField(validator, "adminPassword", "strong-admin-password");
         ReflectionTestUtils.setField(validator, "devLoginBypass", false);
         ReflectionTestUtils.setField(validator, "projectFolder", "/data/smartlect/upload/");
