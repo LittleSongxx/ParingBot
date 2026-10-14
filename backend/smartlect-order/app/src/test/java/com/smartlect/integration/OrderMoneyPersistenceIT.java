@@ -138,7 +138,8 @@ class OrderMoneyPersistenceIT {
         var jdbc = new org.springframework.jdbc.core.JdbcTemplate(source);
         var transaction = new org.springframework.transaction.support.TransactionTemplate(
                 new org.springframework.jdbc.datasource.DataSourceTransactionManager(source));
-        var quotes = new com.smartlect.biz.OrderQuoteService(jdbc);
+        var quotes = new com.smartlect.biz.OrderQuoteService(jdbc,
+                new org.springframework.jdbc.datasource.DataSourceTransactionManager(source));
         var input = new com.smartlect.biz.OrderQuoteService.Input("mock", "quote-address", 0, null,
                 List.of(new com.smartlect.biz.OrderQuoteService.Line("quote-product", "v1", 1, null)));
         var order = com.smartlect.biz.OrderQuoteService.normalize(input);
@@ -159,7 +160,8 @@ class OrderMoneyPersistenceIT {
         }));
         assertNull(jdbc.queryForObject("SELECT pay_order_id FROM order_quote WHERE quote_id=?", String.class, quoteId));
         transaction.executeWithoutResult(status -> quotes.consume(quotes.lock("quote-user", quoteId), "quote-pay-committed"));
-        var restarted = new com.smartlect.biz.OrderQuoteService(new org.springframework.jdbc.core.JdbcTemplate(source));
+        var restarted = new com.smartlect.biz.OrderQuoteService(new org.springframework.jdbc.core.JdbcTemplate(source),
+                new org.springframework.jdbc.datasource.DataSourceTransactionManager(source));
         var used = assertThrows(com.smartlect.exception.HttpBusinessException.class,
                 () -> transaction.execute(status -> restarted.lock("quote-user", quoteId)));
         assertEquals("QUOTE_ALREADY_CONSUMED", used.getMessage());
@@ -202,6 +204,11 @@ class OrderMoneyPersistenceIT {
         ReflectionTestUtils.setField(service, "orderInfoMapper", session.getMapper(OrderInfoMapper.class));
         ReflectionTestUtils.setField(service, "refundRequestMapper", session.getMapper(RefundRequestMapper.class));
         ReflectionTestUtils.setField(service, "transactionalMqSender", mq);
+        // finalizeOrderRefund 走状态机 CAS 翻单（FULL/PARTIAL_REFUND），
+        // 真库装配需要补挂真实 mapper 的状态机（曾因服务新增该依赖而漏注入）。
+        var machine = new com.smartlect.state.OrderStateMachine();
+        ReflectionTestUtils.setField(machine, "orderInfoMapper", session.getMapper(OrderInfoMapper.class));
+        ReflectionTestUtils.setField(service, "orderStateMachine", machine);
         return service;
     }
 }

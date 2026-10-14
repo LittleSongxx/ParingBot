@@ -202,7 +202,7 @@ class MiddlewareIT {
             String jdbcUrl = MYSQL.getJdbcUrl();
             Flyway flyway = Flyway.configure()
                     .dataSource(jdbcUrl, MYSQL.getUsername(), MYSQL.getPassword())
-                    .locations("filesystem:" + migration.getParent().toAbsolutePath())
+                    .locations("filesystem:" + migration.toAbsolutePath())
                     .baselineOnMigrate(true)
                     .baselineVersion(MigrationVersion.fromVersion("0"))
                     .cleanDisabled(false)
@@ -229,8 +229,11 @@ class MiddlewareIT {
             try (Connection connection = DriverManager.getConnection(
                     jdbcUrl, MYSQL.getUsername(), MYSQL.getPassword());
                  Statement statement = connection.createStatement()) {
-                assertEquals(1, statement.executeUpdate(
-                        "DELETE FROM flyway_schema_history WHERE version IS NULL"));
+                // 25ef508 后各域为 V 版本化迁移（version 非 NULL，删 0 行是常态）；
+                // 若某域重新引入 R__ 可重复迁移，这里删除其执行记录后由下方的
+                // migrate + validate 证明 schema 可重复收敛。
+                statement.executeUpdate(
+                        "DELETE FROM flyway_schema_history WHERE version IS NULL");
             }
 
             flyway.migrate();
@@ -501,19 +504,22 @@ class MiddlewareIT {
         if (root == null) {
             throw new IOException("Unable to locate the Smartlect backend root");
         }
+        // 25ef508（Flyway V 化）后各服务改用 V* 版本化迁移，曾经的 R__current_schema.sql
+        // 单文件快照已删除；这里直接以各服务的 db/migration 目录为迁移源，
+        // 语义不变：8 个 Java 域全新库可迁移、重复校验通过。
         List<String> serviceMigrations = List.of(
-                "smartlect-admin/src/main/resources/db/migration/R__current_schema.sql",
-                "smartlect-cart/app/src/main/resources/db/migration/R__current_schema.sql",
-                "smartlect-coupon/app/src/main/resources/db/migration/R__current_schema.sql",
-                "smartlect-order/app/src/main/resources/db/migration/R__current_schema.sql",
-                "smartlect-pay/app/src/main/resources/db/migration/R__current_schema.sql",
-                "smartlect-product/app/src/main/resources/db/migration/R__current_schema.sql",
-                "smartlect-stock/app/src/main/resources/db/migration/R__current_schema.sql",
-                "smartlect-user/app/src/main/resources/db/migration/R__current_schema.sql");
+                "smartlect-admin/src/main/resources/db/migration",
+                "smartlect-cart/app/src/main/resources/db/migration",
+                "smartlect-coupon/app/src/main/resources/db/migration",
+                "smartlect-order/app/src/main/resources/db/migration",
+                "smartlect-pay/app/src/main/resources/db/migration",
+                "smartlect-product/app/src/main/resources/db/migration",
+                "smartlect-stock/app/src/main/resources/db/migration",
+                "smartlect-user/app/src/main/resources/db/migration");
         Path backendRoot = root;
         return serviceMigrations.stream()
                 .map(backendRoot::resolve)
-                .filter(Files::isRegularFile)
+                .filter(Files::isDirectory)
                 .toList();
     }
 

@@ -12,6 +12,7 @@ import com.smartlect.exception.BusinessException;
 import com.smartlect.mappers.SkuStockMapper;
 import com.smartlect.mappers.StockChangeRecordMapper;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+@Slf4j
 @Service
 public class SkuStockService {
 
@@ -188,7 +190,14 @@ public class SkuStockService {
     @Transactional(rollbackFor = Exception.class)
     public int restoreOrderStock(OrderStockRestoreDTO dto) {
         Map<String, Integer> merged = orderRestoreItems(dto);
-        releaseOrderDeductKey(dto.getPayOrderId());
+        // 恢复前置校验（ADR-0018）：只有真实扣减过（order-deduct 账本记录存在）的支付单才允许回补。
+        // 下单 Phase4 扣减失败留下的待付款单被超时/手动关闭时，走这里会跳过回补，
+        // 不再把从未扣过的库存加回去造成虚增。deduct 记录自此不再删除（审计链保留），
+        // 重复恢复仍由 order-close 幂等键挡住，两者职责分离。
+        if (stockChangeRecordMapper.exists(orderDeductBusinessKey(dto.getPayOrderId())) == 0) {
+            log.warn("跳过关单库存恢复：支付单从未扣减过库存, payOrderId={}", dto.getPayOrderId());
+            return 0;
+        }
 
         int total = 0;
         for (Map.Entry<String, Integer> entry : merged.entrySet()) {
@@ -293,13 +302,6 @@ public class SkuStockService {
                 first.getProductId(),
                 first.getPropertyValueIdHash(),
                 amount) == 1;
-    }
-
-    private void releaseOrderDeductKey(String payOrderId) {
-        if (payOrderId == null || payOrderId.isBlank()) {
-            return;
-        }
-        stockChangeRecordMapper.deleteByBusinessKey(orderDeductBusinessKey(payOrderId));
     }
 
     private String orderRestoreBusinessKey(

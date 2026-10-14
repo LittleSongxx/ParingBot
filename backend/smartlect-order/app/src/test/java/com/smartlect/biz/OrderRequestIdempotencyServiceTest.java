@@ -41,25 +41,14 @@ class OrderRequestIdempotencyServiceTest {
     @Mock
     private OrderRequestIdempotencyMapper mapper;
 
+    // 构造器注入的 PlatformTransactionManager mock：TransactionTemplate.execute 在
+    // mock 事务管理器上执行（getTransaction 返回 null、commit/rollback 空操作），
+    // 回调照常运行——REQUIRES_NEW 的真实传播语义由真库 IT（OrderMoneyPersistenceIT）验证。
     @Mock
-    private org.springframework.transaction.support.TransactionTemplate txTemplate;
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     @InjectMocks
     private OrderRequestIdempotencyService service;
-
-    @org.junit.jupiter.api.BeforeEach
-    void setUpTxTemplate() {
-        org.mockito.Mockito.lenient().when(txTemplate.execute(org.mockito.ArgumentMatchers.<org.springframework.transaction.support.TransactionCallback<Object>>any()))
-                .thenAnswer(call -> {
-                    org.springframework.transaction.support.TransactionCallback<?> cb = call.getArgument(0);
-                    return cb.doInTransaction(null);
-                });
-        org.mockito.Mockito.lenient().doAnswer(call -> {
-            java.util.function.Consumer<org.springframework.transaction.TransactionStatus> cb = call.getArgument(0);
-            cb.accept(null);
-            return null;
-        }).when(txTemplate).executeWithoutResult(org.mockito.ArgumentMatchers.<java.util.function.Consumer<org.springframework.transaction.TransactionStatus>>any());
-    }
 
     @Test
     void checkoutReplayIsIdempotentButRejectsChangedQuantity() {

@@ -1,15 +1,12 @@
 package com.smartlect.task;
 
 import com.smartlect.api.support.PayFeignSupport;
-import com.smartlect.component.PayOrderRedisComponent;
 import com.smartlect.component.RedisComponent;
 import com.smartlect.constants.Constants;
 import com.smartlect.entity.config.AppConfig;
 import com.smartlect.api.dto.PayOrderNotifyDTO;
-import com.smartlect.api.enums.OrderStatusEnum;
 import com.smartlect.api.enums.PayChannelEnum;
 import com.smartlect.entity.po.OrderInfo;
-import com.smartlect.entity.query.OrderInfoQuery;
 import com.smartlect.biz.OrderInfoService;
 import com.smartlect.utils.StringTools;
 import jakarta.annotation.Resource;
@@ -21,6 +18,11 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * 支付轮询对账（ADR-0018）：兜底支付成功 MQ 事件丢失/进程崩溃后的状态收敛。
+ * 旧实现依赖 isPayTradeInitiated 的 Redis 标记过滤，但该标记从无生产写入方，
+ * 轮询永远空转（死路径）；现改为按"创建超过 N 分钟仍待付款"直接对账查渠道。
+ */
 @Component
 @Slf4j
 public class PayOrderTask {
@@ -35,13 +37,17 @@ public class PayOrderTask {
     private PayFeignSupport payFeignSupport;
 
     @Resource
-    private PayOrderRedisComponent payOrderRedisComponent;
-
-    @Resource
     private RedisComponent redisComponent;
 
     @Value("${spring.application.name:unknown}")
     private String applicationName;
+
+    /** 只对账创建超过该秒数的待付款单：正在正常支付的用户不查渠道。 */
+    @Value("${smartlect.pay.poll-min-age-seconds:180}")
+    private int pollMinAgeSeconds;
+
+    @Value("${smartlect.pay.poll-batch-size:200}")
+    private int pollBatchSize;
 
     @XxlJob("payOrderPoll")
     public void pollPayOrders() {
@@ -56,29 +62,38 @@ public class PayOrderTask {
             return;
         }
         try {
-            OrderInfoQuery query = new OrderInfoQuery();
-            query.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
-            List<OrderInfo> orderInfoList = orderInfoService.findListByParam(query);
+            int delayMinutes = Math.max(1, pollMinAgeSeconds / 60);
+            List<OrderInfo> orderInfoList =
+                    orderInfoService.findWaitPaymentPollList(delayMinutes, pollBatchSize);
             for (OrderInfo orderInfo : orderInfoList) {
-                String payOrderId = orderInfo.getPayOrderId();
-                if (StringTools.isEmpty(payOrderId)) {
-                    continue;
-                }
-                if (!payOrderRedisComponent.isPayTradeInitiated(payOrderId)) {
-                    continue;
-                }
-                PayChannelEnum payChannelEnum = PayChannelEnum.resolve(orderInfo.getPayChannel());
-                if (payChannelEnum == null) {
-                    continue;
-                }
-                PayOrderNotifyDTO payOrderNotifyDTO = payFeignSupport.queryOrder(payOrderId, payChannelEnum.getPayScene());
-                if (payOrderNotifyDTO == null) {
-                    continue;
-                }
-                orderInfoService.paySuccess(payOrderNotifyDTO);
+                reconcileOne(orderInfo);
             }
         } catch (Exception e) {
-            log.error("查询支付信息异常", e);
+            log.error("支付轮询对账批次异常", e);
+        }
+    }
+
+    private void reconcileOne(OrderInfo orderInfo) {
+        String payOrderId = orderInfo.getPayOrderId();
+        if (StringTools.isEmpty(payOrderId)) {
+            // 无支付单号的待付款单由超时关单延时消息收敛，这里不处理。
+            return;
+        }
+        PayChannelEnum payChannelEnum = PayChannelEnum.resolve(orderInfo.getPayChannel());
+        if (payChannelEnum == null) {
+            return;
+        }
+        try {
+            // 渠道侧无结果（PENDING / 意图不存在）返回 null，交由超时关单收敛；
+            PayOrderNotifyDTO payOrderNotifyDTO =
+                    payFeignSupport.queryOrder(payOrderId, payChannelEnum.getPayScene());
+            if (payOrderNotifyDTO == null) {
+                return;
+            }
+            orderInfoService.paySuccess(payOrderNotifyDTO);
+        } catch (Exception e) {
+            // 单笔对账失败不阻断整批：失败单留在待付款集合里下一轮重试。
+            log.warn("支付轮询对账单笔失败, payOrderId={}", payOrderId, e);
         }
     }
 }

@@ -27,30 +27,14 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class PayOrderRedisComponent {
 
-	@Resource
-	private RedisUtils redisUtils;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
-	@Resource
-	private StringRedisTemplate stringRedisTemplate;
+    // 已移除（ADR-0018）：markPayTradeInitiated / isPayTradeInitiated 曾用于支付轮询的过滤闸，
+    // 但标记从无生产写入方（死代码），轮询因此永远空转。轮询对账已改为按
+    // "创建超过 N 分钟仍待付款"直接查渠道（见 PayOrderTask），不再依赖 Redis 标记。
 
-	public void markPayTradeInitiated(String payOrderId) {
-		if (StringTools.isEmpty(payOrderId)) {
-			return;
-		}
-		redisUtils.setex(
-				Constants.REDIS_KEY_PAY_TRADE_INITIATED + payOrderId,
-				"1",
-				Constants.REDIS_KEY_EXPIRES_DAY);
-	}
-
-	public boolean isPayTradeInitiated(String payOrderId) {
-		if (StringTools.isEmpty(payOrderId)) {
-			return false;
-		}
-		return redisUtils.get(Constants.REDIS_KEY_PAY_TRADE_INITIATED + payOrderId) != null;
-	}
-
-	public boolean tryMarkPayOrderCloseOnce(String payOrderId) {
+    public boolean tryMarkPayOrderCloseOnce(String payOrderId) {
 		if (StringTools.isEmpty(payOrderId)) {
 			return false;
 		}

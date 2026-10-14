@@ -96,7 +96,12 @@ public class PayChannel4Mock implements PayChannel {
 
     @Override
     public PayOrderNotifyDTO queryOrder(String payOrderId) {
-        PayTradeRecord record = requireIntent(payOrderId);
+        PayTradeRecord record = trades.findByPayOrderId(payOrderId);
+        if (record == null || PayChannelEnum.resolve(record.getPayChannel()) != PayChannelEnum.MOCK) {
+            // 对账语义：支付意图不存在（如下单 Phase4 失败留下的孤儿单）视为渠道侧无结果，
+            // 返回 null 由订单侧超时关单收敛，而不是抛错打断整批轮询。
+            return null;
+        }
         return Objects.equals(record.getTradeStatus(), 1) || Objects.equals(record.getTradeStatus(), 3)
                 ? new PayOrderNotifyDTO(record.getPayOrderId(), record.getChannelOrderId()) : null;
     }
@@ -141,6 +146,13 @@ public class PayChannel4Mock implements PayChannel {
 
     @Override
     public void closeOrder(String payOrderId) {
+        requireId(payOrderId, 32);
+        if (trades.findByPayOrderId(payOrderId) == null) {
+            // 关单幂等（ADR-0018）：支付意图可能从未创建（下单 Phase4 失败的孤儿单），
+            // 与 markClosed 对不存在记录 0 行静默的语义对齐，视为已关闭。
+            // 否则超时关单消息会因这里抛错而无限重投。
+            return;
+        }
         PayTradeRecord record = requireIntent(payOrderId);
         if (Objects.equals(record.getTradeStatus(), 1) || Objects.equals(record.getTradeStatus(), 3)) {
             throw new BusinessException("已付款的支付意图不能关单");

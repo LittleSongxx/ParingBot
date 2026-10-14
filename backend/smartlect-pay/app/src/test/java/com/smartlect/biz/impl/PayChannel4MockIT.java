@@ -44,16 +44,21 @@ class PayChannel4MockIT {
         jdbc.update("INSERT INTO pay_trade_record (trade_id, order_id, user_id, pay_order_id, pay_channel, pay_amount, trade_status, create_time) "
                 + "VALUES ('trade-1', 'order-1', 'owner-1', 'pay-1', 'mock', 90.00, 1, NOW())");
         PayTradeRecordService trades = mock(PayTradeRecordService.class);
-        when(trades.findByPayOrderId(anyString())).thenAnswer(call -> jdbc.queryForObject(
-                "SELECT * FROM pay_trade_record WHERE pay_order_id = ?", (row, index) -> {
-                    PayTradeRecord record = new PayTradeRecord();
-                    record.setPayOrderId(row.getString("pay_order_id"));
-                    record.setUserId(row.getString("user_id"));
-                    record.setPayChannel(row.getString("pay_channel"));
-                    record.setPayAmount(row.getBigDecimal("pay_amount"));
-                    record.setTradeStatus(row.getInt("trade_status"));
-                    return record;
-                }, call.getArgument(0, String.class)));
+        when(trades.findByPayOrderId(anyString())).thenAnswer(call -> {
+            // 对缺失行返回 null 而不是抛错——对齐生产实现 MyBatis selectOne 的语义，
+            // 使"支付意图不存在"的幂等路径（closeOrder/queryOrder，ADR-0018）可被测到。
+            List<PayTradeRecord> rows = jdbc.query(
+                    "SELECT * FROM pay_trade_record WHERE pay_order_id = ?", (row, index) -> {
+                        PayTradeRecord record = new PayTradeRecord();
+                        record.setPayOrderId(row.getString("pay_order_id"));
+                        record.setUserId(row.getString("user_id"));
+                        record.setPayChannel(row.getString("pay_channel"));
+                        record.setPayAmount(row.getBigDecimal("pay_amount"));
+                        record.setTradeStatus(row.getInt("trade_status"));
+                        return record;
+                    }, call.getArgument(0, String.class));
+            return rows.isEmpty() ? null : rows.get(0);
+        });
         doAnswer(call -> jdbc.update("UPDATE pay_trade_record SET trade_status = 3 WHERE pay_order_id = ?",
                 call.getArgument(0, String.class))).when(trades).markRefunded(anyString());
         ProxyFactory proxy = new ProxyFactory(new PayChannel4Mock(trades, mock(com.smartlect.constants.TransactionalMqSender.class), jdbc));
@@ -96,6 +101,19 @@ class PayChannel4MockIT {
         assertThrows(BusinessException.class, () -> channel.refund("pay-1", "refund-1", BigDecimal.ONE));
         assertThrows(BusinessException.class, () -> channel.refund("pay-1", "refund-2", new BigDecimal("0.001")));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM pay_mock_refund", Integer.class));
+    }
+
+    @Test
+    void closeOrderTreatsMissingIntentAsAlreadyClosed() {
+        // ADR-0018：下单 Phase4 失败的孤儿单没有支付意图；超时关单消息到达时
+        // closeOrder 必须幂等成功，否则关单消费者会无限重投。
+        assertDoesNotThrow(() -> channel.closeOrder("pay-missing-intent"));
+    }
+
+    @Test
+    void queryOrderReturnsNullForMissingIntentInsteadOfThrowing() {
+        // 对账语义：意图不存在视为渠道侧无结果，由订单侧超时关单收敛。
+        assertNull(channel.queryOrder("pay-missing-intent"));
     }
 
     private boolean tryRefund(String id) {

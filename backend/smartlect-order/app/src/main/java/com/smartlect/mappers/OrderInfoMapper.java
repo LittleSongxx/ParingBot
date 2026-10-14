@@ -41,7 +41,22 @@ public interface OrderInfoMapper<T,P> extends BaseMapper<T,P> {
 				LIMIT #{limit}
 				""")
 		List<OrderInfo> selectAutoReceivableOrders(
-				@Param("delayMinutes") int delayMinutes,
-				@Param("limit") int limit);
+			@Param("delayMinutes") int delayMinutes,
+			@Param("limit") int limit);
+
+		// 支付轮询对账（ADR-0018）：只捞"创建超过 N 分钟仍待付款"的单，正常支付中的用户不查渠道；
+		// 兜底目标是 MQ 支付事件丢失/进程崩溃后的状态收敛。走 idx_order_status_time 索引。
+		@Select("""
+				SELECT order_id AS orderId, pay_order_id AS payOrderId, pay_channel AS payChannel
+				FROM order_info
+				WHERE order_status = 0
+				  AND order_time IS NOT NULL
+				  AND order_time <= DATE_SUB(NOW(), INTERVAL #{delayMinutes} MINUTE)
+				ORDER BY order_time ASC
+				LIMIT #{limit}
+				""")
+		List<OrderInfo> selectWaitPaymentBefore(
+			@Param("delayMinutes") int delayMinutes,
+			@Param("limit") int limit);
 
 	}

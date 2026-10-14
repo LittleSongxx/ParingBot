@@ -8,9 +8,11 @@ import com.smartlect.exception.HttpBusinessException;
 import com.smartlect.mappers.OrderRequestIdempotencyMapper;
 import com.smartlect.utils.JsonUtils;
 import com.smartlect.utils.RequestFingerprint;
-import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.Date;
@@ -23,8 +25,22 @@ import java.util.regex.Pattern;
 @Service
 public class OrderRequestIdempotencyService {
 
-    @jakarta.annotation.Resource
-    private org.springframework.transaction.support.TransactionTemplate txTemplate;
+    // 台账事务语义（ADR-0018）：
+    // - PROCESSING 插入与 FAILED 收口走 REQUIRES_NEW 独立提交——即使调用方（如秒杀入口）
+    //   的外层事务回滚，"请求已受理 / 已失败"仍留痕，同键重放能得到确定性结果而不是凭空重来；
+    //   旧实现用默认 REQUIRED 传播，"独立事务"的注释承诺在 @Transactional 调用方下并不成立。
+    // - COMPLETED 收口保持参与调用方事务（无外层事务时自动提交）：只有业务真正提交后
+    //   响应才可重放，避免"台账已 COMPLETED 而业务回滚"的假成功。
+    private final TransactionTemplate ledgerTx;
+    private final OrderRequestIdempotencyMapper mapper;
+
+    public OrderRequestIdempotencyService(
+            PlatformTransactionManager transactionManager,
+            OrderRequestIdempotencyMapper mapper) {
+        this.ledgerTx = new TransactionTemplate(transactionManager);
+        this.ledgerTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.mapper = mapper;
+    }
 
     public static final String COMMAND_POST_ORDER = "POST_ORDER";
     public static final String COMMAND_POST_ORDER_V2 = "POST_ORDER_V2";
@@ -36,9 +52,6 @@ public class OrderRequestIdempotencyService {
 
     private static final Pattern KEY_PATTERN = Pattern.compile("[A-Za-z0-9._:-]{16,64}");
     static final long STALE_PROCESSING_MILLIS = 120_000L;
-
-    @Resource
-    private OrderRequestIdempotencyMapper mapper;
 
     public <T> T execute(
             String userId,
@@ -67,8 +80,9 @@ public class OrderRequestIdempotencyService {
 
         boolean acquired;
         try {
-            // PROCESSING 插入用独立事务：即使调用方后续回滚，幂等账本仍留痕（请求已受理）
-            acquired = Boolean.TRUE.equals(txTemplate.execute(txStatus ->
+            // PROCESSING 插入走 REQUIRES_NEW 独立事务：即使调用方后续回滚，
+            // 幂等账本仍留痕（请求已受理），重复请求与 stale 判定都有据可依。
+            acquired = Boolean.TRUE.equals(ledgerTx.execute(txStatus ->
                     mapper.insertProcessing(newRecord) == 1));
         } catch (DuplicateKeyException duplicate) {
             // 让唯一约束显式报告一次重放，而不是把插入异常吞成零行影响。
@@ -133,16 +147,15 @@ public class OrderRequestIdempotencyService {
             }
             return response;
         } catch (RuntimeException ex) {
-            // Growth controllers are outside a surrounding transaction. A rejected
-            // command must close its ledger row instead of leaving a permanent lock.
-            // With an outer transaction this update rolls back together with the
-            // domain command, preserving the caller's original transaction semantics.
+            // 被拒绝的命令必须把台账行收口为 FAILED，而不是留下一把永久锁。
+            // FAILED 收口同样走 REQUIRES_NEW：秒杀入口等 @Transactional 调用方回滚时，
+            // 失败结果仍独立提交，同键重放得到"原请求执行失败"而不是从 PROCESSING 从头再来。
             try {
-                mapper.markFailed(
+                ledgerTx.executeWithoutResult(txStatus -> mapper.markFailed(
                         userId,
                         commandType,
                         idempotencyKey,
-                        JsonUtils.toJson(Map.of("errorMessage", failureMessage(ex))));
+                        JsonUtils.toJson(Map.of("errorMessage", failureMessage(ex)))));
             } catch (RuntimeException ledgerError) {
                 ex.addSuppressed(ledgerError);
             }

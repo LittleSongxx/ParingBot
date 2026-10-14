@@ -20,6 +20,9 @@ public interface OrderInfoService {
 
 	List<OrderInfo> findListByParam(OrderInfoQuery param);
 
+	/** 支付轮询对账：创建超过 delayMinutes 仍待付款的订单（按时间升序，限量）。 */
+	List<OrderInfo> findWaitPaymentPollList(int delayMinutes, int limit);
+
 	Integer findCountByParam(OrderInfoQuery param);
 
 	PaginationResultVO<OrderInfo> findListByPage(OrderInfoQuery param);

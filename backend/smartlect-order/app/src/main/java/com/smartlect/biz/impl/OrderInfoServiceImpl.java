@@ -123,6 +123,11 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 	}
 
 	@Override
+	public List<OrderInfo> findWaitPaymentPollList(int delayMinutes, int limit) {
+		return orderInfoMapper.selectWaitPaymentBefore(delayMinutes, limit);
+	}
+
+	@Override
 	public Integer findCountByParam(OrderInfoQuery param) {
 		return this.orderInfoMapper.selectCount(param);
 	}
@@ -200,7 +205,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 	// 见 confirmOrderReceipt 的注释）。方法内没有本地写需要原子保护——prepareOrder 只读、
 	// orderQuoteService.issue 自身非事务，去掉外层事务后各写各自提交，语义不变。
 	public Map<String, Object> quoteOrder(String userId, PostOrderDTO request) {
-		PreparedOrder prepared = prepareOrder(userId, request);
+		PreparedOrder prepared = prepareOrder(userId, request, null);
 		if (!StringTools.isEmpty(request.getUserCouponId())) {
 			BigDecimal gross = prepared.orders().stream().map(OrderInfo::getAmount)
 					.reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -223,11 +228,20 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 				OrderRequestIdempotencyService.COMMAND_POST_ORDER_V2, idempotencyKey,
 				Map.of("quoteId", quoteId, "confirmedAmountCents", confirmedAmountCents,
 						"order", OrderQuoteService.input(request)), PayInfoDTO.class, () -> {
-			OrderQuoteService.Quote quote = orderQuoteService.lock(userId, quoteId);
-			orderQuoteService.validateRequest(quote, userId, request, confirmedAmountCents);
-			PayInfoDTO response = createOrder(userId, request, quote, confirmedAmountCents);
-			orderQuoteService.consume(quote, response.getPayOrderId());
-			return response;
+			// claim-first：先在短事务内占用报价，再执行建单副作用（ADR-0018）。
+			// 并发重复请求在占用处即被 409 挡下，不再先落单后才发现冲突留下孤儿订单。
+			String claimedPayOrderId = StringTools.createPayOrderId();
+			OrderQuoteService.Quote quote =
+					orderQuoteService.claim(userId, quoteId, claimedPayOrderId, request, confirmedAmountCents);
+			try {
+				return createOrder(userId, request, quote, confirmedAmountCents, claimedPayOrderId);
+			} catch (RuntimeException ex) {
+				// 建单失败释放占用，报价可重新下单；释放失败则保持已占用（用户重新报价），不放大故障。
+				if (!orderQuoteService.release(quoteId, userId, claimedPayOrderId)) {
+					log.warn("建单失败后释放报价占用失败, quoteId={}, payOrderId={}", quoteId, claimedPayOrderId);
+				}
+				throw ex;
+			}
 		});
 	}
 
@@ -236,7 +250,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 			List<CartDeleteItemDTO> cart, List<OrderLogisticsInfo> logistics, String subject,
 			String payOrderId, Date now) { }
 
-	private PreparedOrder prepareOrder(String userId, PostOrderDTO postOrderDTO) {
+	private PreparedOrder prepareOrder(String userId, PostOrderDTO postOrderDTO, String presetPayOrderId) {
 		PayChannelEnum payChannelEnum = PayChannelEnum.getByPayScene(postOrderDTO.getPayMethod());
 		if (payChannelEnum == null) {
 			throw new BusinessException(ResponseCodeEnum.CODE_600);
@@ -279,7 +293,9 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 		// 物流信息
 		List<OrderLogisticsInfo> orderLogisticsInfoList = new ArrayList<>();
 		LogisticsSendDTO logisticsSendDTO = redisComponent.getLogisticsInfo();
-		String unifiedPayOrderId = StringTools.createPayOrderId();
+		// V2 报价链路在 claim 占用时已预生成支付单号（与 order_quote.pay_order_id 绑定），
+		// 普通下单仍现场生成。
+		String unifiedPayOrderId = presetPayOrderId != null ? presetPayOrderId : StringTools.createPayOrderId();
 		for (ProductItem productItem : orderList) {
 			// 根据productId获取productInfoMap中的productInfo
 			ProductInfoSnapshotVO productInfo = productInfoMap.get(productItem.getProductId());
@@ -433,13 +449,13 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 	}
 
 	private PayInfoDTO createOrder(String userId, PostOrderDTO request) {
-		return createOrder(userId, request, null, null);
+		return createOrder(userId, request, null, null, null);
 	}
 
 	private PayInfoDTO createOrder(String userId, PostOrderDTO postOrderDTO,
-			OrderQuoteService.Quote quote, Long confirmedAmountCents) {
+			OrderQuoteService.Quote quote, Long confirmedAmountCents, String presetPayOrderId) {
 		// Phase 1: 只读准备（无本地事务，Feign 查地址/快照/库存预检不占连接）
-		PreparedOrder prepared = prepareOrder(userId, postOrderDTO);
+		PreparedOrder prepared = prepareOrder(userId, postOrderDTO, presetPayOrderId);
 		PayChannelEnum payChannelEnum = prepared.channel();
 		OrderFromTypeEnum orderFromTypeEnum = prepared.from();
 		List<ProductItem> newList = prepared.products();
@@ -484,16 +500,33 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 						prepared.address(), orderItemList, total(orderInfoList));
 			}
 
-			// Phase 3: 短本地事务（仅 DB 写入，毫秒级，不包含任何远程调用）
+			// Phase 3: 短本地事务（仅 DB 写入，毫秒级，不包含任何远程调用）。
+			// 超时关单消息同事务写入 Outbox（ADR-0018）：订单落库与关单收敛消息同生共死——
+			// 即使 Phase 4 扣库存/建支付意图失败，留下的待付款单也一定会在 15 分钟后被关闭，
+			// 不再产生既无支付意图又无关单消息的永久孤儿订单。sendAfterCommit 在活跃事务内
+			// 的语义：outbox 落库参与本事务，提交后异步投递不占本连接。
 			final OrderCouponRel relToInsert = couponRel;
 			transactionTemplate.executeWithoutResult(status -> {
 				if (relToInsert != null) orderCouponRelMapper.insert(relToInsert);
 				orderInfoMapper.insertBatch(orderInfoList);
 				orderItemMapper.insertBatch(orderItemList);
 				orderLogisticsInfoMapper.insertBatch(orderLogisticsInfoList);
+				for (OrderInfo orderInfo : orderInfoList) {
+					PayOrderMessageDTO dto = new PayOrderMessageDTO();
+					dto.setOrderId(orderInfo.getOrderId());
+					transactionalMqSender.sendAfterCommit(
+							RocketMqTopics.TOPIC_DELAY,
+							RocketMqTopics.TAG_PAY_TIMEOUT_CLOSE,
+							dto,
+							MqIdempotencyKeys.payTimeout(orderInfo.getOrderId()),
+							MessageReliabilityLevelEnum.STANDARD,
+							System.currentTimeMillis() + RocketMqTopics.PAY_TIMEOUT.toMillis());
+				}
 			});
 
-			// Phase 4: 事务外远程写（幂等，失败不回滚订单——走补偿/超时关单收敛）
+			// Phase 4: 事务外远程写（幂等，失败不回滚订单——订单已随 Phase 3 携带超时关单消息：
+			// 库存/券由 Phase 5 补偿回滚，遗留的待付款单由延时消息关闭，且库存服务对
+			// "从未扣减过"的支付单不再回补，不会虚增库存）
 			stockFeignSupport.changeStockBatch(deductList, "order-deduct:" + unifiedPayOrderId);
 			stockDeducted = true;
 
@@ -506,21 +539,8 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 
 			payFeignSupport.createPending(userId, unifiedPayOrderId, orderInfoList.get(0).getOrderId(),
 					totalAmount, postOrderDTO.getPayMethod());
-			PayInfoDTO payInfoDTO = requestInitialPayInfoBestEffort(
+			return requestInitialPayInfoBestEffort(
 					payChannelEnum.getPayScene(), unifiedPayOrderId, subject, totalAmount);
-
-			for (OrderInfo orderInfo : orderInfoList) {
-				PayOrderMessageDTO dto = new PayOrderMessageDTO();
-				dto.setOrderId(orderInfo.getOrderId());
-				transactionalMqSender.sendAfterCommit(
-						RocketMqTopics.TOPIC_DELAY,
-						RocketMqTopics.TAG_PAY_TIMEOUT_CLOSE,
-						dto,
-						MqIdempotencyKeys.payTimeout(orderInfo.getOrderId()),
-						MessageReliabilityLevelEnum.STANDARD,
-						System.currentTimeMillis() + RocketMqTopics.PAY_TIMEOUT.toMillis());
-			}
-			return payInfoDTO;
 		} catch (RuntimeException ex) {
 			// Phase 5: 补偿（事务外，可独立重试）
 			if (stockDeducted) {

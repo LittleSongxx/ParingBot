@@ -60,7 +60,8 @@ class OrderQuoteServiceTest {
     @Test
     void quoteBindsUserRequestAddressSkuPriceAndExpiration() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        OrderQuoteService service = new OrderQuoteService(jdbc);
+        OrderQuoteService service = new OrderQuoteService(jdbc,
+                mock(org.springframework.transaction.PlatformTransactionManager.class));
         PostOrderDTO order = order();
         UserAddressVO address = address();
         OrderItem item = item();

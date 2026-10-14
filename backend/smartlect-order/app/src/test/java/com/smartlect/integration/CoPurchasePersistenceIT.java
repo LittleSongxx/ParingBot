@@ -145,7 +145,7 @@ class CoPurchasePersistenceIT {
     }
 
     @Test
-    void popularityCountsConfirmedQuantityIncludingZeroPaymentAndCompletedRefund() throws Exception {
+    void popularityCountsConfirmedQuantityIncludingZeroPaymentAndExcludingRefund() throws Exception {
         try (SqlSession session = sessions.openSession(true)) {
             order(session, "paid", "pay-paid", "u1");
             item(session, "paid-line", "paid", "p1", BigDecimal.TEN);
@@ -168,8 +168,11 @@ class CoPurchasePersistenceIT {
                     VALUES ('refund-1','refund-1','pay-refunded','refunded','refunded-line','u1','p4','refunded-line',4,10,'COMPLETED',NOW())
                     """);
             var result = popular(session, Map.of("limit", 20));
-            assertEquals(List.of("p4", "p3", "p1"), result.stream().map(r -> r.get("productId")).toList());
-            assertEquals(List.of(4L, 3L, 2L), result.stream().map(r -> r.get("paidUnits")).toList());
+            // 现行口径（basis=confirmed_payment_units_excluding_refunds）：
+            // 0 元支付单（p3）计入确认数量；整单退款（p4，refunded_amount=paid_amount
+            // 且 order_status=6）被排除。本用例曾按"退款计入"断言，随 SQL 口径演进已陈旧。
+            assertEquals(List.of("p3", "p1"), result.stream().map(r -> r.get("productId")).toList());
+            assertEquals(List.of(3L, 2L), result.stream().map(r -> r.get("paidUnits")).toList());
             assertEquals(List.of("confirmed_payment_units_excluding_refunds"), result.stream().map(r -> r.get("basis")).distinct().toList());
         }
     }

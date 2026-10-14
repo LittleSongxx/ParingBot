@@ -56,6 +56,7 @@ class SkuStockServiceTest {
     @Test
     void orderRestoreMergesSkuQuantityAndUsesStableBusinessKey() {
         OrderStockRestoreDTO dto = orderRestore("pay-1", 2, 3);
+        when(stockChangeRecordMapper.exists("order-deduct:pay-1")).thenReturn(1);
         when(stockChangeRecordMapper.insertIgnore(
                 argThat(key -> key.startsWith("order-close:") && key.length() == 76),
                 eq("ORDER_CLOSE_RESTORE"), eq("p1"), eq("sku1"), eq(5)))
@@ -69,6 +70,7 @@ class SkuStockServiceTest {
     @Test
     void duplicateOrderRestoreDoesNotRestoreSkuTwice() {
         OrderStockRestoreDTO dto = orderRestore("pay-2", 4);
+        when(stockChangeRecordMapper.exists("order-deduct:pay-2")).thenReturn(1);
         when(stockChangeRecordMapper.insertIgnore(
                 argThat(key -> key.startsWith("order-close:")),
                 eq("ORDER_CLOSE_RESTORE"), eq("p1"), eq("sku1"), eq(4)))
@@ -82,6 +84,8 @@ class SkuStockServiceTest {
     void differentPaymentAggregatesUseDifferentRestoreKeys() {
         OrderStockRestoreDTO first = orderRestore("pay-a", 1);
         OrderStockRestoreDTO second = orderRestore("pay-b", 1);
+        when(stockChangeRecordMapper.exists("order-deduct:pay-a")).thenReturn(1);
+        when(stockChangeRecordMapper.exists("order-deduct:pay-b")).thenReturn(1);
         when(stockChangeRecordMapper.insertIgnore(
                 argThat(key -> key != null), eq("ORDER_CLOSE_RESTORE"),
                 eq("p1"), eq("sku1"), eq(1)))
@@ -134,8 +138,26 @@ class SkuStockServiceTest {
     }
 
     @Test
-    void orderRestoreReleasesDeductKey() {
+    void orderRestoreSkipsWhenDeductRecordMissing() {
+        // ADR-0018 防库存虚增：扣减失败留下的待付款单被关闭时，deduct 账本无记录，
+        // 恢复必须整体跳过——既不加库存，也不写 order-close 恢复记录。
+        OrderStockRestoreDTO dto = orderRestore("pay-orphan", 2);
+        when(stockChangeRecordMapper.exists("order-deduct:pay-orphan")).thenReturn(0);
+
+        assertEquals(0, service.restoreOrderStock(dto));
+        verify(skuStockMapper, never()).changeStock("p1", "sku1", 2);
+        verify(stockChangeRecordMapper, never()).insertIgnore(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    void orderRestoreKeepsDeductRecordAsAuditTrail() {
+        // ADR-0018：正常"扣过再关"的恢复照常执行；deduct 账本记录保留作审计链
+        // （deleteByBusinessKey 已移除，账本只增不删）。
         OrderStockRestoreDTO dto = orderRestore("pay-release", 2);
+        when(stockChangeRecordMapper.exists("order-deduct:pay-release")).thenReturn(1);
         when(stockChangeRecordMapper.insertIgnore(
                 argThat(key -> key.startsWith("order-close:")),
                 eq("ORDER_CLOSE_RESTORE"), eq("p1"), eq("sku1"), eq(2)))
@@ -143,7 +165,7 @@ class SkuStockServiceTest {
         when(skuStockMapper.changeStock("p1", "sku1", 2)).thenReturn(1);
 
         assertEquals(1, service.restoreOrderStock(dto));
-        verify(stockChangeRecordMapper).deleteByBusinessKey("order-deduct:pay-release");
+        verify(skuStockMapper).changeStock("p1", "sku1", 2);
     }
 
     @Test

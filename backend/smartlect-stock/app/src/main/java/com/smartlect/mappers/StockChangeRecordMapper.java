@@ -25,6 +25,6 @@ public interface StockChangeRecordMapper {
     @Select("SELECT COUNT(1) FROM stock_change_record WHERE business_key = #{businessKey}")
     int exists(@Param("businessKey") String businessKey);
 
-    @org.apache.ibatis.annotations.Delete("DELETE FROM stock_change_record WHERE business_key = #{businessKey}")
-    int deleteByBusinessKey(@Param("businessKey") String businessKey);
+    // 说明（ADR-0018）：库存变更账本只增不删——deduct/close 记录既是幂等键也是审计链，
+    // 曾经的 deleteByBusinessKey（关单恢复前清扣减键）会破坏"是否扣减过"的判断依据，已移除。
 }

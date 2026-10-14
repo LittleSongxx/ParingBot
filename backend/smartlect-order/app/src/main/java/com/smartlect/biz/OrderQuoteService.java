@@ -15,6 +15,8 @@ import com.smartlect.utils.JsonUtils;
 import com.smartlect.utils.RequestFingerprint;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -45,8 +47,12 @@ public class OrderQuoteService {
                         com.fasterxml.jackson.databind.cfg.CoercionAction.Fail);
     }
     private final JdbcTemplate jdbc;
+    private final TransactionTemplate claimTx;
 
-    public OrderQuoteService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public OrderQuoteService(JdbcTemplate jdbc, PlatformTransactionManager transactionManager) {
+        this.jdbc = jdbc;
+        this.claimTx = new TransactionTemplate(transactionManager);
+    }
 
     public record Line(String productId, String propertyValueIds, Integer buyCount, String remark) { }
     public record Input(String payMethod, String addressId, Integer orderFrom,
@@ -162,6 +168,29 @@ public class OrderQuoteService {
                 payOrderId, quote.quoteId(), quote.userId()) != 1) {
             throw new HttpBusinessException(409, "QUOTE_ALREADY_CONSUMED");
         }
+    }
+
+    /**
+     * claim-first 短事务占用（ADR-0018）：在行锁事务内完成 校验 + 一次性占用。
+     * 旧实现 lock 的 FOR UPDATE 脱离事务上下文即释放、consume 又发生在建单副作用之后，
+     * 并发重复请求会先落单再被 409 挡下，留下无支付意图的孤儿订单。
+     * 现在占用发生在任何建单副作用之前；失败用 {@link #release} 逆向释放。
+     */
+    public Quote claim(String userId, String quoteId, String payOrderId, PostOrderDTO order, Long confirmedAmountCents) {
+        return claimTx.execute(status -> {
+            Quote locked = lock(userId, quoteId);
+            validateRequest(locked, userId, order, confirmedAmountCents);
+            consume(locked, payOrderId);
+            return locked;
+        });
+    }
+
+    /** 建单失败时释放占用：仅当占用者仍是本请求的 payOrderId 才回滚为可下单。 */
+    public boolean release(String quoteId, String userId, String claimedPayOrderId) {
+        return jdbc.update("""
+                UPDATE order_quote SET pay_order_id=NULL
+                WHERE quote_id=? AND user_id=? AND pay_order_id=?
+                """, quoteId, userId, claimedPayOrderId) == 1;
     }
 
     private static String offerHash(UserAddressVO address, List<OrderItem> items, BigDecimal total) {
