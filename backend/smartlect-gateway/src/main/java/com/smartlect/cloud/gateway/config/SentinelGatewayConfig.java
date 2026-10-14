@@ -42,6 +42,12 @@ public class SentinelGatewayConfig {
     private String nacosServerAddr;
     @org.springframework.beans.factory.annotation.Value("${spring.cloud.nacos.config.group:DEFAULT_GROUP}")
     private String nacosGroup;
+    @org.springframework.beans.factory.annotation.Value("${spring.cloud.nacos.config.username:}")
+    private String nacosUsername;
+    @org.springframework.beans.factory.annotation.Value("${spring.cloud.nacos.config.password:}")
+    private String nacosPassword;
+    @org.springframework.beans.factory.annotation.Value("${spring.cloud.nacos.config.namespace:}")
+    private String nacosNamespace;
 
 
     private final GatewayRateLimitProperties rateLimitProperties;
@@ -72,10 +78,24 @@ public class SentinelGatewayConfig {
             com.fasterxml.jackson.core.type.TypeReference<java.util.List<com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayFlowRule>> ruleType =
                     new com.fasterxml.jackson.core.type.TypeReference<>() {
                     };
+            // 必须用 Properties 构造并带上配置中心同源凭据：裸 serverAddr 构造的
+            // NacosDataSource 客户端无鉴权，在开启 auth 的集群 Nacos 上取配置会持续
+            // 403 'user not found!'——挂接看似成功、规则永远为空（2026-10-15 线上实测）。
+            java.util.Properties nacosProps = new java.util.Properties();
+            nacosProps.put(com.alibaba.nacos.api.PropertyKeyConst.SERVER_ADDR, nacosServerAddr);
+            if (nacosUsername != null && !nacosUsername.isBlank()) {
+                nacosProps.put(com.alibaba.nacos.api.PropertyKeyConst.USERNAME, nacosUsername);
+            }
+            if (nacosPassword != null && !nacosPassword.isBlank()) {
+                nacosProps.put(com.alibaba.nacos.api.PropertyKeyConst.PASSWORD, nacosPassword);
+            }
+            if (nacosNamespace != null && !nacosNamespace.isBlank()) {
+                nacosProps.put(com.alibaba.nacos.api.PropertyKeyConst.NAMESPACE, nacosNamespace);
+            }
             // GatewayRuleManager 的 property 类型是 Set<GatewayFlowRule>
             com.alibaba.csp.sentinel.datasource.nacos.NacosDataSource<java.util.Set<com.alibaba.csp.sentinel.adapter.gateway.common.rule.GatewayFlowRule>> source =
                     new com.alibaba.csp.sentinel.datasource.nacos.NacosDataSource<>(
-                            nacosServerAddr, nacosGroup, gatewayRulesDataId,
+                            nacosProps, nacosGroup, gatewayRulesDataId,
                             json -> {
                                 try {
                                     return new java.util.HashSet<>(new com.fasterxml.jackson.databind.ObjectMapper()

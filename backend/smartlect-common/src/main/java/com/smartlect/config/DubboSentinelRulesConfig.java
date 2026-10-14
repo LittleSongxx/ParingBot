@@ -48,9 +48,26 @@ public class DubboSentinelRulesConfig {
                     com.fasterxml.jackson.core.type.TypeReference<List<DegradeRule>> ruleType =
                             new com.fasterxml.jackson.core.type.TypeReference<>() {
                             };
+                    // 必须用 Properties 构造并带上配置中心同源凭据：裸 serverAddr 构造的
+                    // NacosDataSource 客户端无鉴权，在开启 auth 的集群 Nacos 上取配置会持续
+                    // 403 'user not found!'——挂接看似成功、规则永远为空（2026-10-15 线上实测）。
+                    java.util.Properties nacosProps = new java.util.Properties();
+                    nacosProps.put(com.alibaba.nacos.api.PropertyKeyConst.SERVER_ADDR, serverAddr);
+                    String username = environment.getProperty("spring.cloud.nacos.config.username", "");
+                    String password = environment.getProperty("spring.cloud.nacos.config.password", "");
+                    String namespace = environment.getProperty("spring.cloud.nacos.config.namespace", "");
+                    if (!username.isBlank()) {
+                        nacosProps.put(com.alibaba.nacos.api.PropertyKeyConst.USERNAME, username);
+                    }
+                    if (!password.isBlank()) {
+                        nacosProps.put(com.alibaba.nacos.api.PropertyKeyConst.PASSWORD, password);
+                    }
+                    if (!namespace.isBlank()) {
+                        nacosProps.put(com.alibaba.nacos.api.PropertyKeyConst.NAMESPACE, namespace);
+                    }
                     com.alibaba.csp.sentinel.datasource.nacos.NacosDataSource<List<DegradeRule>> source =
                             new com.alibaba.csp.sentinel.datasource.nacos.NacosDataSource<>(
-                                    serverAddr, group, dubboRulesDataId,
+                                    nacosProps, group, dubboRulesDataId,
                                     json -> {
                                         try {
                                             return new com.fasterxml.jackson.databind.ObjectMapper()
