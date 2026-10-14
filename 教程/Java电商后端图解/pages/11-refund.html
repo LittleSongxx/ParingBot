@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>11 退款 Saga · Smartlect 图解</title>
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body data-base="../">
+<header class="topbar">
+  <button class="icon-btn" id="burger" aria-label="菜单">☰</button>
+  <a class="brand" href="../index.html"><span class="logo">商</span>Smartlect <em>图解</em></a>
+  <span class="sp"></span>
+  <button class="icon-btn" id="themeBtn" aria-label="切换主题">🌙</button>
+</header>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main"><div class="content">
+
+<h1>11 · 退款 Saga</h1>
+<p class="lead">退款是跨 order / pay / stock 三个服务的长流程，没有分布式事务，就用「持久化 Saga」：每一步落库、每一步幂等、卡住的有对账任务推着走。</p>
+
+<figure>
+<svg class="svg-d" viewBox="0 0 1000 584" role="img" aria-label="退款 Saga">
+  <defs>
+    <marker id="f1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+    <marker id="f1p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9333ea"/></marker>
+    <marker id="f1r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#dc2626"/></marker>
+  </defs>
+
+  <rect x="30" y="20" width="420" height="76" rx="10" class="fill-web"/>
+  <text x="52" y="46" class="tt">POST /api/order/refundOrder</text>
+  <text x="52" y="68" class="ts">orderItemId + Idempotency-Key（幂等账本同款外壳）</text>
+  <text x="52" y="88" class="ts">例：shopper 对 iPhone 订单明细申请退款</text>
+
+  <line x1="240" y1="96" x2="240" y2="124" class="edge" marker-end="url(#f1a)"/>
+
+  <rect x="30" y="126" width="420" height="116" rx="10" class="fill-db"/>
+  <text x="52" y="150" class="tt">refund_request 建单（uk = order_item_id）</text>
+  <text x="52" y="172" class="ts">锁定订单与明细（FOR UPDATE）→ 校验可退：</text>
+  <text x="52" y="192" class="ts">订单 ∈ {PAID, SHIPPED, PARTIALLY_REFUNDED}</text>
+  <text x="52" y="212" class="ts">退款单号 = UUID.nameUUIDFromBytes("refund:"+itemId)</text>
+  <text x="52" y="232" class="ts">（稳定 ID：同 item 重试 = 同一个号 → 天然幂等）</text>
+
+  <!-- Saga 状态带 -->
+  <rect x="30" y="250" width="940" height="196" rx="12" class="band"/>
+  <text x="52" y="276" class="band-t">SAGA 状态机（refund_request.status）</text>
+
+  <rect x="60" y="296" width="200" height="64" rx="10" class="fill-gw"/>
+  <text x="160" y="320" text-anchor="middle" class="tt">PENDING_PAYMENT</text>
+  <text x="160" y="342" text-anchor="middle" class="ts">等打款</text>
+
+  <rect x="350" y="296" width="210" height="64" rx="10" class="fill-svc"/>
+  <text x="455" y="320" text-anchor="middle" class="tt">PAYMENT_CONFIRMED</text>
+  <text x="455" y="342" text-anchor="middle" class="ts">钱退了，等落账</text>
+
+  <rect x="650" y="296" width="200" height="64" rx="10" class="fill-es"/>
+  <text x="750" y="320" text-anchor="middle" class="tt">STOCK_PENDING</text>
+  <text x="750" y="342" text-anchor="middle" class="ts">等库存回补回执</text>
+
+  <rect x="650" y="376" width="200" height="56" rx="10" class="fill-svc"/>
+  <text x="750" y="398" text-anchor="middle" class="tt">COMPLETED ✓</text>
+  <text x="750" y="418" text-anchor="middle" class="ts">闭环</text>
+
+  <g class="edge" marker-end="url(#f1a)">
+    <line x1="260" y1="328" x2="346" y2="328"/>
+    <line x1="560" y1="328" x2="646" y2="328"/>
+    <line x1="750" y1="360" x2="750" y2="372"/>
+  </g>
+  <text x="272" y="318" class="lbl">① 打款成功</text>
+  <text x="570" y="318" class="lbl">② 落账+发消息</text>
+  <text x="760" y="372" class="lbl">③ stock 回执</text>
+
+  <!-- 三个服务各干什么 -->
+  <rect x="30" y="470" width="300" height="76" rx="10" class="fill-out"/>
+  <text x="52" y="494" class="tt">① pay：真退钱</text>
+  <text x="52" y="516" class="ts">claim 60s 租约防并发 → Dubbo refund</text>
+  <text x="52" y="536" class="ts">FOR UPDATE + mock_refund 台账重放 + Σ退 ≤ 支付额</text>
+
+  <rect x="350" y="470" width="300" height="76" rx="10" class="fill-out"/>
+  <text x="372" y="494" class="tt">② order：落账</text>
+  <text x="372" y="516" class="ts">明细 refunded_amount 累加 → item 置 REFUND</text>
+  <text x="372" y="536" class="ts">订单状态机 CAS：FULL / PARTIAL_REFUND</text>
+
+  <rect x="670" y="470" width="300" height="76" rx="10" class="fill-out"/>
+  <text x="692" y="494" class="tt">③ stock：还库存</text>
+  <text x="692" y="516" class="ts">收 refund-stock 消息（REFUND_RESTORE 键去重）</text>
+  <text x="692" y="536" class="ts">563 → 564，回发 refund-result 给 order</text>
+
+  <!-- 消息边 -->
+  <path d="M 500 466 C 560 440 620 420 690 400" class="edge e-mq" marker-end="url(#f1p)"/>
+  <text x="548" y="440" class="lbl" fill="#7c3aed">Outbox：refund-stock</text>
+  <path d="M 720 466 C 660 450 560 440 470 470" class="edge e-mq dash" marker-end="url(#f1p)"/>
+  <text x="500" y="456" class="lbl" fill="#7c3aed">refund-result 回执</text>
+
+  <rect x="880" y="126" width="90" height="86" rx="10" class="fill-rd"/>
+  <text x="925" y="152" text-anchor="middle" class="tt">异常</text>
+  <text x="925" y="174" text-anchor="middle" class="ts">MANUAL</text>
+  <text x="925" y="192" text-anchor="middle" class="ts">_REVIEW</text>
+  <text x="925" y="208" text-anchor="middle" class="ts">/ REJECTED</text>
+  <path d="M 450 216 C 640 200 800 180 876 164" class="edge dash e-hot" marker-end="url(#f1r)"/>
+  <text x="640" y="192" class="lbl" fill="#b91c1c">打款失败/校验不过</text>
+
+  <text x="30" y="572" class="ts">续推保险丝：xxl-job refundSagaReconcile 每 30s 扫 due 状态接着推；单步重试 60s × 6 次；管理端有 refund_review_ledger 复核台账。</text>
+</svg>
+<figcaption>证据：RefundSagaService.java:28-105、RefundSagaTransactionService.java:63-248、RefundStockListener / RefundResultListener</figcaption>
+</figure>
+
+<h2>要点</h2>
+<ul>
+<li><b>「先退钱，再动货」</b>：钱退出去了（PAYMENT_CONFIRMED）才敢改订单账和库存——方向与下单完全相反，失败面完全不同。</li>
+<li><b>幂等三件套</b>：稳定退款单号（同 item 重试拿到同一个号）、uk(order_item_id)、stock 侧 REFUND_RESTORE 键去重。</li>
+<li><b>部分退款是常态</b>：一次退一个 order_item；订单聚合状态由「剩余正常明细数」决定走 FULL 还是 PARTIAL_REFUND。</li>
+<li><b>关单后的迟到支付</b>是第四条退款入口：refundLatePaymentAfterClose 原路自动退（Redis 一次性标记防重）。</li>
+</ul>
+
+<div class="box ex"><span class="bt">🧺 案例进度（支线结局）</span>
+shopper 收货后后悔：对 iPhone 明细申请退款 → pay 退回 ¥8994（满额）→ 订单 FULL_REFUND → REFUNDED（终态）→ 库存 563 → 564。故事闭环。</div>
+
+<nav class="pager" id="pager"></nav>
+  </div></main>
+  <aside class="toc"><div class="toc-title">本页目录</div><div id="toc-list"></div></aside>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

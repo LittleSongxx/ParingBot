@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>06 库存扣减 · Smartlect 图解</title>
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body data-base="../">
+<header class="topbar">
+  <button class="icon-btn" id="burger" aria-label="菜单">☰</button>
+  <a class="brand" href="../index.html"><span class="logo">商</span>Smartlect <em>图解</em></a>
+  <span class="sp"></span>
+  <button class="icon-btn" id="themeBtn" aria-label="切换主题">🌙</button>
+</header>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main"><div class="content">
+
+<h1>06 · 库存扣减</h1>
+<p class="lead">没有预占字段、没有 Redis 扣减——一张两列的表 + 一条带 WHERE 条件的 UPDATE + 一张幂等台账，把「不超卖」和「不重复扣」同时解决。</p>
+
+<h2>两件必须同时成立的事</h2>
+<ul>
+<li><b>不超卖</b>：扣减必须是「检查 + 扣」一步完成 → 条件更新。</li>
+<li><b>不重复扣</b>：Dubbo 超时重试、Outbox 重放都可能让同一单扣两次 → 先抢幂等键。</li>
+</ul>
+
+<figure>
+<svg class="svg-d" viewBox="0 0 980 560" role="img" aria-label="库存扣减全流程">
+  <defs>
+    <marker id="s6a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#94a3b8"/></marker>
+    <marker id="s6g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#059669"/></marker>
+  </defs>
+
+  <rect x="30" y="20" width="440" height="74" rx="10" class="fill-svc"/>
+  <text x="52" y="44" class="tt">order 服务（下单 Phase 4，事务已提交）</text>
+  <text x="52" y="66" class="ts">changeStockBatch(items, "order-deduct:" + payOrderId)</text>
+  <text x="52" y="86" class="ts">例：[(iPhone, 137e14ea…, buyCount = −1)]</text>
+
+  <line x1="250" y1="94" x2="250" y2="122" class="edge e-dubbo" marker-end="url(#s6g)"/>
+  <text x="262" y="112" class="lbl" fill="#047857">Dubbo → stock :18084</text>
+
+  <rect x="30" y="124" width="440" height="60" rx="10" class="fill-db"/>
+  <text x="52" y="148" class="tt">第 1 步 · 抢幂等键（先于一切）</text>
+  <text x="52" y="170" class="ts">INSERT IGNORE INTO stock_change_record (business_key='order-deduct:PO…')</text>
+
+  <line x1="250" y1="184" x2="250" y2="212" class="edge" marker-end="url(#s6a)"/>
+  <text x="262" y="202" class="lbl">inserted = ?</text>
+
+  <rect x="30" y="214" width="200" height="56" rx="10" class="fill-out"/>
+  <text x="130" y="238" text-anchor="middle" class="tt">= 0：已扣过</text>
+  <text x="130" y="258" text-anchor="middle" class="ts">直接 return（重放安全）</text>
+
+  <rect x="270" y="214" width="200" height="56" rx="10" class="fill-db"/>
+  <text x="370" y="238" text-anchor="middle" class="tt">= 1：首次</text>
+  <text x="370" y="258" text-anchor="middle" class="ts">同 SKU 合并 → TreeMap 排序</text>
+
+  <line x1="370" y1="270" x2="370" y2="298" class="edge" marker-end="url(#s6a)"/>
+  <text x="380" y="290" class="lbl">按 (product_id, hash) 字典序逐条执行 —— 固定顺序防死锁</text>
+
+  <rect x="270" y="300" width="440" height="130" rx="10" class="fill-db"/>
+  <text x="292" y="326" class="tt">第 2 步 · 条件更新（检查 + 扣，一个原子步）</text>
+  <text x="292" y="354" class="ts" style="font-family:var(--mono)">UPDATE sku_stock</text>
+  <text x="292" y="374" class="ts" style="font-family:var(--mono)">SET stock = stock + (−1)</text>
+  <text x="292" y="394" class="ts" style="font-family:var(--mono)">WHERE product_id=? AND hash=?</text>
+  <text x="292" y="414" class="ts" style="font-family:var(--mono)">  AND stock + (−1) &gt;= 0   ← 行锁下判断余量</text>
+
+  <rect x="730" y="300" width="220" height="60" rx="10" class="fill-out"/>
+  <text x="840" y="324" text-anchor="middle" class="tt">affected = 1</text>
+  <text x="840" y="344" text-anchor="middle" class="ts">564 → 563，扣成功</text>
+  <rect x="730" y="374" width="220" height="74" rx="10" class="fill-rd"/>
+  <text x="840" y="398" text-anchor="middle" class="tt">affected = 0</text>
+  <text x="840" y="418" text-anchor="middle" class="ts">= 库存不足</text>
+  <text x="840" y="438" text-anchor="middle" class="ts">抛异常 → 整批回滚（含幂等行）</text>
+
+  <g class="edge" marker-end="url(#s6a)">
+    <line x1="710" y1="330" x2="726" y2="330"/>
+    <line x1="710" y1="400" x2="726" y2="404"/>
+  </g>
+
+  <rect x="30" y="460" width="920" height="86" rx="10" class="fill-out"/>
+  <text x="52" y="484" class="tt">回补（同一套结构，方向相反）</text>
+  <text x="52" y="506" class="ts">超时关单 / 取消：restoreOrderStock —— 先 DELETE business_key「释放扣减键」（允许同单重试再扣），再按 SKU 以</text>
+  <text x="52" y="526" class="ts">"order-close:"+SHA-256(payOrderId∩productId∩hash) insertIgnore 去重，正数 UPDATE 回补；退款走 "refund:" 键同构处理</text>
+</svg>
+<figcaption>库表：sku_stock(product_id, property_value_id_hash, stock) 无 locked 字段 —— 「预占」就是直接扣；证据 SkuStockMapper.xml:28-34、SkuStockService.java:146-164</figcaption>
+</figure>
+
+<h2>要点</h2>
+<ul>
+<li><b>幂等键的生命周期</b>：扣减时抢键 → 回补时删键。键在 = 「这单扣过」；键删 = 允许重新扣。回补自己另有 SHA-256 键防重。</li>
+<li><b>TreeMap 字典序</b>：所有调用方以同一顺序拿行锁，两单并发扣同一批 SKU 也不会交叉死锁。</li>
+<li><b>库存从不进缓存、从不进 ES</b>——全站只有 stock 服务能改它，读它的地方（详情页、购物车、下单预检）全部现查。</li>
+<li>回补失败不会丢：order 侧 <code>remoteCompensateRecorder</code> 落补偿台账，人工/任务可重放（ch.12）。</li>
+</ul>
+
+<div class="box ex"><span class="bt">🧺 案例进度</span>
+shopper 的单进入 stock：抢键 <code>order-deduct:PO-DEMO</code> 成功 → iPhone 银色256G 一条 UPDATE，564 → 563。若此刻另一请求也买最后一件，双方行锁排队，后到者 affected=0 → 「库存不足」。</div>
+
+<nav class="pager" id="pager"></nav>
+  </div></main>
+  <aside class="toc"><div class="toc-title">本页目录</div><div id="toc-list"></div></aside>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

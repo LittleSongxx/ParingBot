@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>07 下单五阶段 · Smartlect 图解</title>
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body data-base="../">
+<header class="topbar">
+  <button class="icon-btn" id="burger" aria-label="菜单">☰</button>
+  <a class="brand" href="../index.html"><span class="logo">商</span>Smartlect <em>图解</em></a>
+  <span class="sp"></span>
+  <button class="icon-btn" id="themeBtn" aria-label="切换主题">🌙</button>
+</header>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main"><div class="content">
+
+<h1>07 · 下单五阶段</h1>
+<p class="lead">全站最硬的一段代码。一个方法被切成五段，每段只解决一个矛盾——把「长事务」切成「短事务 + 可补偿的远程写」。没有 Seata，靠结构换一致。</p>
+
+<div class="box warn"><span class="bt">⚠️ 先看一个反直觉</span>
+<code>postOrder</code> <b>故意不标 <code>@Transactional</code></b>。注释里记着事故：早期版本把远程调用包进事务，一次远程调用占连接 18.1s，把连接池抽干。五阶段的切法就是从这次事故里长出来的。<a class="ev" data-p="backend/smartlect-order/app/src/main/java/com/smartlect/biz/impl/OrderInfoServiceImpl.java" data-l="183">OrderInfoServiceImpl.java:183</a></div>
+
+<h2>总图：一次 postOrder 的五段</h2>
+<figure>
+<svg class="svg-d" viewBox="0 0 1000 880" role="img" aria-label="下单五阶段">
+  <defs>
+    <marker id="o7a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+    <marker id="o7g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#059669"/></marker>
+    <marker id="o7r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#dc2626"/></marker>
+    <marker id="o7p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9333ea"/></marker>
+  </defs>
+
+  <!-- Phase 0 幂等账本 -->
+  <rect x="20" y="14" width="640" height="96" rx="10" class="fill-out"/>
+  <text x="40" y="38" class="band-t">PHASE 0 · 幂等账本（独立小事务，先于一切）</text>
+  <text x="40" y="62" class="ts">INSERT order_request_idempotency (user_id, 'POST_ORDER', Idempotency-Key) status=PROCESSING</text>
+  <text x="40" y="84" class="ts">撞唯一键 = 重放 → 加锁读：hash 相同 → 回放 response_json；PROCESSING 超 120s → INCONCLUSIVE → 409</text>
+
+  <line x1="340" y1="110" x2="340" y2="138" class="edge" marker-end="url(#o7a)"/>
+
+  <!-- Phase 1 -->
+  <rect x="20" y="140" width="640" height="112" rx="10" class="band"/>
+  <text x="40" y="164" class="band-t">PHASE 1 · 只读准备（无事务，只看不动）</text>
+  <text x="40" y="188" class="ts">Dubbo → user.getAddress：收货人、电话、地址</text>
+  <text x="40" y="210" class="ts">Dubbo → product.snapshotBatch：商品名/封面/¥8999 固化为快照（此后商品改名改价与订单无关）</text>
+  <text x="40" y="232" class="ts">Dubbo → stock.getAvailable：564 ≥ 1，预检通过（只读，不锁不扣）</text>
+
+  <line x1="340" y1="252" x2="340" y2="280" class="edge" marker-end="url(#o7a)"/>
+
+  <!-- Phase 2 -->
+  <rect x="20" y="282" width="640" height="96" rx="10" class="band"/>
+  <text x="40" y="306" class="band-t">PHASE 2 · 锁远程资源（无本地事务，条件更新说话）</text>
+  <text x="40" y="330" class="ts">Dubbo → coupon.validateAndLock：user_coupon 状态 NOUSE(0) → CANT(3)，UPDATE 带 WHERE status=0</text>
+  <text x="40" y="352" class="ts">affected=1 → 券锁到手；折扣按金额顺序摊到子单：8999 − 5 = 8994</text>
+  <text x="40" y="372" class="ts">（失败 = 券已被别人用，立即结束，什么都没发生过）</text>
+
+  <line x1="340" y1="378" x2="340" y2="406" class="edge" marker-end="url(#o7a)"/>
+
+  <!-- Phase 3 -->
+  <rect x="20" y="408" width="640" height="130" rx="10" class="fill-db"/>
+  <text x="40" y="432" class="band-t" fill="#2563eb">PHASE 3 · 短本地事务（TransactionTemplate，毫秒级，只写自己的库）</text>
+  <text x="40" y="458" class="ts">一个事务里依次 insert 四张表：</text>
+  <text x="40" y="480" class="ts">order_coupon_rel（券核销明细）→ order_info（状态 WAIT_PAYMENT，带 payOrderId）</text>
+  <text x="40" y="502" class="ts">→ order_item（快照 + buy_count；orderItemId = {orderId}_{序号}）→ order_logistics_info</text>
+  <text x="40" y="526" class="ts">★ 这是整条链路唯一的本地事务 —— 同库同事务，天然原子</text>
+
+  <line x1="340" y1="538" x2="340" y2="566" class="edge" marker-end="url(#o7a)"/>
+
+  <!-- Phase 4 -->
+  <rect x="20" y="568" width="640" height="160" rx="10" class="band"/>
+  <text x="40" y="592" class="band-t">PHASE 4 · 事务外远程写（每步幂等；失败不回滚订单，交给 Phase 5）</text>
+  <text x="40" y="616" class="ts">① Dubbo → stock.changeStockBatch("order-deduct:"+PO)：564 → 563（ch.06）</text>
+  <text x="40" y="638" class="ts">② Dubbo → cart.deleteBatch：清掉购物车那行（CART 来源才清）</text>
+  <text x="40" y="660" class="ts">③ Dubbo → pay.createPending：pay_trade_record 落一行 trade_status=0</text>
+  <text x="40" y="682" class="ts">④ Dubbo → pay.getPayUrl：拿到模拟收银台地址（金额以 pay_trade_record 为准）</text>
+  <text x="40" y="704" class="ts">⑤ Outbox 发 15 分钟定时关单消息（ch.09）</text>
+
+  <!-- Phase 5 补偿 -->
+  <rect x="20" y="756" width="640" height="110" rx="10" class="fill-rd"/>
+  <text x="40" y="780" class="band-t" fill="#dc2626">PHASE 5 · catch 补偿（顺序与锁定相反：先还库存，再放券）</text>
+  <text x="40" y="804" class="ts">① 库存已扣 → stock.restoreOrderStock 回补 563 → 564；回补再失败 → remoteCompensateRecorder 落台账</text>
+  <text x="40" y="826" class="ts">② 券已锁 → coupon CANT(3) → NOUSE(0) 解锁；失败 → 落台账</text>
+  <text x="40" y="846" class="ts">③ 重新抛出原异常 → 幂等账本 markFailed → 前端收到明确错误</text>
+
+  <path d="M 672 648 C 730 648 730 800 684 806" class="edge dash e-hot" marker-end="url(#o7r)"/>
+  <text x="742" y="724" class="lbl" fill="#b91c1c">任一步 RuntimeException</text>
+
+  <!-- 右栏：贯穿案例的账本 -->
+  <rect x="700" y="140" width="280" height="342" rx="10" class="fill-user"/>
+  <text x="718" y="166" class="tt">🧺 shopper 这一单的账</text>
+  <text x="718" y="192" class="ts">SKU：iPhone 银色256G</text>
+  <text x="718" y="214" class="ts">快照价 ¥8999（固化）</text>
+  <text x="718" y="236" class="ts">券：CPDEMOBUYER01 −¥5</text>
+  <text x="718" y="258" class="ts">goods_amount 8999</text>
+  <text x="718" y="280" class="ts">discount_amount 5</text>
+  <text x="718" y="302" class="ts">amount（实付）8994</text>
+  <text x="718" y="324" class="ts">状态：WAIT_PAYMENT(0)</text>
+  <text x="718" y="346" class="ts">payOrderId：一组子单共用</text>
+  <text x="718" y="368" class="ts">（一次结算多商品 = 多个 order</text>
+  <text x="718" y="388" class="ts">  共用一个支付单）</text>
+  <text x="718" y="414" class="ts">响应 PayInfoDTO{payOrderId,</text>
+  <text x="718" y="434" class="ts">payUrl} + 幂等重放时回写头</text>
+  <text x="718" y="454" class="ts">Idempotency-Replayed: true</text>
+
+  <rect x="700" y="568" width="280" height="160" rx="10" class="fill-out"/>
+  <text x="718" y="592" class="tt">为什么这样切？</text>
+  <text x="718" y="616" class="ts">P1 回答「能不能成」：便宜、可随便重试</text>
+  <text x="718" y="638" class="ts">P2 抢稀缺资源：条件更新，一步定胜负</text>
+  <text x="718" y="660" class="ts">P3 最小化事务窗口：只有本地四表</text>
+  <text x="718" y="682" class="ts">P4 把慢的、跨网的挪出事务，靠幂等扛重试</text>
+  <text x="718" y="704" class="ts">P5 承认会失败：反向补偿 + 台账兜底</text>
+</svg>
+<figcaption>五阶段切分：OrderInfoServiceImpl.java:439-551（prepareOrder :239-428）；幂等账本 OrderRequestIdempotencyService.java:43-151</figcaption>
+</figure>
+
+<h2>幂等账本：同一把钥匙开同一扇门</h2>
+<table class="tbl">
+<tr><th>重放时账本状态</th><th>处理</th><th>用户看到</th></tr>
+<tr><td><code>COMPLETED</code> + request_hash 相同</td><td>反序列化 response_json 直接返回</td><td>和第一次一模一样的结果 + 响应头 <code>Idempotency-Replayed: true</code></td></tr>
+<tr><td>request_hash 不同</td><td>拒绝</td><td>409（同一把钥匙想开另一扇门）</td></tr>
+<tr><td><code>PROCESSING</code> 且 &gt; 120s</td><td>判 stale → <code>INCONCLUSIVE</code></td><td>409，人工复核</td></tr>
+<tr><td><code>FAILED</code> / <code>MANUAL_REVIEW</code></td><td>拒绝</td><td>409</td></tr>
+</table>
+<ul>
+<li>账本抢占本身是<b>独立事务</b>的 insert——先于业务、绝不掺和业务事务。</li>
+<li>指纹 = 请求体 JSON 的 SHA-256（剥掉推荐位等无意义字段）。</li>
+<li>Key 规则：<code>[A-Za-z0-9._:-]{16,64}</code>，前端生成，随 <code>Idempotency-Key</code> 头上传。</li>
+</ul>
+
+<div class="box tip"><span class="bt">💡 这张图看不到的事</span>
+P4 的五步里藏着下一个故事：③ 创建的支付单（trade_status=0）和 ⑤ 那条 15 分钟定时消息，会把这单推向两条完全不同的命运——支付成功（ch.08）或超时关单（ch.09）。五阶段只是「出生」，后面两章才是「一生」。</div>
+
+<nav class="pager" id="pager"></nav>
+  </div></main>
+  <aside class="toc"><div class="toc-title">本页目录</div><div id="toc-list"></div></aside>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

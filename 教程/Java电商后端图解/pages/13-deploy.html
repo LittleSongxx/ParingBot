@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>13 部署拓扑 · Smartlect 图解</title>
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body data-base="../">
+<header class="topbar">
+  <button class="icon-btn" id="burger" aria-label="菜单">☰</button>
+  <a class="brand" href="../index.html"><span class="logo">商</span>Smartlect <em>图解</em></a>
+  <span class="sp"></span>
+  <button class="icon-btn" id="themeBtn" aria-label="切换主题">🌙</button>
+</header>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main"><div class="content">
+
+<h1>13 · 部署拓扑</h1>
+<p class="lead">阿里云 ECS 三节点：node1 扛全部有状态中间件 + 应用主节点，node2/3 跑副本。所有编排都是 docker compose，应用由 systemd 拉起 runtime.py。</p>
+
+<figure>
+<svg class="svg-d" viewBox="0 0 1000 620" role="img" aria-label="三节点部署拓扑">
+  <defs>
+    <marker id="e3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+    <marker id="e3b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2563eb"/></marker>
+  </defs>
+
+  <!-- 公网入口 -->
+  <rect x="380" y="14" width="240" height="50" rx="10" class="fill-web"/>
+  <text x="500" y="36" text-anchor="middle" class="tt">smartlect.cn（HTTPS）</text>
+  <text x="500" y="55" text-anchor="middle" class="ts">用户端 / 管理端线上入口</text>
+
+  <line x1="500" y1="64" x2="500" y2="86" class="edge" marker-end="url(#e3a)"/>
+  <text x="512" y="80" class="lbl">解析到 node1 的 Nginx</text>
+
+  <!-- node1 -->
+  <rect x="30" y="90" width="460" height="500" rx="12" class="fill-out"/>
+  <text x="52" y="118" class="tt">node1 · 8c16g · 172.21.131.151（主节点）</text>
+  <g>
+    <rect x="52" y="132" width="200" height="64" rx="9" class="fill-gw"/>
+    <text x="152" y="156" text-anchor="middle" class="tt">Nginx</text>
+    <text x="152" y="176" text-anchor="middle" class="ts">静态 + 反代网关</text>
+    <rect x="268" y="132" width="200" height="64" rx="9" class="fill-db"/>
+    <text x="368" y="156" text-anchor="middle" class="tt">MySQL 8.4 主</text>
+    <text x="368" y="176" text-anchor="middle" class="ts">8 库 · 异步复制→node2</text>
+
+    <rect x="52" y="208" width="200" height="64" rx="9" class="fill-rd"/>
+    <text x="152" y="232" text-anchor="middle" class="tt">Redis 主 + Sentinel</text>
+    <text x="152" y="252" text-anchor="middle" class="ts">三哨兵仲裁自动切换</text>
+    <rect x="268" y="208" width="200" height="64" rx="9" class="fill-mq"/>
+    <text x="368" y="232" text-anchor="middle" class="tt">RocketMQ 5.3</text>
+    <text x="368" y="252" text-anchor="middle" class="ts">单机三容器(broker/namesrv/proxy)</text>
+
+    <rect x="52" y="284" width="200" height="64" rx="9" class="fill-out"/>
+    <text x="152" y="308" text-anchor="middle" class="tt">Nacos c1</text>
+    <text x="152" y="328" text-anchor="middle" class="ts">集群 3 节点之一</text>
+    <rect x="268" y="284" width="200" height="64" rx="9" class="fill-es"/>
+    <text x="368" y="308" text-anchor="middle" class="tt">ES 8.19+IK · Canal · xxl-job</text>
+    <text x="368" y="328" text-anchor="middle" class="ts">内网绑定叠加</text>
+
+    <rect x="52" y="360" width="416" height="210" rx="9" class="fill-svc"/>
+    <text x="72" y="386" class="tt">应用主节点（systemd → runtime.py up）</text>
+    <text x="72" y="412" class="ts">9 个 Java 服务（gateway/user/product/stock/cart/</text>
+    <text x="72" y="432" class="ts">order/pay/coupon/admin）+ 两个 Vue 前端</text>
+    <text x="72" y="458" class="ts">端口 18080-18181，注册到 Nacos SMARTLECT_GROUP</text>
+    <text x="72" y="484" class="ts">监控：Prometheus 指标 + Micrometer（Outbox EXHAUSTED</text>
+    <text x="72" y="504" class="ts">等业务指标也进了指标面）</text>
+    <text x="72" y="530" class="ts">数据：compose.node1.yaml 叠加内网绑定覆盖</text>
+    <text x="72" y="550" class="ts">（ES/Qdrant 只监听内网——跨网 health DOWN 的教训）</text>
+  </g>
+
+  <!-- node2 -->
+  <rect x="520" y="90" width="450" height="240" rx="12" class="fill-out"/>
+  <text x="542" y="118" class="tt">node2 · 2c8g · 172.19.34.202（副本）</text>
+  <g>
+    <rect x="542" y="132" width="190" height="56" rx="9" class="fill-db"/>
+    <text x="637" y="156" text-anchor="middle" class="tt">MySQL 从</text>
+    <text x="637" y="176" text-anchor="middle" class="ts">异步复制</text>
+    <rect x="748" y="132" width="200" height="56" rx="9" class="fill-rd"/>
+    <text x="848" y="156" text-anchor="middle" class="tt">Redis 副本 + Sentinel</text>
+    <text x="848" y="176" text-anchor="middle" class="ts">可被举主</text>
+    <rect x="542" y="200" width="190" height="56" rx="9" class="fill-mq"/>
+    <text x="637" y="224" text-anchor="middle" class="tt">RocketMQ 副本</text>
+    <text x="637" y="244" text-anchor="middle" class="ts">（DLedger 未成，暂单机）</text>
+    <rect x="748" y="200" width="200" height="56" rx="9" class="fill-out"/>
+    <text x="848" y="224" text-anchor="middle" class="tt">Nacos c2</text>
+    <text x="848" y="244" text-anchor="middle" class="ts">集群成员</text>
+    <rect x="542" y="268" width="406" height="48" rx="9" class="fill-svc"/>
+    <text x="745" y="288" text-anchor="middle" class="tt">应用副本 ×5：gateway · product · order · user · cart</text>
+    <text x="745" y="308" text-anchor="middle" class="ts">网关经 Nacos/LB 跨节点分流</text>
+  </g>
+
+  <!-- node3 -->
+  <rect x="520" y="350" width="450" height="240" rx="12" class="fill-out"/>
+  <text x="542" y="378" class="tt">node3 · 2c8g · 172.19.34.203（副本）</text>
+  <g>
+    <rect x="542" y="392" width="190" height="56" rx="9" class="fill-rd"/>
+    <text x="637" y="416" text-anchor="middle" class="tt">Redis 副本 + Sentinel</text>
+    <text x="637" y="436" text-anchor="middle" class="ts">三哨兵之一</text>
+    <rect x="748" y="392" width="200" height="56" rx="9" class="fill-mq"/>
+    <text x="848" y="416" text-anchor="middle" class="tt">RocketMQ 副本</text>
+    <text x="848" y="436" text-anchor="middle" class="ts">broker/namesrv</text>
+    <rect x="542" y="460" width="190" height="56" rx="9" class="fill-out"/>
+    <text x="637" y="484" text-anchor="middle" class="tt">Nacos c3</text>
+    <text x="637" y="504" text-anchor="middle" class="ts">集群成员（Raft）</text>
+    <rect x="542" y="528" width="406" height="48" rx="9" class="fill-svc"/>
+    <text x="745" y="548" text-anchor="middle" class="tt">应用副本 ×5（与 node2 同组）</text>
+    <text x="745" y="568" text-anchor="middle" class="ts">压测口径端口 18101-18108</text>
+  </g>
+
+  <!-- 跨节点关系 -->
+  <g class="edge" marker-end="url(#e3b)">
+    <line x1="468" y1="164" x2="540" y2="150"/>
+  </g>
+  <text x="472" y="146" class="lbl" fill="#2563eb">binlog 异步复制</text>
+  <g class="edge e-mq" marker-end="url(#e3a)">
+    <line x1="468" y1="240" x2="540" y2="226"/>
+  </g>
+  <text x="470" y="222" class="lbl" fill="#7c3aed">哨兵仲裁 / MQ 集群</text>
+  <path d="M 500 90 C 700 60 860 70 940 80" class="edge dash"/>
+  <text x="700" y="52" class="lbl">Nacos 集群跨三节点</text>
+</svg>
+<figcaption>事实源：deploy/cluster/nodes.env、deploy/cluster/README.md、docs/prod-hardening/ha-cluster.md；应用 systemd 单元 ExecStart=runtime.py up</figcaption>
+</figure>
+
+<h2>版本与编排速查</h2>
+<table class="tbl">
+<tr><th>组件</th><th>版本</th><th>编排文件</th></tr>
+<tr><td>MySQL</td><td>8.4.11</td><td><code>deploy/compose.yaml</code> + <code>cluster/compose.node1.yaml</code> 叠加</td></tr>
+<tr><td>Redis</td><td>7.4.7（主从 + 3 Sentinel）</td><td><code>cluster/redis/compose.replica.yaml</code></td></tr>
+<tr><td>RocketMQ</td><td>5.3.2（namesrv/broker/topic-init/proxy）</td><td>node1 单机三容器（DLedger 尝试失败实录在改动记录）</td></tr>
+<tr><td>Nacos</td><td>2.5.3 三节点</td><td><code>cluster/nacos/compose.cluster.yaml</code></td></tr>
+<tr><td>Elasticsearch</td><td>8.19.0 自建镜像 + IK 同版本插件</td><td><code>deploy/elasticsearch/Dockerfile</code></td></tr>
+<tr><td>Canal</td><td>1.1.8（serverMode=rocketMQ）</td><td><code>deploy/compose.yaml:198</code> + startup.sh envsubst</td></tr>
+<tr><td>xxl-job</td><td>admin 容器</td><td><code>deploy/compose.yaml:230</code></td></tr>
+</table>
+
+<h2>两条踩坑记录（图里画不下的）</h2>
+<ul>
+<li><b>ES 内网绑定缺失</b>：副本节点 product 的 elasticsearch health 组件跨网不可达，把整体 health 拖成 DOWN——修复 = 中间件统一叠加内网绑定覆盖。<a class="ev" data-p="docs/改动记录/2026-10-14/应用副本启用成功.md">2026-10-14 记录</a></li>
+<li><b>Dubbo 3.3.6 传递的 nacos-client 3.0.3 与 Nacos Server 2.5 不兼容</b>（gRPC 握手失败）→ 父 pom 强制对齐 2.5.1。<a class="ev" data-p="backend/pom.xml" data-l="80">backend/pom.xml:80</a></li>
+</ul>
+
+<div class="box tip"><span class="bt">🏁 全书完</span>
+回到第一页的问题：shopper 买一台 iPhone，从登录到退款，你现在已经能指着每一行代码说清「钱、库存、状态各自在哪一步、由谁、以什么方式保证不出错」。面试里被问到任何一段，从根约束那句话开始推就行。</div>
+
+<nav class="pager" id="pager"></nav>
+  </div></main>
+  <aside class="toc"><div class="toc-title">本页目录</div><div id="toc-list"></div></aside>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

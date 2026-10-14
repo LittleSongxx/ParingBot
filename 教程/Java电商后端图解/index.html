@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Smartlect 图解 · Java 电商后端</title>
+<link rel="stylesheet" href="assets/site.css" />
+</head>
+<body data-base="./">
+<header class="topbar">
+  <button class="icon-btn" id="burger" aria-label="菜单">☰</button>
+  <a class="brand" href="index.html"><span class="logo">商</span>Smartlect <em>图解</em></a>
+  <span class="sp"></span>
+  <button class="icon-btn" id="themeBtn" aria-label="切换主题">🌙</button>
+</header>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main"><div class="content">
+
+    <div class="hero">
+      <h1>Smartlect Java 电商后端 · 图解</h1>
+      <p class="sub">10 个 Maven 模块 · 9 个微服务 · 一条贯穿全链的购物故事</p>
+      <div class="badges">
+        <span class="badge">Java 17</span>
+        <span class="badge">Spring Boot 3.5</span>
+        <span class="badge">Spring Cloud 2025</span>
+        <span class="badge">Dubbo 3.3 + Nacos</span>
+        <span class="badge">MySQL 8.4 · 独立库</span>
+        <span class="badge">Redis 7 + Redisson</span>
+        <span class="badge">RocketMQ 5（含定时消息）</span>
+        <span class="badge">Elasticsearch 8.19 + IK</span>
+        <span class="badge">Canal CDC</span>
+        <span class="badge">xxl-job</span>
+      </div>
+    </div>
+
+    <div class="case-card">
+      <h2>🧺 贯穿案例：shopper 的一台 iPhone</h2>
+      <p>全站所有链路都用同一个故事讲：演示买家 <code>shopper@smartlect.demo</code>，搜索并购买一台
+      <strong>iPhone 17 Pro Max 银色 256G</strong>，用一张 <strong>5 元无门槛券</strong>抵扣。以下数据全部来自仓库真实种子数据（<a class="ev" data-p="backend/data/02_catalog_seed.sql">02_catalog_seed.sql</a>），每章引用时不再重复解释。</p>
+      <div class="kv">
+        <div><div class="k">买家（userId）</div><div class="v">shopper · 8800000002</div></div>
+        <div><div class="k">商品（productId）</div><div class="v">895150981058759</div></div>
+        <div><div class="k">SKU（属性值 hash）</div><div class="v">137e14ea…（银色+256G）</div></div>
+        <div><div class="k">单价 × 库存</div><div class="v">¥8999.00 × 564 件</div></div>
+        <div><div class="k">优惠券</div><div class="v">CPDEMOBUYER01 · 无门槛 ¥5</div></div>
+        <div><div class="k">应付</div><div class="v">8999 − 5 = ¥8994.00</div></div>
+      </div>
+    </div>
+
+    <h2>章节</h2>
+    <div class="cards">
+      <a class="card" href="pages/01-start.html"><div class="no">01</div><div class="t">项目速览</div><div class="d">这家店是什么、由哪些服务组成、刻意不做什么</div></a>
+      <a class="card" href="pages/02-architecture.html"><div class="no">02</div><div class="t">总体架构</div><div class="d">全景图、端口与建库地图、Dubbo 调用关系</div></a>
+      <a class="card" href="pages/03-gateway.html"><div class="no">03</div><div class="t">网关与认证</div><div class="d">路由表、过滤器链、Sa-Token 两层校验、登录时序</div></a>
+      <a class="card" href="pages/04-product.html"><div class="no">04</div><div class="t">商品与搜索</div><div class="d">表模型、ES 检索、Canal 增量同步、多级缓存</div></a>
+      <a class="card" href="pages/05-cart.html"><div class="no">05</div><div class="t">购物车</div><div class="d">纯 MySQL 购物车、价格快照、增量更新</div></a>
+      <a class="card" href="pages/06-stock.html"><div class="no">06</div><div class="t">库存扣减</div><div class="d">一条条件 UPDATE + 一张幂等台账解决超卖与重复扣</div></a>
+      <a class="card" href="pages/07-order.html"><div class="no">07</div><div class="t">下单五阶段</div><div class="d">全站核心：幂等账本 → 预占 → 短事务 → 远程写 → 补偿</div></a>
+      <a class="card" href="pages/08-pay.html"><div class="no">08</div><div class="t">支付与 Outbox</div><div class="d">模拟支付、Outbox 本地消息表、事件最终一致</div></a>
+      <a class="card" href="pages/09-lifecycle.html"><div class="no">09</div><div class="t">订单状态机</div><div class="d">9 状态全部合法迁移、超时关单、模拟物流、自动收货</div></a>
+      <a class="card" href="pages/10-coupon-rush.html"><div class="no">10</div><div class="t">优惠券秒杀</div><div class="d">限流 → Redis Lua 预占 → DB 条件扣减 → 定时对账</div></a>
+      <a class="card" href="pages/11-refund.html"><div class="no">11</div><div class="t">退款 Saga</div><div class="d">打款 → 落账+回补库存 → 回执，三步长事务</div></a>
+      <a class="card" href="pages/12-consistency.html"><div class="no">12</div><div class="t">一致性总纲</div><div class="d">为什么没有 Seata：五层防线各自的职责</div></a>
+      <a class="card" href="pages/13-deploy.html"><div class="no">13</div><div class="t">部署拓扑</div><div class="d">阿里云 ECS 三节点、中间件版本与分布</div></a>
+    </div>
+
+    <div class="box tip"><span class="bt">💡 阅读路径</span>
+      <ul>
+        <li>想<b>面试式吃透</b>：02 → 03 → 06 → 07 → 08 → 09，这是交易主链；</li>
+        <li>想看<b>高并发设计</b>：直接跳 10（秒杀）与 12（一致性总纲）；</li>
+        <li>每章图里的数字、键名、SQL 都是仓库里真实存在的，悬停 <span class="ev">证据锚点</span> 可跳 GitHub 对应行。</li>
+      </ul>
+    </div>
+
+    <nav class="pager" id="pager"></nav>
+  </div></main>
+  <aside class="toc"><div class="toc-title">本页目录</div><div id="toc-list"></div></aside>
+</div>
+<script src="assets/site.js"></script>
+</body>
+</html>

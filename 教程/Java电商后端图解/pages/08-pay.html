@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>08 支付与 Outbox · Smartlect 图解</title>
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body data-base="../">
+<header class="topbar">
+  <button class="icon-btn" id="burger" aria-label="菜单">☰</button>
+  <a class="brand" href="../index.html"><span class="logo">商</span>Smartlect <em>图解</em></a>
+  <span class="sp"></span>
+  <button class="icon-btn" id="themeBtn" aria-label="切换主题">🌙</button>
+</header>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main"><div class="content">
+
+<h1>08 · 支付与 Outbox</h1>
+<p class="lead">支付是模拟的，但一致性是真的：pay 库一个事务里「改状态 + 落 Outbox」，事务提交后异步投 RocketMQ；order 消费端三层幂等。支付成功这件事，最终一定被订单知道。</p>
+
+<h2>支付成功事件流</h2>
+<figure>
+<svg class="svg-d" viewBox="0 0 1000 600" role="img" aria-label="支付成功事件流">
+  <defs>
+    <marker id="y8a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+    <marker id="y8p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9333ea"/></marker>
+    <marker id="y8g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#059669"/></marker>
+    <marker id="y8r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#dc2626"/></marker>
+  </defs>
+
+  <!-- 生命线 -->
+  <rect x="30" y="16" width="180" height="42" rx="9" class="fill-web"/><text x="120" y="42" text-anchor="middle" class="tt">shopper 点支付</text>
+  <rect x="270" y="16" width="170" height="42" rx="9" class="fill-svc"/><text x="355" y="42" text-anchor="middle" class="tt">pay :18087</text>
+  <rect x="640" y="16" width="160" height="42" rx="9" class="fill-mq"/><text x="720" y="42" text-anchor="middle" class="tt">RocketMQ</text>
+  <rect x="850" y="16" width="130" height="42" rx="9" class="fill-svc"/><text x="915" y="42" text-anchor="middle" class="tt">order :18086</text>
+  <line x1="120" y1="58" x2="120" y2="580" class="edge dash"/><line x1="355" y1="58" x2="355" y2="580" class="edge dash"/>
+  <line x1="720" y1="58" x2="720" y2="580" class="edge dash"/><line x1="915" y1="58" x2="915" y2="580" class="edge dash"/>
+
+  <line x1="120" y1="92" x2="345" y2="92" class="edge" marker-end="url(#y8a)"/>
+  <text x="130" y="86" class="lbl">① POST /internal/pay/mock/complete（属主 + 金额 8994 复核，不符→409）</text>
+
+  <rect x="200" y="112" width="310" height="76" rx="9" class="fill-db"/>
+  <text x="220" y="136" class="tt">② 一个本地事务里做两件事</text>
+  <text x="220" y="158" class="ts">UPDATE pay_trade_record 0→1（条件更新，已成功则幂等跳过）</text>
+  <text x="220" y="178" class="ts">INSERT local_message_outbox（key=pay-success:{PO}，HIGH）</text>
+
+  <path d="M 510 150 C 590 150 630 130 668 122" class="edge e-mq" marker-end="url(#y8p)"/>
+  <text x="548" y="128" class="lbl" fill="#7c3aed">③ afterCommit 异步投</text>
+
+  <line x1="720" y1="92" x2="908" y2="200" class="edge e-mq" marker-end="url(#y8p)"/>
+  <text x="742" y="180" class="lbl" fill="#7c3aed">④ smartlect-pay / pay-success</text>
+
+  <rect x="740" y="220" width="240" height="120" rx="9" class="fill-rd"/>
+  <text x="760" y="244" class="tt">⑤ 消费幂等第 1 层：Redis 三态租约</text>
+  <text x="760" y="266" class="ts">done → 直接 ACK（重放吞掉）</text>
+  <text x="760" y="286" class="ts">processing → BUSY，30s 后回投</text>
+  <text x="760" y="306" class="ts">完成后写 done，TTL 7 天</text>
+  <text x="760" y="328" class="ts">Lua 原子完成，不留缝</text>
+
+  <rect x="30" y="240" width="660" height="150" rx="9" class="fill-svc"/>
+  <text x="52" y="266" class="tt">⑥ 第 2、3 层幂等 + 正常推进（Redisson 支付单生命周期锁内）</text>
+  <text x="52" y="290" class="ts">第 2 层：Dubbo → pay.assertSettled 反查权威状态（不信消息体，信库）</text>
+  <text x="52" y="312" class="ts">第 3 层：状态机 CAS UPDATE … WHERE order_status=0；已 PAID 再来一次 → rows=0 幂等跳过</text>
+  <text x="52" y="336" class="ts">→ order_info: WAIT_PAYMENT → PAID，回填 channelOrderId = smartlect-mock-{PO}</text>
+  <text x="52" y="358" class="ts">→ 券核销 CANT(3) → USED(1)（已 USED 则忽略）· pay.markSuccess</text>
+  <text x="52" y="380" class="ts">→ order_item.paid_amount 按原价权重分摊，末行吸收分差（Σ = 8994 不变式）</text>
+
+  <line x1="690" y1="290" x2="736" y2="290" class="edge" marker-end="url(#y8g)"/>
+
+  <rect x="30" y="410" width="660" height="70" rx="9" class="fill-mq"/>
+  <text x="52" y="434" class="tt">⑦ 后续接力也走定时消息</text>
+  <text x="52" y="456" class="ts">支付成功事务提交后，Outbox 再发「1 小时后物流 step=0」→ 自动发货（ch.09）</text>
+
+  <rect x="30" y="500" width="950" height="76" rx="9" class="fill-out"/>
+  <text x="52" y="524" class="tt">失败重试链（消费侧）</text>
+  <text x="52" y="546" class="ts">业务异常 → 定时回投 5s / 30s / 120s 共 3 次 → 耗尽：落 mq_compensation_log（可人工 replay）+ 归档到 smartlect-mq-failure</text>
+  <text x="52" y="566" class="ts">消息彻底丢（极少）：PayOrderTask 5s 轮询渠道 queryOrder 兜底（默认关，可配置开）</text>
+</svg>
+<figcaption>证据：PayChannel4Mock.java:56-90、RabbitMQPaySuccessListenerComponent.java:30-54（名字是历史遗留）、MqConsumerIdempotencyHelper.java:59-96</figcaption>
+</figure>
+
+<h2>Outbox：本地消息表的生与死</h2>
+<figure>
+<svg class="svg-d" viewBox="0 0 1000 330" role="img" aria-label="Outbox 生命周期">
+  <defs>
+    <marker id="b8a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+    <marker id="b8g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#059669"/></marker>
+    <marker id="b8r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#dc2626"/></marker>
+  </defs>
+
+  <rect x="40" y="40" width="200" height="64" rx="10" class="fill-db"/>
+  <text x="140" y="66" text-anchor="middle" class="tt">PENDING</text>
+  <text x="140" y="88" text-anchor="middle" class="ts">业务事务内 insert（同库同事务）</text>
+
+  <rect x="400" y="40" width="200" height="64" rx="10" class="fill-gw"/>
+  <text x="500" y="66" text-anchor="middle" class="tt">SENDING</text>
+  <text x="500" y="88" text-anchor="middle" class="ts">claim 租约（lease_owner/until）</text>
+
+  <rect x="760" y="40" width="200" height="64" rx="10" class="fill-svc"/>
+  <text x="860" y="66" text-anchor="middle" class="tt">SENT ✓</text>
+  <text x="860" y="88" text-anchor="middle" class="ts">producer.send 同步确认（重试 3 次）</text>
+
+  <g class="edge" marker-end="url(#b8a)">
+    <line x1="240" y1="62" x2="396" y2="62"/>
+    <line x1="600" y1="62" x2="756" y2="62"/>
+  </g>
+  <text x="318" y="52" class="lbl">afterCommit 快路 / 5s 扫描</text>
+  <text x="678" y="52" class="lbl">投递成功</text>
+
+  <rect x="400" y="180" width="200" height="64" rx="10" class="fill-rd"/>
+  <text x="500" y="204" text-anchor="middle" class="tt">FAILED</text>
+  <text x="500" y="226" text-anchor="middle" class="ts">指数退避 2s×2^n，封顶 5min + 抖动</text>
+
+  <rect x="760" y="180" width="200" height="64" rx="10" class="fill-out"/>
+  <text x="860" y="204" text-anchor="middle" class="tt">EXHAUSTED（重试 10 次）</text>
+  <text x="860" y="226" text-anchor="middle" class="ts">Micrometer 指标 + 运维接口人工 replay</text>
+
+  <path d="M 480 104 C 460 140 480 160 494 176" class="edge e-hot" marker-end="url(#b8r)"/>
+  <text x="400" y="146" class="lbl" fill="#b91c1c">投递失败</text>
+  <path d="M 600 212 C 680 212 690 190 700 170" class="edge dash" marker-end="url(#b8a)"/>
+  <text x="632" y="252" class="lbl">再试</text>
+  <path d="M 570 190 C 640 160 680 120 700 96" class="edge dash" marker-end="url(#b8a)"/>
+  <line x1="860" y1="180" x2="860" y2="108" class="edge dash" marker-end="url(#b8a)"/>
+  <text x="872" y="146" class="lbl">replay → PENDING</text>
+
+  <rect x="40" y="180" width="310" height="110" rx="10" class="fill-out"/>
+  <text x="60" y="204" class="tt">扫描器</text>
+  <text x="60" y="226" class="ts">xxl-job outboxDispatch：5s 一轮 · batch 30</text>
+  <text x="60" y="246" class="ts">Redis 锁 4s 防多副本 · 跳过 3s 内新行</text>
+  <text x="60" y="266" class="ts">（把机会留给 afterCommit 快路，避免双发）</text>
+  <text x="60" y="286" class="ts">幂等键唯一约束防「同键不同消息」</text>
+</svg>
+<figcaption>定位：这不是 RocketMQ 事务消息，是「业务事务内落表 + 提交后投递」的本地消息表；定时消息 = delivery_expire_at → setDeliveryTimestamp。证据 OutboxMessageServiceImpl.java:85-192</figcaption>
+</figure>
+
+<h2>要点</h2>
+<ul>
+<li><b>为什么 Outbox 而不是事务消息</b>：业务事实（支付单 0→1）和「要发的消息」在<b>同一个本地事务</b>里原子落库——不存在「库改了消息没发」或反过来。</li>
+<li><b>金额不信任入参</b>：收银台地址、金额一律以 <code>pay_trade_record</code> 为准；<code>expectedAmountCents</code> 不符直接 409 要求重新确认。</li>
+<li><b>拒绝 ≠ 关闭</b>：mock decline 只向 <code>pay_payment_attempt</code> 插一条 DECLINED 事实，支付单状态不动——「试了没成」和「单子关了」是两回事。</li>
+<li>退款幂等：<code>SELECT … FOR UPDATE</code> 串行化 + <code>pay_mock_refund</code> 台账按退款单号重放 + 累计 ≤ pay_amount。</li>
+</ul>
+
+<div class="box ex"><span class="bt">🧺 案例进度</span>
+shopper 在模拟收银台点「支付 ¥8994」：pay_trade_record 0→1 → Outbox → RocketMQ → order 收到：订单 <b>WAIT_PAYMENT → PAID</b>，券标记已用，明细的 paid_amount 分摊落账，1 小时后物流自动推进。若 shopper 15 分钟都没付钱？下一章。</div>
+
+<nav class="pager" id="pager"></nav>
+  </div></main>
+  <aside class="toc"><div class="toc-title">本页目录</div><div id="toc-list"></div></aside>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

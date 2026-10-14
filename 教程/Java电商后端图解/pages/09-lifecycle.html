@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>09 订单状态机 · Smartlect 图解</title>
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body data-base="../">
+<header class="topbar">
+  <button class="icon-btn" id="burger" aria-label="菜单">☰</button>
+  <a class="brand" href="../index.html"><span class="logo">商</span>Smartlect <em>图解</em></a>
+  <span class="sp"></span>
+  <button class="icon-btn" id="themeBtn" aria-label="切换主题">🌙</button>
+</header>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main"><div class="content">
+
+<h1>09 · 订单状态机</h1>
+<p class="lead">9 个状态、10 种事件，合法迁移全部写死在一张表里；每次迁移都是一条「带旧状态条件的 CAS UPDATE」——并发抢状态、消息重放，都伤不到它。</p>
+
+<figure>
+<svg class="svg-d" viewBox="0 0 1000 660" role="img" aria-label="订单状态机">
+  <defs>
+    <marker id="m9a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+    <marker id="m9g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#059669"/></marker>
+    <marker id="m9r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#dc2626"/></marker>
+    <marker id="m9p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9333ea"/></marker>
+  </defs>
+
+  <!-- 状态节点 -->
+  <rect x="330" y="30" width="200" height="58" rx="10" class="fill-gw"/>
+  <text x="430" y="54" text-anchor="middle" class="tt">WAIT_PAYMENT (0) 待付款</text>
+  <text x="430" y="74" text-anchor="middle" class="ts">下单出生点 · ch.07</text>
+
+  <rect x="60" y="150" width="200" height="58" rx="10" class="fill-out"/>
+  <text x="160" y="174" text-anchor="middle" class="tt">CANCELLED (4) 交易取消</text>
+  <text x="160" y="194" text-anchor="middle" class="ts">用户主动取消</text>
+
+  <rect x="600" y="150" width="200" height="58" rx="10" class="fill-out"/>
+  <text x="700" y="174" text-anchor="middle" class="tt">CLOSED (5) 交易关闭</text>
+  <text x="700" y="194" text-anchor="middle" class="ts">系统路径（无用户上下文）</text>
+
+  <rect x="330" y="250" width="200" height="58" rx="10" class="fill-svc"/>
+  <text x="430" y="274" text-anchor="middle" class="tt">PAID (1) 已付款</text>
+  <text x="430" y="294" text-anchor="middle" class="ts">pay-success 消费 · ch.08</text>
+
+  <rect x="60" y="330" width="200" height="58" rx="10" class="fill-out"/>
+  <text x="160" y="354" text-anchor="middle" class="tt">REFUNDED (6) 已退款</text>
+  <text x="160" y="374" text-anchor="middle" class="ts">全部明细退完 · 终态</text>
+
+  <rect x="330" y="390" width="200" height="58" rx="10" class="fill-svc"/>
+  <text x="430" y="414" text-anchor="middle" class="tt">SHIPPED (2) 已发货</text>
+  <text x="430" y="434" text-anchor="middle" class="ts">模拟物流 step=0</text>
+
+  <rect x="600" y="390" width="210" height="58" rx="10" class="fill-es"/>
+  <text x="705" y="414" text-anchor="middle" class="tt">PARTIALLY_REFUNDED (7)</text>
+  <text x="705" y="434" text-anchor="middle" class="ts">部分退款 · 还能继续退/收货</text>
+
+  <rect x="330" y="520" width="200" height="58" rx="10" class="fill-svc"/>
+  <text x="430" y="544" text-anchor="middle" class="tt">COMPLETED (3) 已完成</text>
+  <text x="430" y="564" text-anchor="middle" class="ts">确认收货 · 终态（销量在此 +1）</text>
+
+  <rect x="660" y="540" width="300" height="90" rx="10" class="fill-out"/>
+  <text x="680" y="564" class="tt">DELETE (−1) 已删除</text>
+  <text x="680" y="586" class="ts">COMPLETED / CANCELLED / CLOSED /</text>
+  <text x="680" y="606" class="ts">REFUNDED → 用户删除（软删，唯一入口）</text>
+
+  <!-- 迁移边 -->
+  <g fill="none">
+    <line x1="430" y1="88" x2="430" y2="246" class="edge e-dubbo" marker-end="url(#m9g)"/>
+    <text x="440" y="170" class="lbl" fill="#047857">PAY_SUCCESS（第 8 章主线）</text>
+
+    <line x1="336" y1="76" x2="250" y2="148" class="edge" marker-end="url(#m9a)"/>
+    <text x="196" y="120" class="lbl">USER_CANCEL</text>
+
+    <line x1="524" y1="76" x2="616" y2="148" class="edge" marker-end="url(#m9a)"/>
+    <text x="520" y="120" class="lbl">PAYMENT_TIMEOUT（15min 定时消息）</text>
+    <text x="520" y="136" class="lbl">SYSTEM_CANCEL（系统取消）</text>
+
+    <line x1="430" y1="308" x2="430" y2="386" class="edge" marker-end="url(#m9a)"/>
+    <text x="440" y="352" class="lbl">SHIP（支付后 1h 物流首步）</text>
+
+    <path d="M 330 285 C 260 295 210 310 160 326" class="edge e-hot" marker-end="url(#m9r)"/>
+    <text x="128" y="300" class="lbl" fill="#b91c1c">FULL_REFUND</text>
+
+    <path d="M 530 300 C 600 330 650 360 680 386" class="edge e-hot" marker-end="url(#m9r)"/>
+    <text x="560" y="330" class="lbl" fill="#b91c1c">PARTIAL_REFUND</text>
+
+    <path d="M 240 380 C 300 400 320 420 330 440" class="edge e-hot dash" marker-end="url(#m9r)"/>
+    <text x="212" y="424" class="lbl" fill="#b91c1c">SHIPPED 也可退款</text>
+
+    <line x1="600" y1="424" x2="540" y2="424" class="edge e-hot dash" marker-end="url(#m9r)"/>
+    <text x="548" y="416" class="lbl" fill="#b91c1c">再退→REFUNDED</text>
+
+    <line x1="430" y1="448" x2="430" y2="516" class="edge" marker-end="url(#m9a)"/>
+    <text x="440" y="488" class="lbl">CONFIRM_RECEIPT（送达后 7 天自动 / 手点）</text>
+
+    <path d="M 705 448 C 700 480 620 510 536 530" class="edge dash" marker-end="url(#m9a)"/>
+    <text x="644" y="524" class="lbl">部分退款后仍可确认收货</text>
+
+    <path d="M 530 60 C 760 60 830 200 812 386" class="edge e-mq dash" marker-end="url(#m9p)"/>
+    <text x="556" y="44" class="lbl" fill="#7c3aed">COUPON_RUSH_PAY_SUCCESS（秒杀券单直达完成，ch.10）</text>
+  </g>
+</svg>
+<figcaption>状态机全图：迁移表 OrderStateMachine.java:127-153；非法组合在解析目标状态时直接抛 BusinessException</figcaption>
+</figure>
+
+<h2>迁移的实现：CAS，不是 if-else</h2>
+<pre class="code"><span class="cm">-- 每次迁移 = 一条带旧状态条件的 UPDATE（OrderStateMachine.transition）</span>
+UPDATE order_info
+SET order_status = <span class="st">&lt;目标&gt;</span>
+WHERE order_id = ? AND order_status = <span class="st">&lt;期望旧状态&gt;</span>;
+<span class="cm">-- rows = 1 → 迁移成功
+-- rows = 0 → 两种可能：
+--   ① 目标态 == 当前态：视为幂等重放，读比对后安全返回
+--   ② 其他：非法流转 / 并发被别人抢先 → 抛异常
+-- 按 payOrderId 整组迁移（transitionPayOrder）：一次结算的多个子单同生共死</span></pre>
+
+<h2>一张时间轴看兜底</h2>
+<figure>
+<svg class="svg-d" viewBox="0 0 1000 190" role="img" aria-label="订单时间轴">
+  <defs>
+    <marker id="t9a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+  </defs>
+  <line x1="40" y1="80" x2="960" y2="80" class="edge" marker-end="url(#t9a)"/>
+  <g>
+    <circle cx="60" cy="80" r="7" fill="#d97706"/><text x="60" y="56" text-anchor="middle" class="tt">下单</text><text x="60" y="106" text-anchor="middle" class="ts">WAIT_PAYMENT</text>
+    <circle cx="250" cy="80" r="7" fill="#dc2626"/><text x="250" y="56" text-anchor="middle" class="tt">15min 未付</text><text x="250" y="106" text-anchor="middle" class="ts">定时消息 → CLOSED</text>
+    <circle cx="430" cy="80" r="7" fill="#059669"/><text x="430" y="56" text-anchor="middle" class="tt">支付成功</text><text x="430" y="106" text-anchor="middle" class="ts">→ PAID</text>
+    <circle cx="590" cy="80" r="7" fill="#059669"/><text x="590" y="56" text-anchor="middle" class="tt">+1h 物流首步</text><text x="590" y="106" text-anchor="middle" class="ts">→ SHIPPED</text>
+    <circle cx="750" cy="80" r="7" fill="#0d9488"/><text x="750" y="56" text-anchor="middle" class="tt">每 1h 推进一站</text><text x="750" y="106" text-anchor="middle" class="ts">送达（模拟物流）</text>
+    <circle cx="900" cy="80" r="7" fill="#059669"/><text x="900" y="56" text-anchor="middle" class="tt">+7 天自动收货</text><text x="900" y="106" text-anchor="middle" class="ts">→ COMPLETED</text>
+  </g>
+  <text x="40" y="150" class="ts">迟到的支付：关单后钱到了 → refundLatePaymentAfterClose 原路自动退款（Redis 一次性标记防重）。</text>
+  <text x="40" y="172" class="ts">对账兜底：orderAutoReceiptReconcile 每 600s 扫超期未收货的单补推进 —— 定时消息是主路径，对账是保险丝。</text>
+</svg>
+<figcaption>每个时刻都有「主路径（定时消息）+ 保险丝（xxl-job 对账）」两套推进机制</figcaption>
+</figure>
+
+<div class="box ex"><span class="bt">🧺 案例进度</span>
+shopper 付了 ¥8994：PAID →（1 小时后物流首步）SHIPPED →（每小时一站）送达 → 7 天后自动 COMPLETED，iPhone 的 total_sale 33 → 34（确认收货事务提交后才远程加销量）。中途想退一台？下一章。</div>
+
+<nav class="pager" id="pager"></nav>
+  </div></main>
+  <aside class="toc"><div class="toc-title">本页目录</div><div id="toc-list"></div></aside>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

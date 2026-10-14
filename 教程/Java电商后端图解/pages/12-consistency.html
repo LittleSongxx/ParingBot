@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>12 一致性总纲 · Smartlect 图解</title>
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body data-base="../">
+<header class="topbar">
+  <button class="icon-btn" id="burger" aria-label="菜单">☰</button>
+  <a class="brand" href="../index.html"><span class="logo">商</span>Smartlect <em>图解</em></a>
+  <span class="sp"></span>
+  <button class="icon-btn" id="themeBtn" aria-label="切换主题">🌙</button>
+</header>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main"><div class="content">
+
+<h1>12 · 一致性总纲</h1>
+<p class="lead">把前面 11 章的机制叠起来看：一套五层防线，代替了分布式事务框架。每层只回答一个问题——「上一层没拦住的，我来拦」。</p>
+
+<h2>为什么敢移除 Seata</h2>
+<ul>
+<li>ADR-0006 决策：移除 Seata 全套（server / undo_log / pom / yml / 注解），移除前对秒杀补偿链做了自洽核验。<a class="ev" data-p="docs/adr/0006-remove-seata.md">docs/adr/0006-remove-seata.md</a></li>
+<li>现状可验证：全库 0 个 <code>@GlobalTransactional</code>、0 个 seata 依赖；残留只有 <code>file.conf</code> 历史文件和两处注释。</li>
+<li>取舍：XA/AT 换来的是「写路径的全局原子」，代价是运行时组件、锁持有时间、排障复杂度；而这个项目的写流量是单店规模——<b>用幂等 + 补偿换简单性，更划算</b>。</li>
+</ul>
+
+<figure>
+<svg class="svg-d" viewBox="0 0 1000 560" role="img" aria-label="五层一致性防线">
+  <defs>
+    <marker id="w2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+  </defs>
+
+  <text x="500" y="34" text-anchor="middle" class="lg" fill="#475569">一次跨服务写请求从上往下闯 —— 每层拦掉一种失败</text>
+
+  <rect x="60" y="56" width="640" height="76" rx="10" class="fill-gw"/>
+  <text x="80" y="80" class="tt">L1 · 请求幂等</text>
+  <text x="80" y="104" class="ts">Idempotency-Key + order_request_idempotency 账本（下单/取消/退款/抢券共用一套）</text>
+  <text x="80" y="124" class="ts">INSERT 抢占 · 冲突即重放 response_json · 指纹防「同钥匙开别门」</text>
+  <text x="740" y="98" class="lg" fill="#059669">← 用户双击 / 前端重试</text>
+
+  <rect x="60" y="146" width="640" height="76" rx="10" class="fill-db"/>
+  <text x="80" y="170" class="tt">L2 · 资源条件更新 + 业务键台账</text>
+  <text x="80" y="194" class="ts">UPDATE … WHERE stock+n&gt;=0 / status=0 / order_status=期望值（状态机 CAS）</text>
+  <text x="80" y="214" class="ts">stock_change_record.business_key：一次扣减一次回补，重放天然安全</text>
+  <text x="740" y="188" class="lg" fill="#059669">← 并发抢占 / 超卖 / 重复扣</text>
+
+  <rect x="60" y="236" width="640" height="86" rx="10" class="fill-mq"/>
+  <text x="80" y="260" class="tt">L3 · 本地事务 + Outbox</text>
+  <text x="80" y="284" class="ts">业务事实与消息同库同事务落表 → afterCommit 异步投 → 指数退避 → EXHAUSTED 人工 replay</text>
+  <text x="80" y="304" class="ts">消费端三层幂等：Redis 租约(done/processing) + 反查权威 + 条件更新幂等跳过</text>
+  <text x="740" y="288" class="lg" fill="#7c3aed">← 「改了库没发消息」/「消息重复投」</text>
+
+  <rect x="60" y="336" width="640" height="76" rx="10" class="fill-es"/>
+  <text x="80" y="360" class="tt">L4 · 定时消息兜底</text>
+  <text x="80" y="384" class="ts">15min 超时关单 · 秒杀超时四形态 · 1h 物流推进 · 7 天自动收货</text>
+  <text x="80" y="404" class="ts">时间本身就是触发器 —— 主路径不靠轮询</text>
+  <text x="740" y="378" class="lg" fill="#0f766e">← 用户不动 / 流程卡住</text>
+
+  <rect x="60" y="426" width="640" height="86" rx="10" class="fill-out"/>
+  <text x="80" y="450" class="tt">L5 · 定时对账（保险丝）</text>
+  <text x="80" y="474" class="ts">outboxDispatch 5s · 券库存对账 10min（DB 重灌 Redis + sweep 僵尸）</text>
+  <text x="80" y="494" class="ts">退款 Saga 续推 30s · 自动收货对账 600s · MQ 补偿重放 60s</text>
+  <text x="80" y="514" class="ts">补偿台账（remoteCompensate / mq_compensation_log）+ /internal 运维 replay 接口</text>
+  <text x="740" y="478" class="lg" fill="#475569">← 消息彻底丢 / Redis 漂移 / 一切意外</text>
+
+  <g class="edge" marker-end="url(#w2a)">
+    <line x1="380" y1="132" x2="380" y2="142"/><line x1="380" y1="222" x2="380" y2="232"/>
+    <line x1="380" y1="322" x2="380" y2="332"/><line x1="380" y1="412" x2="380" y2="422"/>
+  </g>
+</svg>
+<figcaption>防线总图：不是每个场景都用满五层 —— 下单用到 L1-L3，秒杀用到 L1/L2/L5，收货只用 L4/L5</figcaption>
+</figure>
+
+<h2>场景 × 防线对照</h2>
+<table class="tbl">
+<tr><th>场景</th><th>用到的层</th><th>关键证据</th></tr>
+<tr><td>下单</td><td>L1 + L2 + L3</td><td>幂等账本 / validateAndLock / order-deduct 键 / Outbox 关单消息</td></tr>
+<tr><td>支付成功</td><td>L2 + L3</td><td>pay_trade_record 0→1 条件更新 / Outbox pay-success / 消费三层幂等</td></tr>
+<tr><td>超时关单</td><td>L4</td><td>15min 定时消息 → PAYMENT_TIMEOUT → 回补库存 + 券解锁</td></tr>
+<tr><td>秒杀抢券</td><td>L1 + L2 + L5</td><td>限流 + Lua 三键 / DB remain_count&gt;0 / 10min 对账重灌</td></tr>
+<tr><td>退款</td><td>L1 + L2 + L4 + L5</td><td>稳定退款单号 / 明细 refunded_amount 累加 / 30s Saga 续推</td></tr>
+<tr><td>商品搜索</td><td>—（降级）</td><td>ES 挂 → LIKE；同步链路挂不影响查询</td></tr>
+</table>
+
+<div class="box tip"><span class="bt">💡 一句话总结</span>
+Smartlect 的交易一致性 = <b>「每一步都敢重做」</b>：请求可重放（幂等键）、资源更新带条件（CAS）、消息必达（Outbox）、时间会触发（定时消息）、最后有人对账（xxl-job）。五件小事叠起来，替代了一件大而脆的事（分布式事务）。代价是：读代码时脑子里要装五个机制，而不是一个 <code>@GlobalTransactional</code>。</div>
+
+<nav class="pager" id="pager"></nav>
+  </div></main>
+  <aside class="toc"><div class="toc-title">本页目录</div><div id="toc-list"></div></aside>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

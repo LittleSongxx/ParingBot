@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>03 网关与认证 · Smartlect 图解</title>
+<link rel="stylesheet" href="../assets/site.css" />
+</head>
+<body data-base="../">
+<header class="topbar">
+  <button class="icon-btn" id="burger" aria-label="菜单">☰</button>
+  <a class="brand" href="../index.html"><span class="logo">商</span>Smartlect <em>图解</em></a>
+  <span class="sp"></span>
+  <button class="icon-btn" id="themeBtn" aria-label="切换主题">🌙</button>
+</header>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main"><div class="content">
+
+<h1>03 · 网关与认证</h1>
+<p class="lead">所有请求先过网关两道过滤器 + 一道限流，才见到业务服务；身份在 Redis，网关只查「会话还在不在」，权限在服务层细查。</p>
+
+<h2>一次请求要闯的关卡</h2>
+<figure>
+<svg class="svg-d" viewBox="0 0 980 620" role="img" aria-label="网关过滤器链">
+  <defs>
+    <marker id="g3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#94a3b8"/></marker>
+    <marker id="g3r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#dc2626"/></marker>
+  </defs>
+
+  <rect x="30" y="14" width="470" height="44" rx="9" class="fill-web"/>
+  <text x="265" y="33" text-anchor="middle" class="tt">浏览器请求（Cookie: token / adminToken）</text>
+  <text x="265" y="51" text-anchor="middle" class="ts">例：POST /api/order/postOrder + Idempotency-Key</text>
+
+  <line x1="265" y1="58" x2="265" y2="84" class="edge" marker-end="url(#g3a)"/>
+
+  <rect x="30" y="86" width="470" height="58" rx="9" class="fill-gw"/>
+  <text x="265" y="108" text-anchor="middle" class="tt">① InternalTokenGlobalFilter（order = −200）</text>
+  <text x="265" y="126" text-anchor="middle" class="ts">仅拦 /internal/**：校验 X-Internal-Token（常量时间比较）；其余直过</text>
+
+  <line x1="265" y1="144" x2="265" y2="168" class="edge" marker-end="url(#g3a)"/>
+
+  <rect x="30" y="170" width="470" height="228" rx="9" class="fill-gw"/>
+  <text x="265" y="192" text-anchor="middle" class="tt">② AuthGlobalFilter（order = −100）</text>
+  <text x="58" y="216" class="ts">1. 先剥掉客户端伪造的身份头（X-User-Id、X-Admin-* 等 13 个）</text>
+  <text x="58" y="238" class="ts">2. 直接放行：OPTIONS 预检 · /api/assistant · /actuator/health*</text>
+  <text x="58" y="262" class="ts">3. /admin-api/**：白名单？→</text>
+  <text x="342" y="262" class="ts">Redis EXISTS adminToken:admin:token:{t}</text>
+  <text x="58" y="286" class="ts">4. /api/**：白名单？→</text>
+  <text x="270" y="286" class="ts">Redis GET token:login:token:{t} → loginId</text>
+  <text x="58" y="312" class="ts">查到 loginId = 放行（网关不下发身份头，下游各自内省）</text>
+  <text x="58" y="336" class="ts">白名单（12 条）：login/register/captcha /api/product/**</text>
+  <text x="58" y="358" class="ts">… /api/discountCoupon/{详情,领券} 等只读口</text>
+  <text x="58" y="382" class="ts">→ 失败：HTTP 401 + code 901「登录超时」</text>
+
+  <line x1="265" y1="398" x2="265" y2="422" class="edge" marker-end="url(#g3a)"/>
+
+  <rect x="30" y="424" width="470" height="62" rx="9" class="fill-gw"/>
+  <text x="265" y="446" text-anchor="middle" class="tt">③ Sentinel 网关流控（令牌桶 QPS）</text>
+  <text x="265" y="466" text-anchor="middle" class="ts">auth-sensitive 组（登录/注册/邮箱码/管理登录）30 QPS</text>
+  <text x="265" y="484" text-anchor="middle" class="ts">web-api / admin-api / 8 条路由 各 200 QPS → 超限 429</text>
+
+  <line x1="265" y1="486" x2="265" y2="510" class="edge" marker-end="url(#g3a)"/>
+
+  <rect x="30" y="512" width="470" height="90" rx="9" class="fill-svc"/>
+  <text x="265" y="534" text-anchor="middle" class="tt">④ 业务服务（服务层第二道校验）</text>
+  <text x="265" y="554" text-anchor="middle" class="ts">@SaCheckLogin（登录态）· @SaCheckPermission(type=admin)（RBAC）</text>
+  <text x="265" y="572" text-anchor="middle" class="ts">TrialUserWriteFilter：visitor 写操作黑名单 40 条路径 → 403</text>
+  <text x="265" y="590" text-anchor="middle" class="ts">幂等注解、限流注解也织入在这一层</text>
+
+  <!-- 右侧失败响应与信任模型 -->
+  <rect x="540" y="170" width="410" height="120" rx="9" class="fill-rd"/>
+  <text x="558" y="194" class="tt">失败长什么样</text>
+  <text x="558" y="216" class="ts">401 → {"status":"error","code":901,"info":"登录超时"}</text>
+  <text x="558" y="238" class="ts">429 → {"status":"error","code":429,"info":"请求过于频繁…"}</text>
+  <text x="558" y="262" class="ts">403 → USER_DENIED（visitor 写操作被拒）</text>
+  <text x="558" y="284" class="ts">网关直连 Redis（ReactiveStringRedisTemplate）</text>
+
+  <rect x="540" y="310" width="410" height="150" rx="9" class="fill-out"/>
+  <text x="558" y="334" class="tt">两层校验的分工（信任模型）</text>
+  <text x="558" y="356" class="ts">网关 = 粗粒度：只回答「这个 token 的会话还在吗」</text>
+  <text x="558" y="378" class="ts">服务层 = 细粒度：@SaCheckLogin / @SaCheckPermission</text>
+  <text x="558" y="400" class="ts">管理端独立 StpLogic（loginType=admin，token 名</text>
+  <text x="558" y="422" class="ts">adminToken，互不串号）</text>
+  <text x="558" y="444" class="ts">网关从不向下游转发身份头 —— 身份由服务层自己内省</text>
+
+  <g class="edge" marker-end="url(#g3a)">
+    <line x1="500" y1="90" x2="540" y2="90"/>
+  </g>
+  <text x="520" y="80" class="lbl">/internal/**</text>
+</svg>
+<figcaption>网关三道关卡 + 服务层第四道：证据见 AuthGlobalFilter.java、SentinelGatewayConfig.java（gateway/src/main/java/com/smartlect）</figcaption>
+</figure>
+
+<h2>贯穿案例：shopper 登录的 8 步</h2>
+<figure>
+<svg class="svg-d" viewBox="0 0 980 470" role="img" aria-label="登录时序">
+  <defs>
+    <marker id="s3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker>
+    <marker id="s3g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#059669"/></marker>
+    <marker id="s3r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#dc2626"/></marker>
+  </defs>
+
+  <!-- 生命线 -->
+  <g>
+    <rect x="60" y="14" width="150" height="42" rx="9" class="fill-web"/><text x="135" y="40" text-anchor="middle" class="tt">浏览器</text>
+    <rect x="330" y="14" width="170" height="42" rx="9" class="fill-gw"/><text x="415" y="40" text-anchor="middle" class="tt">Nginx + 网关</text>
+    <rect x="590" y="14" width="150" height="42" rx="9" class="fill-svc"/><text x="665" y="40" text-anchor="middle" class="tt">user :18082</text>
+    <rect x="800" y="14" width="150" height="42" rx="9" class="fill-rd"/><text x="875" y="40" text-anchor="middle" class="tt">Redis</text>
+    <line x1="135" y1="56" x2="135" y2="450" class="edge dash"/><line x1="415" y1="56" x2="415" y2="450" class="edge dash"/>
+    <line x1="665" y1="56" x2="665" y2="450" class="edge dash"/><line x1="875" y1="56" x2="875" y2="450" class="edge dash"/>
+  </g>
+  <text x="60" y="80" class="ts">（MySQL：user_info 表在第 ④ 步被查一次，画面外）</text>
+
+  <!-- 消息 -->
+  <line x1="135" y1="108" x2="410" y2="108" class="edge" marker-end="url(#s3a)"/>
+  <text x="145" y="102" class="lbl">① POST /api/account/login（shopper@smartlect.demo + 密码 + 滑块验证码）</text>
+
+  <line x1="415" y1="140" x2="660" y2="140" class="edge" marker-end="url(#s3a)"/>
+  <text x="425" y="134" class="lbl">② 白名单直过（/api/account/login）→ RewritePath → lb://smartlect-user</text>
+
+  <line x1="665" y1="172" x2="870" y2="172" class="edge" marker-end="url(#s3r)"/>
+  <text x="675" y="166" class="lbl">③ 校验验证码 smartlect:checkcode:{key}（演示邮箱免验）</text>
+
+  <line x1="665" y1="204" x2="440" y2="204" class="edge dash" marker-end="url(#s3a)"/>
+  <text x="450" y="198" class="lbl">④ 查 user_info（email 唯一）→ bcrypt 比对 → 临时封禁检查</text>
+
+  <line x1="665" y1="240" x2="870" y2="240" class="edge" marker-end="url(#s3r)"/>
+  <text x="675" y="234" class="lbl">⑤ StpUtil.login(8800000002) 写两个键：</text>
+  <text x="675" y="258" class="ts">token:login:token:{uuid} → "8800000002"（TTL 1 天）</text>
+  <text x="675" y="276" class="ts">token:login:session:8800000002 → 用户信息 JSON</text>
+
+  <line x1="665" y1="316" x2="145" y2="316" class="edge" marker-end="url(#s3g)"/>
+  <text x="155" y="310" class="lbl">⑥ 200 + Set-Cookie: token={uuid}（HttpOnly · SameSite=Lax · Path=/）</text>
+
+  <line x1="135" y1="356" x2="410" y2="356" class="edge" marker-end="url(#s3a)"/>
+  <text x="145" y="350" class="lbl">⑦ 之后每个请求：Cookie 自动带 token</text>
+
+  <line x1="415" y1="388" x2="870" y2="388" class="edge" marker-end="url(#s3r)"/>
+  <text x="425" y="382" class="lbl">⑧ 网关只做一件事：GET token:login:token:{t} → loginId 非空？</text>
+
+  <rect x="60" y="414" width="890" height="46" rx="9" class="fill-out"/>
+  <text x="505" y="434" text-anchor="middle" class="ts">token 是 Sa-Token 生成的 UUID，活不过 86400s；登出 = logoutByTokenValue 删键 + 清 Cookie。权限判定（能干什么）永远在服务层。</text>
+</svg>
+<figcaption>登录时序：证据 AccountController.java:152-198、GatewayTokenResolver.java:25-41、AuthGlobalFilter.java:94-107</figcaption>
+</figure>
+
+<h2>三个演示账号：同一套代码，三层不同待遇</h2>
+<table class="tbl">
+<tr><th>账号</th><th>身份</th><th>能做</th><th>被谁拦</th></tr>
+<tr><td><code>shopper</code></td><td>演示买家</td><td>逛店、加购、下单、退款</td><td>改密/改资料被拒（isPublishedDemoUser）</td></tr>
+<tr><td><code>visitor</code></td><td>访客</td><td>逛店、看商品</td><td>写操作黑名单 40 条路径 → TrialUserWriteFilter 403</td></tr>
+<tr><td><code>gallery</code></td><td>管理端展厅（TRIAL_OPERATOR 角色，仅 <code>admin:trial</code> 权限码）</td><td>看板、商品、订单、退款复核</td><td><code>@SaCheckPermission</code> 全不满足 → 天然只读</td></tr>
+</table>
+
+<div class="box tip"><span class="bt">💡 反直觉的一处</span>
+网关<b>故意不发身份头</b>给下游（很多网关方案是校验完塞 <code>X-User-Id</code> 转发）。这里反过来：网关只管「session 活着」，每个服务自己内省出用户身份——伪造头在第②步就被剥掉，就算内网有人直连服务也骗不了它。<a class="ev" data-p="backend/smartlect-gateway/src/main/java/com/smartlect/filter/AuthGlobalFilter.java" data-l="38">AuthGlobalFilter.java:38</a></div>
+
+<nav class="pager" id="pager"></nav>
+  </div></main>
+  <aside class="toc"><div class="toc-title">本页目录</div><div id="toc-list"></div></aside>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>
