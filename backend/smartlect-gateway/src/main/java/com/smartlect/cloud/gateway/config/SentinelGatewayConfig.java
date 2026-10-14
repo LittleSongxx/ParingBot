@@ -52,7 +52,16 @@ public class SentinelGatewayConfig {
 
     @PostConstruct
     public void init() {
+        // 自查修复（2026-10-15）：批次六的插入曾把下面四步吞进 attachNacosDataSourceIfConfigured
+        // 且该方法在未配置 data-id（默认部署）时提前 return——默认部署下限流规则/分组/BlockHandler
+        // 全部不再注册。现恢复为 init 依序执行四步，attach 只负责可选数据源挂接。
+        initBlockHandler();
         attachNacosDataSourceIfConfigured();
+        if (!rateLimitProperties.isEnabled()) {
+            return;
+        }
+        initCustomApis();
+        initGatewayRules();
     }
 
     private void attachNacosDataSourceIfConfigured() {
@@ -81,13 +90,6 @@ public class SentinelGatewayConfig {
         } catch (Exception e) {
             log.warn("网关流控 Nacos 数据源挂接失败，回退代码兜底规则 dataId={}", gatewayRulesDataId, e);
         }
-
-        initBlockHandler();
-        if (!rateLimitProperties.isEnabled()) {
-            return;
-        }
-        initCustomApis();
-        initGatewayRules();
     }
 
     private void initCustomApis() {

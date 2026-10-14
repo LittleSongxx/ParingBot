@@ -19,7 +19,7 @@ public interface LocalMessageOutboxMapper {
                              @Param("failedStatus") Integer failedStatus,
                              @Param("sendingStatus") Integer sendingStatus,
                              @Param("leaseOwner") String leaseOwner,
-                             @Param("leaseMillis") long leaseMillis);
+                             @Param("leaseMicros") long leaseMicros);
 
     Integer markSent(@Param("id") Long id,
                      @Param("sendingStatus") Integer sendingStatus,

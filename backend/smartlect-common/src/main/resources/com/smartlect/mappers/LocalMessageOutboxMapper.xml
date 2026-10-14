@@ -44,7 +44,7 @@
         set status = #{sendingStatus},
             update_time = now(),
             lease_owner = #{leaseOwner},
-            lease_until = DATE_ADD(NOW(), INTERVAL #{leaseMillis} MILLISECOND),
+            lease_until = DATE_ADD(NOW(), INTERVAL #{leaseMicros} MICROSECOND),
             error_message = null
         where id = #{id}
           and (

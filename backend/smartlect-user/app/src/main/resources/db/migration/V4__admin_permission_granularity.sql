@@ -15,3 +15,10 @@ on duplicate key update description = incoming.description;
 insert ignore into admin_role_permission (role_id, permission_id)
 select r.role_id, p.permission_id from admin_role r join admin_permission p
 where r.role_code = 'SUPER_ADMIN';
+
+-- 自查修复（2026-10-15）：README 演示契约中 gallery（TRIAL_OPERATOR）具备"退款复核"能力，
+-- RefundReviewController 挂了 order:manage 后需为该角色补授，避免演示账号被 403。
+insert ignore into admin_role_permission (role_id, permission_id)
+select r.role_id, p.permission_id from admin_role r join admin_permission p
+  on p.permission_code = 'order:manage'
+where r.role_code = 'TRIAL_OPERATOR';

@@ -224,12 +224,12 @@ public class DiscountCouponServiceImpl implements DiscountCouponService {
 			} else if (CouponTypeEnum.NOTHRESHOLD.getStatus().equals(discountCoupon.getCouponType())){
 				coupon.setDiscountAmount(discountCoupon.getDiscountAmount());
 			}
-			coupon.setValidStartTime(DateUtil.parse(discountCoupon.getValidStartTime(), DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern()));
-			coupon.setValidEndTime(DateUtil.parse(discountCoupon.getValidEndTime(), DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern()));
+			coupon.setValidStartTime(parseCouponTime(discountCoupon.getValidStartTime()));
+			coupon.setValidEndTime(parseCouponTime(discountCoupon.getValidEndTime()));
 			if (RushingCouponStatusEnum.YES.getStatus().equals(discountCoupon.getRushingstatus())){
 				coupon.setRushingstatus(RushingCouponStatusEnum.YES.getStatus());
-				coupon.setRushingStartTime(DateUtil.parse(discountCoupon.getRushingStartTime(), DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern()));
-				coupon.setRushingEndTime(DateUtil.parse(discountCoupon.getRushingEndTime(), DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern()));
+				coupon.setRushingStartTime(parseCouponTime(discountCoupon.getRushingStartTime()));
+				coupon.setRushingEndTime(parseCouponTime(discountCoupon.getRushingEndTime()));
 			}
 		} else {
 			coupon = this.discountCouponMapper.selectByCouponId(discountCoupon.getCouponId());
@@ -364,5 +364,21 @@ public class DiscountCouponServiceImpl implements DiscountCouponService {
 
 	private void broadcastRushCouponNotification(DiscountCoupon coupon) {
 		// 站内通知线已随 2026-10 收敛重构退役；保留空实现避免调用点扩散。
+	}
+
+	/**
+	 * 自查修复（2026-10-15）：DateUtil.parse 改为解析失败抛错后，管理端提交的时间串
+	 * （外部输入）需转为可读的业务错误，而不是让 IllegalArgumentException 裸奔成 500。
+	 * 旧"静默回退当前时间"本来就会把发券时间悄悄写错，明确报错才是正确行为。
+	 */
+	private java.util.Date parseCouponTime(String value) {
+		if (value == null || value.isBlank()) {
+			throw new BusinessException("时间不能为空");
+		}
+		try {
+			return DateUtil.parse(value, DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern());
+		} catch (IllegalArgumentException e) {
+			throw new BusinessException("时间格式必须为 yyyy-MM-dd HH:mm:ss");
+		}
 	}
 }

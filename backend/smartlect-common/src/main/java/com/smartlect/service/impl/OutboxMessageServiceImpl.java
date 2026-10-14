@@ -104,7 +104,8 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
                 OutboxMessageStatusEnum.FAILED.getStatus(),
                 OutboxMessageStatusEnum.SENDING.getStatus(),
                 dispatcherId,
-                Math.max(leaseMs, 5000L));
+                // MySQL 无 MILLISECOND 区间单位，微秒传入由 SQL 侧 INTERVAL ... MICROSECOND 计算
+                Math.max(leaseMs, 5000L) * 1000L);
         if (claimed == null || claimed != 1) {
             return;
         }

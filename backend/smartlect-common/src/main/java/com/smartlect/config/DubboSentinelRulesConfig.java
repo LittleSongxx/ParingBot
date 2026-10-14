@@ -31,6 +31,15 @@ public class DubboSentinelRulesConfig {
 
     @PostConstruct
     public void init() {
+        // 自查修复（2026-10-15）：数据源挂接成功后 register2Property 已接管规则，
+        // 下方 loadRules 会用内部 property 覆盖掉它——挂接成功时跳过代码兜底规则注册。
+        if (attachNacosDataSourceIfConfigured()) {
+            return;
+        }
+        registerCodeFallbackRules();
+    }
+
+    private boolean attachNacosDataSourceIfConfigured() {
         if (!dubboRulesDataId.isBlank()) {
             try {
                 String serverAddr = environment.getProperty("spring.cloud.nacos.config.server-addr", "");
@@ -53,11 +62,16 @@ public class DubboSentinelRulesConfig {
                                     });
                     com.alibaba.csp.sentinel.slots.block.degrade.DegradeRuleManager.register2Property(source.getProperty());
                     log.info("Sentinel Dubbo 熔断规则已挂接 Nacos 数据源 dataId={}, group={}", dubboRulesDataId, group);
+                    return true;
                 }
             } catch (Exception e) {
                 log.warn("Nacos 数据源挂接失败，回退代码兜底规则 dataId={}", dubboRulesDataId, e);
             }
         }
+        return false;
+    }
+
+    private void registerCodeFallbackRules() {
         List<DegradeRule> rules = new ArrayList<>();
         for (String resource : new String[]{
                 "com.smartlect.api.dubbo.StockDubboService.getStock",
