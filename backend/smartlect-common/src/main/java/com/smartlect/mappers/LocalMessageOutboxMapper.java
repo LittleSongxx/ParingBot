@@ -39,6 +39,17 @@ public interface LocalMessageOutboxMapper {
                                  @Param("exhaustedStatus") Integer exhaustedStatus,
                                  @Param("maxRetries") int maxRetries);
 
+    /**
+     * 定时消息驻留：距到期还超过 broker 时间轮上限时把 next_retry_time 推到
+     * "到期 - 上限 + 安全余量"（唤醒后剩余延迟已低于上限，投递不再被 40012 拒绝）。
+     * 判定与写入全部用数据库时钟；未触发驻留时返回 0（调用方继续正常投递）。
+     */
+    Integer parkUntilTimerHorizon(@Param("id") Long id,
+                                  @Param("pendingStatus") Integer pendingStatus,
+                                  @Param("failedStatus") Integer failedStatus,
+                                  @Param("horizonMs") long horizonMs,
+                                  @Param("wakeBeforeMs") long wakeBeforeMs);
+
     Integer requeueExhausted(@Param("id") Long id,
                              @Param("exhaustedStatus") Integer exhaustedStatus,
                              @Param("pendingStatus") Integer pendingStatus);

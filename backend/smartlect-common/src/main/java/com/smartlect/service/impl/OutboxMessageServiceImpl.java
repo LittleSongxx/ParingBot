@@ -39,6 +39,14 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
     @Value("${mq.outbox.retry-base-ms:2000}")
     private long retryBaseMs;
 
+    // broker 定时消息（时间轮）单条最大延迟，超过即被 40012 拒绝。7 天确认收货这类
+    // 远未来消息必须驻留到剩余延迟落入上限内再投（见 tryDispatch 与 parkUntilTimerHorizon）。
+    @Value("${mq.outbox.timer-horizon-ms:86400000}")
+    private long timerHorizonMs;
+
+    // 驻留唤醒的安全余量：提前 60s 醒，确保真正投递时剩余延迟已低于上限（时钟精度/网络延迟）
+    private static final long TIMER_WAKE_BEFORE_MS = 60_000L;
+
     private final String dispatcherId = UUID.randomUUID().toString();
 
     @Override
@@ -94,6 +102,20 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
         }
         if (OutboxMessageStatusEnum.SENT.getStatus().equals(beforeClaim.getStatus())) {
             return;
+        }
+        // 定时消息驻留：距到期仍超过 broker 时间轮上限时不投——直接投递必被 40012
+        // 拒绝，重试预算几分钟内耗尽转 EXHAUSTED（2026-10-15 线上 7 天确认收货消息实测）。
+        // 驻留命中即返回，由定时扫描在"剩余延迟低于上限"的时刻重投（SQL 全用数据库时钟）。
+        if (beforeClaim.getDeliveryExpireAt() != null) {
+            Integer parked = localMessageOutboxMapper.parkUntilTimerHorizon(
+                    id,
+                    OutboxMessageStatusEnum.PENDING.getStatus(),
+                    OutboxMessageStatusEnum.FAILED.getStatus(),
+                    timerHorizonMs,
+                    TIMER_WAKE_BEFORE_MS);
+            if (parked != null && parked == 1) {
+                return;
+            }
         }
         // ADR-0023：租约与退避时间全部由数据库 NOW() 推导（SQL 侧 DATE_ADD），
         // 消除跨实例应用时钟漂移超过租约期导致的双重投递窗口

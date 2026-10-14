@@ -105,6 +105,18 @@
           )
     </update>
 
+    <!-- 定时消息驻留（时间轮上限）：见接口注释。唤醒时刻 = 到期 - 上限 + 余量，
+         全部用数据库时钟判定，避免跨实例时钟漂移；未触发时 0 行。 -->
+    <update id="parkUntilTimerHorizon">
+        update local_message_outbox
+        set next_retry_time = from_unixtime((delivery_expire_at - #{horizonMs} + #{wakeBeforeMs}) / 1000),
+            update_time = now()
+        where id = #{id}
+          and status in (#{pendingStatus}, #{failedStatus})
+          and delivery_expire_at is not null
+          and delivery_expire_at - #{horizonMs} + #{wakeBeforeMs} &gt; unix_timestamp(now(3)) * 1000
+    </update>
+
     <update id="requeueExhausted">
         update local_message_outbox
         set status = #{pendingStatus},

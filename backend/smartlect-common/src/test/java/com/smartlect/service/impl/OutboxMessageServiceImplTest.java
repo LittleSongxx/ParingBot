@@ -42,6 +42,76 @@ class OutboxMessageServiceImplTest {
     void setUp() {
         ReflectionTestUtils.setField(service, "leaseMs", 30_000L);
         ReflectionTestUtils.setField(service, "retryBaseMs", 10L);
+        ReflectionTestUtils.setField(service, "timerHorizonMs", 86_400_000L);
+    }
+
+    @Test
+    void farFutureTimedMessageParksInsteadOfSending() {
+        // 7 天确认收货类消息：距到期远超 broker 时间轮上限（24h），驻留等待
+        LocalMessageOutbox row = new LocalMessageOutbox();
+        row.setId(9L);
+        row.setStatus(OutboxMessageStatusEnum.PENDING.getStatus());
+        row.setExchangeName("smartlect-delay");
+        row.setRoutingKey("confirm-receipt");
+        row.setIdempotencyKey("pay:confirm:9");
+        row.setPayloadJson("{\"orderId\":\"9\"}");
+        row.setRetryCount(0);
+        row.setDeliveryExpireAt(System.currentTimeMillis() + java.time.Duration.ofDays(7).toMillis());
+
+        when(mapper.selectById(9L)).thenReturn(row);
+        when(mapper.parkUntilTimerHorizon(
+                eq(9L),
+                eq(OutboxMessageStatusEnum.PENDING.getStatus()),
+                eq(OutboxMessageStatusEnum.FAILED.getStatus()),
+                eq(86_400_000L),
+                eq(60_000L)))
+                .thenReturn(1);
+
+        service.tryDispatch(9L);
+
+        verify(mapper, org.mockito.Mockito.never()).claimForDispatch(
+                any(), anyInt(), anyInt(), anyInt(), anyString(), anyLong());
+        verify(sender, org.mockito.Mockito.never()).replaySend(
+                any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void nearFutureTimedMessageSendsWithRemainingDelay() {
+        // 1 小时物流链消息：剩余延迟在上限内，正常按剩余时长投递
+        LocalMessageOutbox row = new LocalMessageOutbox();
+        row.setId(10L);
+        row.setStatus(OutboxMessageStatusEnum.PENDING.getStatus());
+        row.setExchangeName("smartlect-delay");
+        row.setRoutingKey("logistics-step");
+        row.setIdempotencyKey("logistics:10");
+        row.setPayloadJson("{\"orderId\":\"10\"}");
+        row.setRetryCount(0);
+        row.setDeliveryExpireAt(System.currentTimeMillis() + 3_600_000L);
+
+        when(mapper.selectById(10L)).thenReturn(row);
+        when(mapper.parkUntilTimerHorizon(
+                eq(10L),
+                eq(OutboxMessageStatusEnum.PENDING.getStatus()),
+                eq(OutboxMessageStatusEnum.FAILED.getStatus()),
+                eq(86_400_000L),
+                eq(60_000L)))
+                .thenReturn(0);
+        when(mapper.claimForDispatch(
+                eq(10L), anyInt(), anyInt(), anyInt(), anyString(), anyLong()))
+                .thenReturn(1);
+        when(mapper.markSent(
+                eq(10L), anyInt(), anyInt(), anyString(), any(Date.class)))
+                .thenReturn(1);
+
+        service.tryDispatch(10L);
+
+        org.mockito.ArgumentCaptor<java.time.Duration> delay =
+                org.mockito.ArgumentCaptor.forClass(java.time.Duration.class);
+        verify(sender).replaySend(
+                eq("smartlect-delay"), eq("logistics-step"), any(), eq("logistics:10"), delay.capture());
+        long ms = delay.getValue().toMillis();
+        org.junit.jupiter.api.Assertions.assertTrue(
+                ms > 3_500_000L && ms <= 3_600_000L, "剩余延迟应约 1 小时, 实际=" + ms);
     }
 
     @Test
