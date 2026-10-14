@@ -834,15 +834,18 @@ class ShoppingMySQLTests(unittest.TestCase):
                 else:
                     self.assertEqual(self.memory.preferences(self.actor)[0]["value"], 15000)
 
-    def test_six_actual_attempts_include_retries_and_fallback_does_not_reset_budget(self):
+    def test_eight_actual_attempts_include_retries_and_fallback_does_not_reset_budget(self):
+        # 预算默认 8（SMARTLECT_MODEL_CALL_LIMIT，2026-10-10 提交 43c23eb 自 6 调整，
+        # 受 TURN_DEADLINE_SECONDS=90 硬约束的折中值）；本测试曾漏同步该调整。
         provider = FakeProvider([tool("load_skill", {"skill_id": "support_policy"})], attempts_per_call=2)
         run, lease = self.begin()
         result = asyncio.run(self.execute(provider, run, lease))
-        self.assertEqual(provider.actual_attempts, 6)
-        # 预加载后前三轮各 2 次重试用尽 6 次预算；第四轮能组窗但 before_attempt 会先被上限拦住。
+        self.assertEqual(provider.actual_attempts, 8)
+        # 预加载后四轮各 2 次尝试（失败重试+成功）用尽 8 次预算；预算耗尽后不再开
+        # 第五轮窗口，直接走 rule-fallback 收口——重试消耗预算、fallback 不重置预算。
         self.assertEqual(len(provider.messages), 4)
-        self.assertEqual(result["context"]["model_calls"], 6)
-        self.assertEqual(len(result["context"]["model_attempts"]), 6)
+        self.assertEqual(result["context"]["model_calls"], 8)
+        self.assertEqual(len(result["context"]["model_attempts"]), 8)
         self.assertEqual(result["result"]["model_mode"], "rule-fallback")
         self.assertEqual(result["context"]["retrieval_calls"], 0)
         self.assertEqual(len(self.knowledge.searches), 0)

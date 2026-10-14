@@ -253,7 +253,7 @@ async def run_shopping(*, actor, run, lease, store, commerce, knowledge, memory,
         if await asyncio.to_thread(memory.handoff_state, actor, conversation_id):
             raise StateError('human_control_active')
         # The turn deadline still bounds the run; the call count is a configurable
-        # backstop (default 6). Evaluation stacks raise it so bounded-ReAct burnout
+        # backstop (default 8, SMARTLECT_MODEL_CALL_LIMIT). Evaluation stacks raise it so bounded-ReAct burnout
         # reflects model behaviour, not the cap.
         if context['model_calls'] >= MODEL_CALL_LIMIT or time.monotonic() >= timeout_at:
             raise BudgetExceeded('model_call_or_time_limit')
