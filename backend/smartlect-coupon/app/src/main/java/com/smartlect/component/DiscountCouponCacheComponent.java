@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -30,9 +30,12 @@ public class DiscountCouponCacheComponent {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    // ADR-0021 后 Bean 定义返回 Executor（ThreadPoolTaskExecutor，非 ExecutorService），
+    // 注入类型必须与之对齐——此前按旧类型 ExecutorService 注入，装配期
+    // "required a bean of type ExecutorService" 让 coupon 服务启动即退（2026-10-15 线上部署实测）
     @Resource
     @Qualifier(CouponCacheExecutorConfig.CACHE_REBUILD_EXECUTOR)
-    private ExecutorService cacheRebuildExecutor;
+    private Executor cacheRebuildExecutor;
 
     private static final TypeReference<PaginationResultVO<DiscountCoupon>> PLAZA_LIST_TYPE =
             new TypeReference<>() {
