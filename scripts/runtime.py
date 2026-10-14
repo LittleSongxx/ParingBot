@@ -776,7 +776,7 @@ def start_app(service, env, records):
 def wait_apps(services, records):
     pending = set(services)
     # 副本节点跨网连中间件 + 布隆全量预热（8.7 万商品）首启更慢，允许环境变量放宽
-    deadline = time.monotonic() + int(env.get("SMARTLECT_APP_HEALTH_TIMEOUT_SECONDS", "240"))
+    deadline = time.monotonic() + int(os.environ.get("SMARTLECT_APP_HEALTH_TIMEOUT_SECONDS", "240"))
     while pending and time.monotonic() < deadline:
         for service in tuple(pending):
             if not owned_process(records[service]):
