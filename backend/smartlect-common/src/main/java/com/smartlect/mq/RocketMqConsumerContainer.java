@@ -92,6 +92,26 @@ public class RocketMqConsumerContainer implements SmartInitializingSingleton {
 
     ConsumeResult dispatch(SmartlectMessageListener<Object> listener, MessageView view) {
         SmartlectMqMessage message = wrap(view);
+        // 链路追踪贯穿（ADR-0021）：消费线程此前无 MDC，日志与 HTTP/Dubbo 链路无法串联
+        String priorTraceId = org.slf4j.MDC.get(com.smartlect.constants.InternalApiHeaders.TRACE_ID_MDC);
+        String messageTraceId = message.properties() == null ? null : message.properties().get("traceId");
+        if (messageTraceId != null && !messageTraceId.isEmpty()) {
+            org.slf4j.MDC.put(com.smartlect.constants.InternalApiHeaders.TRACE_ID_MDC, messageTraceId);
+        }
+        try {
+            return dispatchInTraceContext(listener, message);
+        } finally {
+            if (messageTraceId != null && !messageTraceId.isEmpty()) {
+                if (priorTraceId != null) {
+                    org.slf4j.MDC.put(com.smartlect.constants.InternalApiHeaders.TRACE_ID_MDC, priorTraceId);
+                } else {
+                    org.slf4j.MDC.remove(com.smartlect.constants.InternalApiHeaders.TRACE_ID_MDC);
+                }
+            }
+        }
+    }
+
+    private ConsumeResult dispatchInTraceContext(SmartlectMessageListener<Object> listener, SmartlectMqMessage message) {
         long ttl = listener.idempotencyTtlSeconds();
         if (ttl > 0) {
             MqConsumerIdempotencyHelper.ClaimResult claim =

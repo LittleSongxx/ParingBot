@@ -53,12 +53,24 @@ public class AGlobalExceptionHandlerController extends ABaseController {
             ajaxResponse.setInfo(biz.getMessage());
             ajaxResponse.setData(biz.getData());
             ajaxResponse.setStatus(STATUC_ERROR);
-        } else if (e instanceof BindException|| e instanceof MethodArgumentTypeMismatchException || e instanceof HandlerMethodValidationException) {
-            //参数类型错误
+        } else if (e instanceof BindException || e instanceof MethodArgumentTypeMismatchException
+                || e instanceof HandlerMethodValidationException) {
+            //参数类型错误 / 字段校验失败：此前吞成 CODE_600 通用文案，前端拿不到字段级提示
             logger.warn("请求参数无效, url={}, type={}, message={}",
                     request.getRequestURL(), e.getClass().getSimpleName(), e.getMessage());
             ajaxResponse.setCode(ResponseCodeEnum.CODE_600.getCode());
             ajaxResponse.setInfo(ResponseCodeEnum.CODE_600.getMsg());
+            if (e instanceof BindException bindException) {
+                // 字段级校验错误（@Valid/@Validated 的 BindingResult）随 data 返回：
+                // [{field, message}]，无绑定错误时（纯类型不匹配）data 保持为空
+                if (bindException.getBindingResult().hasFieldErrors()) {
+                    ajaxResponse.setData(bindException.getBindingResult().getFieldErrors().stream()
+                            .map(error -> java.util.Map.of(
+                                    "field", error.getField(),
+                                    "message", error.getDefaultMessage() == null ? "" : error.getDefaultMessage()))
+                            .toList());
+                }
+            }
             ajaxResponse.setStatus(STATUC_ERROR);
         } else if (e instanceof DuplicateKeyException) {
             //主键冲突

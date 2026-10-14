@@ -21,20 +21,28 @@ import java.util.function.Supplier;
  */
 public final class PageUtils {
 
+    /** 单页上限（可配）：此前 pageSize 无上限，客户端可传 10000 拖垮回源查询。 */
+    private static final int MAX_PAGE_SIZE = Integer.parseInt(
+            System.getProperty("smartlect.page.max-size", "100"));
+
     private PageUtils() {
+    }
+
+    static int capPageSize(int size) {
+        return Math.min(size, MAX_PAGE_SIZE);
     }
 
     /** 供需要中间 PageInfo 的调用方使用（如 SKU 列表转换 VO 需拿 total）。 */
     public static <T> PageInfo<T> pageInfo(Integer pageNo, Integer pageSize, Supplier<List<T>> query) {
         int effectivePageNo = pageNo == null || pageNo < 1 ? 1 : pageNo;
-        int effectivePageSize = pageSize == null || pageSize < 1 ? PageSize.SIZE15.getSize() : pageSize;
+        int effectivePageSize = capPageSize(pageSize == null || pageSize < 1 ? PageSize.SIZE15.getSize() : pageSize);
         PageHelper.startPage(effectivePageNo, effectivePageSize);
         return new PageInfo<>(query.get());
     }
 
     public static <T> PaginationResultVO<T> page(Integer pageNo, Integer pageSize, Supplier<List<T>> query) {
         int effectivePageNo = pageNo == null || pageNo < 1 ? 1 : pageNo;
-        int effectivePageSize = pageSize == null || pageSize < 1 ? PageSize.SIZE15.getSize() : pageSize;
+        int effectivePageSize = capPageSize(pageSize == null || pageSize < 1 ? PageSize.SIZE15.getSize() : pageSize);
         PageHelper.startPage(effectivePageNo, effectivePageSize);
         List<T> list = query.get();
         PageInfo<T> info = new PageInfo<>(list);

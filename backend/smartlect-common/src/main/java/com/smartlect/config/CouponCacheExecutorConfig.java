@@ -2,11 +2,10 @@ package com.smartlect.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Configuration
@@ -14,21 +13,19 @@ public class CouponCacheExecutorConfig {
 
     public static final String CACHE_REBUILD_EXECUTOR = "CACHE_REBUILD_EXECUTOR";
 
+    // ADR-0021：改用 ThreadPoolTaskExecutor 以获得 MDC 传播装饰器；语义保持——
+    // 固定 10 线程 + 队列 500 + CallerRuns 回压 + daemon 命名线程。
     @Bean(name = CACHE_REBUILD_EXECUTOR)
-    public ExecutorService couponCacheRebuildExecutor() {
-        AtomicInteger seq = new AtomicInteger(1);
-        return new ThreadPoolExecutor(
-                10,
-                10,
-                60L,
-                TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(500),
-                r -> {
-                    Thread t = new Thread(r, "coupon-cache-rebuild-" + seq.getAndIncrement());
-                    t.setDaemon(true);
-                    return t;
-                },
-                new ThreadPoolExecutor.CallerRunsPolicy()
-        );
+    public Executor couponCacheRebuildExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(10);
+        executor.setMaxPoolSize(10);
+        executor.setQueueCapacity(500);
+        executor.setThreadNamePrefix("coupon-cache-rebuild-");
+        executor.setDaemon(true);
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setTaskDecorator(new MdcTaskDecorator());
+        executor.initialize();
+        return executor;
     }
 }
