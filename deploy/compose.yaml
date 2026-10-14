@@ -238,6 +238,11 @@ services:
         --spring.datasource.username=smartlect_xxljob
         --spring.datasource.password=${SMARTLECT_XXLJOB_MYSQL_PASSWORD:?run bootstrap}
         --xxl.job.accessToken=${SMARTLECT_XXLJOB_TOKEN:?run bootstrap}
+      # JVM 堆上限（对齐 ES 的 heap=limit/2 惯例）：不设时 Java 8 按 512m 上限自动取 128m 堆，
+      # 非堆增长把 cgroup 顶爆——2026-10-14 早间本容器 OOMKilled 后停摆 19 小时（恢复见
+      # docs/改动记录/2026-10-15/七批次线上部署验证.md）。restart 策略让其自愈。
+      JAVA_OPTS: "-Xms256m -Xmx256m"
+    restart: unless-stopped
     ports:
       - "127.0.0.1:${SMARTLECT_XXLJOB_PORT:-18090}:8080"
     mem_limit: 512m
