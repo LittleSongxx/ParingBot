@@ -90,7 +90,9 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: [backend, assistant, web]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 40 分钟：打包+冒烟+重启典型 ~15 分钟；2026-10-15 冒烟因磁盘满挂起时 30 分钟被撞满，
+    # job 在重启前被取消——冒烟已修（截止强制），此余量防同类尾部风险。
+    timeout-minutes: 40
     env:
       # 长重启期间无输出，必须带 keepalive 防中间层掐连接
       SSH_CMD: ssh -i ~/deploy_key -o BatchMode=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=10

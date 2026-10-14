@@ -13,6 +13,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -529,7 +530,8 @@ def package_fingerprint(directory):
 
 
 def immutable_jar(source, directory):
-    # ponytail: retain old hashes; prune only inactive snapshots if disk usage matters.
+    # 历史版本快照由 prune_staged_artifacts（apps_up/smoke 收尾调用）回收——2026-10-15
+    # 因从未回收累积 14G 撑满根分区，见 docs/改动记录/2026-10-15/七批次线上部署验证.md。
     before = source.stat()
     directory.mkdir(parents=True, exist_ok=True)
     descriptor, name = tempfile.mkstemp(dir=directory, suffix=".tmp")
@@ -557,6 +559,33 @@ def immutable_jar(source, directory):
         return target, digest, after.st_mtime_ns
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def prune_staged_artifacts(grace_seconds=600):
+    """回收 run/apps 下不再被台账引用的历史版本 JAR（immutable_jar 每次启动按新哈希暂存副本）。
+
+    2026-10-15 事故：多日部署累积约 14G 暂存 JAR 撑满 40G 根分区——MySQL 临时表分配失败
+    （错误 1114）、冒烟语句永久等待、部署撞 job 超时被取消。保留台账（processes.json）
+    引用的运行版本；未引用且写入已超过 grace_seconds 的才删（防删"已暂存未 exec"的副本）。
+    """
+    try:
+        records = json.loads(PROCESS_FILE.read_text())
+    except (OSError, ValueError):
+        return
+    keep = {str(arg) for record in records.values() for arg in (record.get("cmdline") or [])
+            if str(arg).endswith(".jar")}
+    apps_dir = ROOT / "run" / "apps"
+    if not apps_dir.exists():
+        return
+    now = time.time()
+    freed = 0
+    for jar in apps_dir.glob("*/*.jar"):
+        if str(jar) in keep or now - jar.stat().st_mtime < grace_seconds:
+            continue
+        freed += jar.stat().st_size
+        jar.unlink()
+    if freed:
+        print(f"pruned staged artifacts: {freed / 1e6:.0f} MB（历史版本快照，不影响运行中进程）")
 
 
 def java_launch_args(service, env):
@@ -652,23 +681,42 @@ def smoke_apps(env, timeout=180):
                                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT, text=True, start_new_session=True)
         lines = []
+        reader_done = threading.Event()
+
+        def _collect():
+            try:
+                for line in process.stdout:
+                    lines.append(line.rstrip())
+            except (ValueError, OSError):
+                pass  # finally 里关流会打断读线程，属预期
+            finally:
+                reader_done.set()
+
+        threading.Thread(target=_collect, daemon=True).start()
         outcome = None
         try:
+            # 读线程 + 轮询：原直接 readline 是阻塞读，deadline 只在两行之间被检查——
+            # 某语句被锁/资源卡住（如 2026-10-15 磁盘满致 MySQL 临时表分配失败）而不再
+            # 输出新行时，冒烟会永久挂起并把部署拖到 job 超时（见 docs/改动记录/2026-10-15）。
             deadline = started + timeout
+            scanned = 0
             while time.monotonic() < deadline:
-                line = process.stdout.readline()
-                if not line:
-                    if process.poll() is not None:
+                while scanned < len(lines):
+                    line = lines[scanned]
+                    scanned += 1
+                    if "Started " in line and " in " in line and "seconds" in line:
+                        outcome = "ok"
                         break
-                    continue
-                lines.append(line.rstrip())
-                if "Started " in line and " in " in line and "seconds" in line:
-                    outcome = "ok"
+                    if "APPLICATION FAILED TO START" in line:
+                        outcome = "failed"
+                        break
+                if outcome is not None or reader_done.is_set():
                     break
-                if "APPLICATION FAILED TO START" in line:
-                    outcome = "failed"
-                    break
+                time.sleep(0.2)
             if outcome is None:
+                if reader_done.is_set():
+                    with contextlib.suppress(subprocess.TimeoutExpired):
+                        process.wait(timeout=3)
                 outcome = "failed" if process.poll() not in (None, 0) else "timeout"
         finally:
             for reader in (process.stdout, process.stderr):
@@ -687,6 +735,7 @@ def smoke_apps(env, timeout=180):
         detail = "\n".join(lines[-8:]) or "（无输出）"
         failures.append((service, f"{outcome} after {elapsed:.0f}s\n{detail}"))
         print(f"smoke: {service} FAILED ({outcome}, {elapsed:.0f}s)")
+    prune_staged_artifacts()
     if failures:
         for service, detail in failures:
             print(f"smoke failure [{service}]:\n{detail}", file=sys.stderr)
@@ -819,6 +868,7 @@ def apps_up(env):
         apps_check(env)
         java_count = len([name for name in local if name not in {"assistant", "web-user", "web-admin"}])
         print(f"Smartlect application startup smoke passed: {java_count} Java services, AI API and UI health.")
+        prune_staged_artifacts()
 
 
 def apps_check(env):
