@@ -46,11 +46,24 @@ node2/3 = 172.19.34.202/203 4c）。部署内容：IK + RocketMQ 5.3 + Dubbo 3.3
    多数派下启动时「create system broadcast topic DefaultHeartBeatSyncerTopic failed」循环
    重启（单节点孤岛时反而正常）。已收敛为 node1 单机 RocketMQ（已知限制：MQ 单点）。
    排查方向：5.3.2 DLedger+proxy 的系统 topic 创建路径/`lockInStrictMode`。
-2. **node2/3 应用副本未启用**：分发完成、user 服务健康通过、product 启动 22.9s 正常且
-   Dubbo 注册正确，但 actuator/health 整体 DOWN（readiness/liveness 均 UP，组外某
-   indicator 待定位——嫌疑 xxl/sentinel/跨网组件）。已停用避免反复重启；排查方向：
-   show-components 定位 DOWN 组件。
-3. 线上 DNS/证书等原有设施未动；前端 dist 为服务器构建产物。
+2. 线上 DNS/证书等原有设施未动；前端 dist 为服务器构建产物。
+3. xxl-job(18090)/Nacos(18848) 的内网探活在安全组层面未放行（应用实际经集群多地址/本机
+   nacos 工作，不受影响）；后续如需直连再放行。
+
+## 同日补记：应用副本启用成功
+
+「node2/3 应用副本 health DOWN」的根因定位与修复（当日完成）：
+
+- **根因**：node1 的 ES 端口只绑 127.0.0.1，副本 env 的 ES_URL 又从 127.0.0.1 复制而来
+  ——product 的 Spring Boot `elasticsearch` health 组件跨网不可达，把整体 health 拖为
+  DOWN（readiness/liveness 本身是 UP 的）。经 `show-components=always` 临时开启后逐组件
+  定位（用完即清）。
+- **修复**：compose.node1.yaml 给 elasticsearch/qdrant 叠加内网绑定（第 10 项部署缺陷，
+  与 mysql/redis/xxl/proxy 同一类）；两副本 env 的 ES_URL/QDRANT_URL 改指
+  172.21.131.151。容器重建生效有延迟，初次探活仍不通、数分钟后恢复。
+- **终态**：node2/3 各 5 服务（gateway/product/order/user/cart）健康通过、Nacos 各 5 条
+  注册、启动冒烟通过；线上首页与管理端 200。三机公网映射：node1=39.96.202.14、
+  node2=60.205.141.221、node3=101.201.119.23。
 
 ## 启用与回滚
 
