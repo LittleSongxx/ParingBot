@@ -60,7 +60,11 @@ class TrialOrderPrivacyTest {
 
     @Test
     void superAdminSeesRealValues() {
-        AdminSecurityContext.set(principal(Set.of("SUPER_ADMIN"), Set.of("admin:manage")));
+        // 权限集合必须是超管的真实形态：全部权限点（含 admin:trial / admin:legacy）。
+        // 此前这里只放了 admin:manage，恰好绕过"有权 admin:trial 即展厅"的误判路径，
+        // 让 2026-10-16 的超管误判（写操作 403、物流脱敏）没有测试网住。
+        AdminSecurityContext.set(principal(Set.of("SUPER_ADMIN"),
+                Set.of("admin:trial", "admin:legacy", "admin:manage", "order:manage", "coupon:manage")));
 
         OrderLogisticsInfo info = logistics();
         OrderLogisticsInfo result = TrialOrderPrivacy.redact(info);

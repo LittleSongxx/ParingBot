@@ -1,5 +1,6 @@
 package com.smartlect.security;
 
+import com.smartlect.constants.AdminPermissions;
 import org.springframework.util.AntPathMatcher;
 
 import java.util.List;
@@ -96,8 +97,15 @@ public final class TrialAdminAccess {
 
     public static boolean isTrial(java.util.Collection<String> roles,
                                   java.util.Collection<String> permissions) {
-        return (roles != null && roles.contains(TRIAL_ROLE))
+        // 身份判定必须带超管豁免：超管拥有全部权限点（含 admin:trial），只看
+        // "有 admin:trial"会把超管误判成展厅——2026-10-16 本地实测超管写券被
+        // 403"展厅账号"文案拦截。口径与 TrialIdentities.isTrialAdmin 一致
+        // （admin:trial 且无 admin:legacy、非 SUPER_ADMIN）。
+        boolean trial = (roles != null && roles.contains(TRIAL_ROLE))
                 || (permissions != null && permissions.contains(TRIAL_PERMISSION));
+        boolean superAdmin = (roles != null && roles.contains(AdminPermissions.SUPER_ADMIN_ROLE))
+                || (permissions != null && permissions.contains(AdminPermissions.ADMIN_LEGACY));
+        return trial && !superAdmin;
     }
 
     /** 写方法判定：GET 视为读；其余方法一律先按写处理（真正的读语义由 ALLOWED_WRITE 之外的白名单兜底）。 */

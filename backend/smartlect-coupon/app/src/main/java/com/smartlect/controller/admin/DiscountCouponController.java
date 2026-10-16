@@ -2,6 +2,8 @@ package com.smartlect.controller.admin;
 
 import com.smartlect.component.CouponRushStockService;
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.annotation.SaMode;
+import com.smartlect.constants.AdminPermissions;
 import com.smartlect.api.dto.CouponRushStockReconcileDTO;
 import com.smartlect.annotation.AdminSensitiveConfirm;
 import com.smartlect.api.dto.DiscountCouponDTO;
@@ -19,10 +21,13 @@ import java.util.List;
 
 @RequestMapping("/admin/discountCoupon")
 @RestController("adminDiscountCouponController")
-// 读/写拆分（2026-10-16 审计）：类级注解此前让"查看券"也要求 coupon:manage，
-// 展厅（TRIAL_OPERATOR）连券列表都读不到、而前端菜单却挂着券管理页。现在读接口放开给
-// 展厅，写接口保持仅超管；展厅的写还会被 TrialAdminAccess 的拒绝清单再挡一次。
-@SaCheckPermission(value = {"coupon:manage"}, orRole = "SUPER_ADMIN", type = "admin")
+// 读/写拆分（2026-10-16 审计）：展厅（TRIAL_OPERATOR，口令公开）的菜单挂着券管理页，
+// 但类级注解只认 coupon:manage——展厅读列表直接 NotPermissionException（线上实测 500）。
+// 现在注解层放开 admin:trial（与助手侧 admin API 的 require_any(admin:trial) 同口径），
+// 写接口由 TrialAdminAccess 的拒绝清单兜底（saveDiscountCoupon / updateDiscountCouponStatus /
+// warmupRushStock / reconcileRushStock 四条都在清单里，门禁脚本强制）。
+// 注意方法级 @SaCheckPermission 会叠加而非覆盖类级：改这里时不要只在方法上加（类级先抛）。
+@SaCheckPermission(value = {"coupon:manage", AdminPermissions.ADMIN_TRIAL}, mode = SaMode.OR, type = "admin")
 public class DiscountCouponController extends com.smartlect.controller.admin.ABaseController{
 
     @Resource
@@ -38,7 +43,6 @@ public class DiscountCouponController extends com.smartlect.controller.admin.ABa
     }
 
     // 获取所有优惠券
-    @SaCheckPermission(value = {"coupon:manage"}, orRole = {"SUPER_ADMIN", "TRIAL_OPERATOR"}, type = "admin")
     @PostMapping("/loadDiscountCoupon")
     public ResponseVO loadDiscountCoupon(Integer pageNo, Integer pageSize, String couponNameFuzzy, Integer couponType, Integer status){
         PaginationResultVO resultVO = discountCouponService.loadDiscountCoupon4Admin(pageNo, pageSize, couponNameFuzzy, couponType, status);
@@ -46,7 +50,6 @@ public class DiscountCouponController extends com.smartlect.controller.admin.ABa
     }
 
     // 获取优惠券详情信息
-    @SaCheckPermission(value = {"coupon:manage"}, orRole = {"SUPER_ADMIN", "TRIAL_OPERATOR"}, type = "admin")
     @PostMapping("/getDiscountCouponInfo")
     public ResponseVO getDiscountCouponInfo(String couponId){
         DiscountCoupon discountCoupon = discountCouponService.getDiscountCouponByCouponId(couponId);

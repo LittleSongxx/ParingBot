@@ -4,8 +4,12 @@ import com.smartlect.entity.enums.ResponseCodeEnum;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.exception.BusinessException;
 import com.smartlect.exception.HttpBusinessException;
+import cn.dev33.satoken.exception.NotLoginException;
+import cn.dev33.satoken.exception.NotPermissionException;
+import cn.dev33.satoken.exception.NotRoleException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -53,8 +57,32 @@ public class AGlobalExceptionHandlerController extends ABaseController {
             ajaxResponse.setInfo(biz.getMessage());
             ajaxResponse.setData(biz.getData());
             ajaxResponse.setStatus(STATUS_ERROR);
+        } else if (e instanceof org.springframework.web.HttpRequestMethodNotSupportedException) {
+            // 方法不支持（GET 打 POST 接口等）：此前同样落到通用 500
+            logger.warn("请求方法不支持, url={}, message={}", request.getRequestURL(), e.getMessage());
+            response.setStatus(405);
+            ajaxResponse.setCode(ResponseCodeEnum.CODE_405.getCode());
+            ajaxResponse.setInfo(ResponseCodeEnum.CODE_405.getMsg());
+            ajaxResponse.setStatus(STATUS_ERROR);
+        } else if (e instanceof NotLoginException) {
+            // 未登录/登录失效：此前落到通用 500（"服务器返回错误"）。管理端前端认 code 901
+            // 或 HTTP 401（web/admin/src/api/client.js）跳登录页，这里两者都给。
+            logger.warn("请求未登录或登录已失效, url={}, message={}", request.getRequestURL(), e.getMessage());
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            ajaxResponse.setCode(ResponseCodeEnum.CODE_901.getCode());
+            ajaxResponse.setInfo(ResponseCodeEnum.CODE_901.getMsg());
+            ajaxResponse.setStatus(STATUS_ERROR);
+        } else if (e instanceof NotPermissionException || e instanceof NotRoleException) {
+            // 注解级权限/角色不足：此前同样落到通用 500——线上展厅账号读券接口
+            // （类级 coupon:manage）实测就是 500。与 TrialAdminGuardInterceptor 的
+            // 拒绝响应保持一致的 HTTP 403 + body 403；info 用通用文案，细节留在日志。
+            logger.warn("请求权限不足, url={}, message={}", request.getRequestURL(), e.getMessage());
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            ajaxResponse.setCode(ResponseCodeEnum.CODE_403.getCode());
+            ajaxResponse.setInfo(ResponseCodeEnum.CODE_403.getMsg());
+            ajaxResponse.setStatus(STATUS_ERROR);
         } else if (e instanceof BindException || e instanceof MethodArgumentTypeMismatchException
-                || e instanceof HandlerMethodValidationException) {
+                || e instanceof HandlerMethodValidationException || e instanceof ConstraintViolationException) {
             //参数类型错误 / 字段校验失败：此前吞成 CODE_600 通用文案，前端拿不到字段级提示
             logger.warn("请求参数无效, url={}, type={}, message={}",
                     request.getRequestURL(), e.getClass().getSimpleName(), e.getMessage());
@@ -70,6 +98,14 @@ public class AGlobalExceptionHandlerController extends ABaseController {
                                     "message", error.getDefaultMessage() == null ? "" : error.getDefaultMessage()))
                             .toList());
                 }
+            } else if (e instanceof ConstraintViolationException violationException) {
+                // @Validated 方法参数（@NotNull/@NotEmpty 等）违反：此前落通用 500，
+                // 用户端登录少传 email 参数实测就是 500（"服务器返回错误"）
+                ajaxResponse.setData(violationException.getConstraintViolations().stream()
+                        .map(violation -> java.util.Map.of(
+                                "field", String.valueOf(violation.getPropertyPath()),
+                                "message", violation.getMessage() == null ? "" : violation.getMessage()))
+                        .toList());
             }
             ajaxResponse.setStatus(STATUS_ERROR);
         } else if (e instanceof DuplicateKeyException) {

@@ -1,5 +1,6 @@
 package com.smartlect.interceptor;
 
+import com.smartlect.constants.TrialIdentities;
 import com.smartlect.entity.dto.AdminPrincipalDTO;
 import com.smartlect.security.AdminSecurityContext;
 import com.smartlect.security.TrialAdminAccess;
@@ -28,8 +29,10 @@ public class TrialAdminGuardInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         AdminPrincipalDTO principal = AdminSecurityContext.current();
-        if (principal == null
-                || !TrialAdminAccess.isTrial(principal.getRoles(), principal.getPermissions())) {
+        // 身份判定走权威实现（account==gallery 或 role==TRIAL_OPERATOR，超管有豁免）：
+        // 2026-10-16 本地实测"只看 admin:trial 权限点"会把超管误判成展厅，使超管的
+        // 发货/改分类/改用户状态全被 403 —— 权限点不是身份（超管持有全部权限点）。
+        if (principal == null || !TrialIdentities.isTrialAdmin(principal)) {
             return true;
         }
         if (handler instanceof HandlerMethod method && method.hasMethodAnnotation(TrialReadable.class)) {

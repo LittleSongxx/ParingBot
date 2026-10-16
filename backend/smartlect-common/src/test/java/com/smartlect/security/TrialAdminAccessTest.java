@@ -47,7 +47,19 @@ class TrialAdminAccessTest {
     void trialIdentityIsDetectedByRoleOrPermission() {
         assertTrue(TrialAdminAccess.isTrial(Set.of("TRIAL_OPERATOR"), Set.of()));
         assertTrue(TrialAdminAccess.isTrial(Set.of(), Set.of("admin:trial")));
-        assertFalse(TrialAdminAccess.isTrial(Set.of("SUPER_ADMIN"), Set.of("admin:manage")));
         assertFalse(TrialAdminAccess.isTrial(null, null));
+    }
+
+    @Test
+    void superAdministratorIsNeverTreatedAsTrial() {
+        // 超管拥有全部权限点（含 admin:trial）——只看权限点会把超管当成展厅，
+        // 使发货/改分类/改用户状态全被 403（2026-10-16 本地实测）。这条是回归网。
+        assertFalse(TrialAdminAccess.isTrial(Set.of("SUPER_ADMIN"),
+                Set.of("admin:trial", "admin:legacy", "admin:manage", "coupon:manage")));
+        assertFalse(TrialAdminAccess.isTrial(Set.of("SUPER_ADMIN", "OTHER"), Set.of("admin:trial")));
+        // 带老管理端标记（admin:legacy）的非超管账号同样不属于展厅（与 TrialIdentities 口径一致）
+        assertFalse(TrialAdminAccess.isTrial(Set.of(), Set.of("admin:trial", "admin:legacy")));
+        // 展厅本尊：TRIAL_OPERATOR 角色 + admin:trial 权限点，两条路径都要命中
+        assertTrue(TrialAdminAccess.isTrial(Set.of("TRIAL_OPERATOR"), Set.of("admin:trial", "order:manage")));
     }
 }
