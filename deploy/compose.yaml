@@ -228,6 +228,10 @@ services:
 
   # XXL-JOB 调度中心：替代 @Scheduled + Redis 锁，任务管理/触发/告警统一到控制台。
   xxl-job-admin:
+    # 调度中心在容器里、执行器在宿主机：容器需要 host.docker.internal 才能回调执行器
+    # （Docker Desktop 自带该域名；Linux 上用 host-gateway 映射到宿主网关）
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     image: xuxueli/xxl-job-admin:2.5.0
     depends_on:
       mysql:

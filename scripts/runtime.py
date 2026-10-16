@@ -26,6 +26,12 @@ PROCESS_FILE = ROOT / "run/processes.json"
 PROCESS_LOCK = ROOT / "run/processes.lock"
 DATABASES = ("admin", "user", "product", "stock", "cart", "order", "pay", "coupon")
 APPS = ("assistant", "user", "product", "stock", "order", "pay", "cart", "coupon", "admin", "gateway", "web-user", "web-admin")
+# xxl-job 执行器需要有**稳定且容器可回拨**的地址：调度中心跑在容器里、应用跑在宿主机，
+# 自动探测出的局域网 IP 容器回不来（触发全部超时、兜底任务静默不执行，2026-10-16 演练实测）。
+# 地址必须写全 http://host:port/ —— xxl-job 对显式 address 是原样使用、不会补端口，
+# 因此这里给每个服务分配固定端口（与 xxljob_setup.py 的执行器组一一对应）后再拼地址。
+XXLJOB_EXECUTOR_SERVICES = ("user", "product", "stock", "cart", "order", "pay", "coupon", "admin")
+XXLJOB_EXECUTOR_BASE_PORT = 10011
 PORTS = {"MYSQL": 13306, "REDIS": 16379, "ROCKETMQ_NAMESRV": 9876, "ROCKETMQ_GRPC": 8081, "NACOS": 18848, "ES": 9200, "QDRANT": 6333, "CANAL": 11111, "XXLJOB": 18090,
          "GATEWAY": 18080, "ASSISTANT": 18000, "DASHBOARD": 18501,
          "ADMIN": 18101, "USER": 18105, "PRODUCT": 18106, "STOCK": 18108,
@@ -138,6 +144,9 @@ def bootstrap():
         "SMARTLECT_ASSISTANT_MYSQL_USER": "smartlect_growth",
         "SMARTLECT_ASSISTANT_MYSQL_DATABASE": "smartlect_growth",
         "SMARTLECT_ASSISTANT_MYSQL_SSL": "0",
+        # 本地：调度中心在容器里，执行器必须报"容器能回拨的主机名"；端口由 launch_env_for
+        # 按服务分配后拼成完整地址（xxl-job 对显式地址原样使用，不补端口）
+        "SMARTLECT_XXLJOB_EXECUTOR_HOST": "host.docker.internal",
         "SMARTLECT_MODEL_MODE": "mock", "SMARTLECT_PAYMENT_MODE": "mock", "SMARTLECT_DEMO_ENABLED": "true",
     }
     password_keys = ["MYSQL_ROOT_PASSWORD", "MYSQL_PASSWORD", "FLYWAY_PASSWORD",
@@ -646,6 +655,14 @@ def launch_env_for(service, env):
                                               or str(ROOT / "run/uploads") + "/")
     launch_env['LANGSMITH_TRACING'] = 'false'
     launch_env['LANGCHAIN_TRACING_V2'] = 'false'
+    executor_host = env.get("SMARTLECT_XXLJOB_EXECUTOR_HOST", "")
+    if service in XXLJOB_EXECUTOR_SERVICES and executor_host:
+        port = XXLJOB_EXECUTOR_BASE_PORT + XXLJOB_EXECUTOR_SERVICES.index(service)
+        launch_env['SMARTLECT_XXLJOB_EXECUTOR_PORT'] = str(port)
+        launch_env['SMARTLECT_XXLJOB_EXECUTOR_ADDRESS'] = f"http://{executor_host}:{port}"
+    else:
+        launch_env.pop('SMARTLECT_XXLJOB_EXECUTOR_ADDRESS', None)
+        launch_env.pop('SMARTLECT_XXLJOB_EXECUTOR_PORT', None)
     if service in {'web-user', 'web-admin'}:
         launch_env = {k: v for k, v in os.environ.items() if k in {'PATH', 'LANG', 'LC_ALL', 'TZ'}}
     return launch_env

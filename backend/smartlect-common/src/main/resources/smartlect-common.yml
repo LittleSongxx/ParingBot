@@ -128,6 +128,11 @@ xxl:
       # 固定端口只有先启动的那个能绑定，其余八个执行器注册直接失败，
       # 表现是调度中心里任务照常触发但永远"无可用执行器"。
       port: ${SMARTLECT_XXLJOB_EXECUTOR_PORT:0}
+      # 执行器向调度中心"自报"的地址。默认空 = 自动探测本机 IP；
+      # 但本地形态是"调度中心在容器里、应用在宿主机"，自动探测会报出局域网 IP，
+      # 容器回不来 → 调度触发全部超时、任务静默不执行（2026-10-16 演练实测）。
+      # 本地由 bootstrap 注入 host.docker.internal（容器可达宿主机），生产留空用真实内网 IP。
+      address: ${SMARTLECT_XXLJOB_EXECUTOR_ADDRESS:}
       logpath: ./logs/xxl-job
       logretentiondays: 7
 

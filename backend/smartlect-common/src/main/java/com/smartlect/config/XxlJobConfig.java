@@ -26,6 +26,15 @@ public class XxlJobConfig {
     @Value("${xxl.job.executor.port:9999}")
     private int port;
 
+    /**
+     * 执行器向调度中心自报的地址（可空）。空 = xxl-job 自动探测本机 IP——
+     * 这在"调度中心跑在容器里、应用跑在宿主机"的本地形态下会报出局域网 IP，
+     * 容器回不来，表现为**触发全部超时、兜底任务静默不执行**（2026-10-16 演练实测）。
+     * 本地由 bootstrap 注入 host.docker.internal；生产留空或填真实内网 IP。
+     */
+    @Value("${xxl.job.executor.address:}")
+    private String address;
+
     @Value("${xxl.job.executor.logpath:./logs/xxl-job}")
     private String logPath;
 
@@ -41,7 +50,11 @@ public class XxlJobConfig {
         executor.setPort(port);
         executor.setLogPath(logPath);
         executor.setLogRetentionDays(logRetentionDays);
-        log.info("XXL-JOB 执行器初始化 appname={} admin={}", appname, adminAddresses);
+        if (address != null && !address.isBlank()) {
+            executor.setAddress(address);
+        }
+        log.info("XXL-JOB 执行器初始化 appname={} admin={} address={}", appname, adminAddresses,
+                address == null || address.isBlank() ? "(auto)" : address);
         return executor;
     }
 }

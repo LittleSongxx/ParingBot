@@ -269,7 +269,7 @@ Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预
 |---|---|---|
 | 站点 | `http://127.0.0.1/` | nginx 反代网关，`/actuator` 与业务端口不对公网开放 |
 | 网关健康 | `:18080/actuator/health` | 依赖 Redis / Nacos 的存活探针 |
-| 调度中心 | `:18090/xxl-job-admin` | 10 个任务的执行记录、手动触发、失败重试 |
+| 调度中心 | `:18090/xxl-job-admin` | 10 个任务的执行记录、手动触发、失败重试；**判断"任务在跑"看 handle_code=200**，只看触发会漏掉"调度成功但执行器不可达" |
 | 配置中心 | `:18848` Nacos 控制台 | `SMARTLECT_GROUP` 下的配置；改完用 `scripts/nacos_config_push.py` 推送 |
 | 指标 | 各服务 `/actuator/prometheus` | JVM / Hikari / 线程池 / 业务指标；只从内网抓 |
 | 应用日志 | `run/logs/<服务>.log` | 启动失败先看这里；`run/logs/<服务>/nacos/` 是注册与配置客户端日志 |
@@ -304,6 +304,9 @@ Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预
 - **从机 Outbox 兜底不全**：兜底投递目前只挂在 order 组，pay / product 等库依赖 afterCommit 即时投递，没有调度重扫。
 - **幂等账本无业务参数**：账本不存下游业务 id，因此 `INCONCLUSIVE / MANUAL_REVIEW` 不能自动改判，只能由运维带业务参数驱动核对（`scripts/reconcile_idempotency.py` + `orderIdempotencyReconcile` 上报）；要让它自动闭环，需要在业务行上冗余幂等键（列变更 + 回填，未做）。
 - **Sentinel 规则热更**（Nacos 数据源）已完成代码侧，线上演练未做。
+- **本地 xxl-job 执行器地址**：调度中心在容器、应用在宿主机，执行器必须自报
+  `http://host.docker.internal:<port>`（`SMARTLECT_XXLJOB_EXECUTOR_HOST` 由 bootstrap 注入，
+  端口按服务分配）；否则触发全部超时、兜底任务静默不执行——2026-10-16 故障演练定位并修复。
 - **`deploy/seata/` 残留**：历史容器卷挂载留下的 root 属主空目录，未纳入版本控制，本地删除需 sudo。
 - **`smartlect_growth`**：助手库与账号沿用历史命名（环境变量已统一为 `SMARTLECT_ASSISTANT_*`），改名需数据迁移，暂不动。
 - **集成档进 CI 前的老问题**：`OutboxLeaseSqlIT` 曾因 MySQL 秒级 DATETIME 的四舍五入而抖动（创建时刻落在"未来 1 秒"），已回拨 create_time 修复。
