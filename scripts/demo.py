@@ -1,5 +1,6 @@
 """Exercise actual Smartlect HTTP transactions and reconcile Java money/stock."""
 import argparse
+import sys
 import json
 from pathlib import Path
 import time
@@ -60,7 +61,13 @@ def transaction_scenario(seed):
             "productId": sku["productId"], "propertyValueIdHash": sku["propertyValueIdHash"]}])[0]["stock"]
 
     selected = [sku for sku in skus if stock(sku) >= 1][:3]
-    assert len(selected) == 3, "No remaining demo stock; never silently refill consumed SKUs"
+    if len(selected) != 3:
+        # 刻意不静默补货（补货会掩盖真实库存行为），但要让失败"可判定"：
+        # 退出码 2 = 环境需要重置，而不是断言失败（2026-10-16 审计：此前被当回归门禁时产生假红）。
+        print("demo: 演示库存已被此前的运行消费，请先重置环境再跑：\n"
+              "  ./scripts/dev.sh seed-store      # 重新铺演示货架\n"
+              "  python3 scripts/reset_demo.py    # 退役旧 demo run", file=sys.stderr)
+        raise SystemExit(2)
     before = [stock(sku) for sku in selected]
     passed("Java fixtures and authoritative catalogue/SKU lookup")
 

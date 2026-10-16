@@ -193,6 +193,7 @@ def drill_mq_down() -> bool:
     opener, _ = login()
     emit(f"  停掉 {BROKER}（RocketMQ broker）")
     docker("stop", BROKER)
+    # 停机/恢复必须成对：中途异常也要把 broker 拉回来（此前脚本失败会把环境留在停机态）
 
     key = f"drill-mq-{int(time.time())}"
     baseline_id = int(sql("SELECT COALESCE(MAX(id), 0) FROM smartlect_order.local_message_outbox"))
@@ -216,7 +217,10 @@ def drill_mq_down() -> bool:
                 f"分布={states}")
 
     emit(f"  恢复 {BROKER}，等待 Outbox 兜底投递（xxl-job outboxDispatch 每 5s 一轮）")
-    docker("start", BROKER)
+    try:
+        docker("start", BROKER)
+    except Exception as error:  # noqa: BLE001
+        raise AssertionError(f"恢复 broker 失败，请手工执行 docker start {BROKER}：{error}") from error
     sent = "0"
     for _ in range(24):
         time.sleep(5)
@@ -247,13 +251,22 @@ def drill_redis_down() -> bool:
     time.sleep(1)
     status_down, payload_down = api("GET", "/api/order/loadMyOrder?pageNo=1&pageSize=5", opener=opener)
     detail_down, _ = api("GET", "/api/product/getProduct?productId=" + PRODUCT_ID, opener=opener)
-    emit(f"  Redis 停机：订单列表 status={status_down} payload={str(payload_down)[:100]}；"
-         f"商品详情 status={detail_down}")
-    ok &= check("会话校验 fail-closed（不再放行）", status_down != 200, f"status={status_down}")
+    # 更强的 fail-closed 判据：Redis 不可用时**不能再签发新会话**（此前只看"非 200"，
+    # 500/502 也会当通过）。新登录请求必须失败，才说明鉴权真的关上了门。
+    login_status, login_payload = api("POST", "/api/account/login", form={
+        "email": SHOPPER[0], "password": SHOPPER[1]})
+    emit(f"  Redis 停机：订单列表 status={status_down} payload={str(payload_down)[:80]}；"
+         f"商品详情 status={detail_down}；新登录 status={login_status}")
+    ok &= check("Redis 不可用时订单列表不放行", status_down not in (200,), f"status={status_down}")
+    ok &= check("Redis 不可用时无法签发新会话（fail-closed 而非 fail-open）",
+                login_status != 200, f"login={login_status}")
     ok &= check("商品详情仍可用（缓存不可达→回源 DB）", detail_down == 200, f"status={detail_down}")
 
     emit(f"  恢复 {REDIS}")
-    docker("start", REDIS)
+    try:
+        docker("start", REDIS)
+    except Exception as error:  # noqa: BLE001
+        raise AssertionError(f"恢复 Redis 失败，请手工执行 docker start {REDIS}：{error}") from error
     time.sleep(6)
     status_back, _ = api("GET", "/api/order/loadMyOrder?pageNo=1&pageSize=5", opener=opener)
     emit(f"  恢复后订单列表 status={status_back}（Redis 有 AOF，会话未丢）")

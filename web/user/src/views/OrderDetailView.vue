@@ -214,7 +214,9 @@ const refundItem = async (orderItemId: string) => {
   openAgent({ draft: `请带我核对明细 ${orderItemId} 的退款确认卡` });
 };
 
-const formatMoney = (val: unknown) => Number(val ?? 0).toFixed(2);
+// null/undefined 显示 — ：把缺失画成 ¥0.00 会被当成真实金额（2026-10-16 审计）
+const formatMoney = (val: unknown) =>
+  val === null || val === undefined || val === '' ? '—' : Number(val).toFixed(2);
 
 const formatTime = (val: unknown) => {
   if (!val) return '--';

@@ -46,7 +46,8 @@ def collect() -> tuple[int, int, list[tuple[str, float, int, int]]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--update", action="store_true", help="把当前覆盖率写回 baseline")
+    parser.add_argument("--update", action="store_true", help="把当前覆盖率写回 baseline（人工确认后）")
+    parser.add_argument("--init", action="store_true", help="首次建立 baseline（仅仓库初始化时用）")
     args = parser.parse_args()
 
     covered, missed, rows = collect()
@@ -60,10 +61,15 @@ def main() -> int:
     print(f"  汇总（{len(rows)} 模块）        行覆盖 {ratio * 100:5.1f}%  ({covered}/{total})")
 
     baseline = float(BASELINE_FILE.read_text().strip()) if BASELINE_FILE.exists() else None
-    if args.update or baseline is None:
+    if args.update or args.init:
         BASELINE_FILE.write_text(f"{ratio:.4f}\n")
         print(f"coverage_gate: baseline 已写入 {BASELINE_FILE.relative_to(ROOT)} = {ratio:.4f}")
         return 0
+    if baseline is None:
+        # 基线缺失一律判失败：此前会"自动生成并放行"，等于一条 rm 就能绕过棘轮（2026-10-16 审计 M5）
+        print(f"coverage_gate: 失败——缺少 {BASELINE_FILE.relative_to(ROOT)}（棘轮无法比较；"
+              f"确认要初始化时显式运行 --init）", file=sys.stderr)
+        return 1
     if ratio < baseline - TOLERANCE:
         print(f"coverage_gate: 失败——行覆盖率 {ratio * 100:.1f}% 低于基线 "
               f"{baseline * 100:.1f}%（容差 {TOLERANCE * 100:.0f}pp）", file=sys.stderr)

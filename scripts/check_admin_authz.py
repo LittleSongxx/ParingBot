@@ -38,7 +38,9 @@ MUTATING_VERBS = {"Put", "Delete", "Patch"}
 
 
 def access_lists() -> tuple[set[str], set[str]]:
-    text = ACCESS_FILE.read_text(encoding="utf-8")
+    raw = ACCESS_FILE.read_text(encoding="utf-8")
+    # 先剥掉行注释：清单里出现过含引号的说明文字，曾把注释当成条目（门禁不该被注释骗到）
+    text = "\n".join(line.split("//")[0] for line in raw.splitlines())
     def block(name: str) -> set[str]:
         m = re.search(name + r"\s*=\s*List\.of\(([\s\S]*?)\);", text)
         if not m:

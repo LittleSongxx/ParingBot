@@ -190,6 +190,10 @@ def restore_overlay(client, plan, priors, stock_priors, inserted_categories):
         except Exception as error:  # restore is best effort but loudly recorded
             status = {'status': 'restore_failed', 'error': type(error).__name__ + ':' + str(error)[:200]}
         evidence.setdefault('catalog_overlay', {})['restore'] = status
+        if status['status'] != 'restored':
+            # 恢复失败意味着运行环境已被改成评测目录（商品名/价格/分类/库存），
+            # 建立在它之上的任何分数都不可信，也不能继续拿它当基线（2026-10-16 审计 M4）。
+            raise RuntimeError('catalog_overlay_restore_failed:' + str(status.get('error')))
         return status
     return run
 

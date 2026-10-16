@@ -1,6 +1,13 @@
 import { couponTypeLabel } from '@/constants/backendEnums';
 
-export const formatOrderMoney = (val: unknown) => Number(val ?? 0).toFixed(2);
+/**
+ * 金额展示：null / undefined / 空串 显示为 "—" 而不是 0.00。
+ *
+ * 2026-10-16 审计：`Number(val ?? 0).toFixed(2)` 会把"后端没给这个字段"画成 ¥0.00，
+ * 用户与客服都可能把它当成真实金额（与"金额以服务端为准"的承诺冲突）。
+ */
+export const formatOrderMoney = (val: unknown) =>
+  val === null || val === undefined || val === '' ? '—' : Number(val).toFixed(2);
 
 export const hasOrderCouponDiscount = (order?: Record<string, any> | null) =>
   Number(order?.couponDiscountAmount ?? 0) > 0;
