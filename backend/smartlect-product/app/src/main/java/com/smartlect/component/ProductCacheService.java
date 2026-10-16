@@ -3,13 +3,17 @@ package com.smartlect.component;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.smartlect.entity.po.ProductSku;
 import com.smartlect.entity.vo.Product4VO;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -19,6 +23,11 @@ import java.util.concurrent.TimeUnit;
  * L1 拦截热点读（进程内纳秒级），L2 跨实例共享（毫秒级），写路径先删 L2 再广播
  * 失效事件让所有实例清 L1。库存不进缓存（架构原则：交易事实以 Java 查询时点为准），
  * 仅缓存商品静态信息（基础 + 属性 + SKU 规格）。</p>
+ *
+ * <p><b>缓存隔离</b>：缓存里存的是「库存清零的静态快照」，而调用方拿到对象后要补实时库存
+ * （{@code ProductInfoServiceImpl.replenishRealtimeStock}）。因此本类<b>不把缓存实例交出去</b>：
+ * put 时在副本上清零、入缓存的是副本；get 时返回副本。否则调用方原地写库存会污染 L1，
+ * 且冷启动（未命中）路径会把「清零后的库存」当作实时库存返回给前端。</p>
  *
  * <p>降级语义：Redis 不可达时 L1 仍可用（仅本实例命中率下降）；
  * 两者都不可达时调用方直查 DB（调用方视为 miss）。</p>
@@ -49,18 +58,18 @@ public class ProductCacheService {
                 .build();
     }
 
-    /** 读：L1 → L2 → miss（调用方查 DB 后调 put 回填）。库存字段由调用方实时补，不进缓存。 */
+    /** 读：L1 → L2 → miss（调用方查 DB 后调 put 回填）。返回副本，调用方可安全地补实时库存。 */
     public Product4VO get(String productId) {
         Product4VO cached = l1.getIfPresent(productId);
         if (cached != null) {
-            return cached;
+            return copyOf(cached);
         }
         try {
             String json = redisTemplate.opsForValue().get(KEY_PREFIX + productId);
             if (json != null) {
                 Product4VO value = objectMapper.readValue(json, Product4VO.class);
                 l1.put(productId, value);
-                return value;
+                return copyOf(value);
             }
         } catch (Exception e) {
             log.debug("L2 读失败 productId={}：{}（L1 仍可用，继续 miss）", productId, e.getMessage());
@@ -68,10 +77,15 @@ public class ProductCacheService {
         return null;
     }
 
-    /** 写：回填 L2 + L1（不广播——写方自己知道，广播仅在失效时发）。 */
+    /**
+     * 写：回填 L2 + L1（不广播——写方自己知道，广播仅在失效时发）。
+     * 入缓存的是「副本 + 库存清零」；调用方对象保持原样，未命中路径才能把实时库存返回给前端。
+     */
     public void put(String productId, Product4VO value) {
-        // 库存清零后再入缓存：防止调用方未清就回填带旧库存的快照
-        Product4VO snapshot = stripVolatileStock(value);
+        Product4VO snapshot = copyOf(value);
+        if (snapshot.getSkuList() != null) {
+            snapshot.getSkuList().forEach(sku -> sku.setStock(0));
+        }
         l1.put(productId, snapshot);
         try {
             String json = objectMapper.writeValueAsString(snapshot);
@@ -100,12 +114,26 @@ public class ProductCacheService {
         l1.invalidate(productId);
     }
 
-    /** 库存清零：缓存的是静态快照，库存字段设 0 防调用方误用旧值（真实库存由调用方实时 RPC 查）。 */
-    private Product4VO stripVolatileStock(Product4VO value) {
-        if (value.getSkuList() != null) {
-            value.getSkuList().forEach(sku -> sku.setStock(0));
+    /**
+     * 深拷贝可变的 SKU 列表、共享只读部分（商品基础与属性在查询侧构造后不再改写）。
+     * 缓存实例与调用方对象因此互不影响，成本只有 SKU 数量的少量对象分配。
+     */
+    private static Product4VO copyOf(Product4VO source) {
+        Product4VO copy = new Product4VO();
+        copy.setProductInfo(source.getProductInfo());
+        copy.setProductPropertyList(source.getProductPropertyList());
+        List<ProductSku> skus = source.getSkuList();
+        if (skus == null) {
+            return copy;
         }
-        return value;
+        List<ProductSku> copies = new ArrayList<>(skus.size());
+        for (ProductSku sku : skus) {
+            ProductSku one = new ProductSku();
+            BeanUtils.copyProperties(sku, one);
+            copies.add(one);
+        }
+        copy.setSkuList(copies);
+        return copy;
     }
 
     public Cache<String, Product4VO> l1Cache() {
