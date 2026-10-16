@@ -18,6 +18,7 @@ import com.smartlect.mappers.ProductInfoMapper;
 import com.smartlect.entity.query.ProductInfoQuery;
 import com.smartlect.utils.PageUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -32,9 +33,18 @@ import java.util.Map;
  * 商品搜索索引（smartlect-products）的读写门面。
  *
  * <p>索引只承担检索谓词（文本短语包含 + 在售过滤），结构化过滤（品类、价格区间、
- * 排除项）与排序仍由 DB 查询完成——文本谓词的语义必须与被替换的
+ * 排除项）与排序仍由 DB 查询完成——文本谓词的**默认**语义必须与被替换的
  * {@code product_name like '%kw%'} 逐字等价：keyword 子字段 + case-insensitive
  * wildcard（v16 评测曾因分词检索放宽资格语义而回退，见 ProductInfoMapper 注释）。</p>
+ *
+ * <p><b>打分腿（hybrid 模式）默认关闭，有实测依据</b>（{@code scripts/eval_product_search.py}，
+ * 2026-10-16 / 87469 条索引 / 40 采样 / top-10）：分词腿把命中集合从个位数放大到数百条
+ * （同查询 wildcard 1 条 vs match 210 条），而本索引返回的是**按创建时间排序的 top-N**——
+ * 宽松命中会把逐字命中的那一条顶出窗口：实测逐字查询命中率 100% → 68%，词序打乱查询
+ * 12% → 44%，同时前 10 条里多出 15 条不逐字包含的结果。也就是说"保留子串腿 = 召回超集"
+ * 只对无界结果集成立，对"有界窗口 + 非分数排序"不成立。要用分数换相关性，得把排序权
+ * 整体交给 ES（分页/过滤契约要重做），那是另一档重构。可设
+ * {@code smartlect.search.mode=hybrid} 复现这组对照。</p>
  *
  * <p>价格/库存不入索引（与"交易事实以 Java 查询时点为准"的架构边界一致），
  * 仅冗余商品静态快照。ES 不可达时所有方法返回降级信号（null / false），
@@ -54,12 +64,24 @@ public class ProductIndexService {
      * wildcard 保证（与 SQL LIKE 逐字等价）。
      */
 
+    /** 检索谓词模式：substring = 与 SQL LIKE 逐字等价（默认）；hybrid = 叠加分词打分腿。 */
+    static final String MODE_SUBSTRING = "substring";
+    static final String MODE_HYBRID = "hybrid";
+
     private final ElasticsearchClient client;
     private final ProductInfoMapper productInfoMapper;
+
+    @Value("${smartlect.search.mode:substring}")
+    private String searchMode = MODE_SUBSTRING;
 
     public ProductIndexService(ElasticsearchClient client, ProductInfoMapper productInfoMapper) {
         this.client = client;
         this.productInfoMapper = productInfoMapper;
+    }
+
+    /** 供测试与运维核对当前生效模式（非法值等价于默认）。 */
+    String searchMode() {
+        return MODE_HYBRID.equals(searchMode) ? MODE_HYBRID : MODE_SUBSTRING;
     }
 
     public boolean ensureIndex() {
@@ -222,8 +244,19 @@ public class ProductIndexService {
                     .map(co.elastic.clients.elasticsearch._types.FieldValue::of).toList();
             Query query = Query.of(q -> {
                 q.bool(b -> {
-                    b.must(m -> m.wildcard(w -> w
-                            .field("productName.raw").caseInsensitive(true).wildcard(pattern)));
+                    // 文本谓词：substring 与 LIKE 等价；hybrid 在保留子串腿的前提下叠加分词腿
+                    // （minimumShouldMatch=1 → 召回是子串的超集，评测脚本量化放宽了多少）
+                    b.must(m -> m.bool(t -> {
+                        t.should(sh -> sh.wildcard(w -> w
+                                .field("productName.raw").caseInsensitive(true).wildcard(pattern)
+                                .boost(1.0f)));
+                        if (MODE_HYBRID.equals(searchMode())) {
+                            t.should(sh -> sh.match(mq -> mq.field("productName").query(trimmed).boost(2.0f)));
+                            t.should(sh -> sh.match(mq -> mq.field("productDesc").query(trimmed).boost(1.0f)));
+                        }
+                        t.minimumShouldMatch("1");
+                        return t;
+                    }));
                     b.filter(f -> f.term(t -> t.field("status").value(1)));
                     b.filter(f -> f.bool(nb -> nb
                             .mustNot(n -> n.term(t -> t.field("catalogScope").value("eval")))));
