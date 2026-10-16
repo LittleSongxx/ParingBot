@@ -79,8 +79,12 @@ public class PayOrderRedisComponent {
 		boolean acquired = false;
 		boolean releaseDeferred = false;
 		try {
+			// 不显式给 leaseTime：走 Redisson 看门狗续期——临界区包含多次远程调用
+			// （关单/支付回调：markClosed→closeOrder→解券→回补），累计可能超过 30s；
+			// 显式 lease 到期后第二个执行者会进入同一支付单，与仍在执行的第一个并发写状态
+			// （2026-10-16 审计 M9）。看门狗在持有者存活期间自动续期，进程死亡即释放。
 			long waitMs = Constants.PAY_ORDER_LIFECYCLE_LOCK_WAIT_MS;
-			acquired = lock.tryLock(waitMs, Constants.PAY_ORDER_LIFECYCLE_LOCK_SECONDS * 1000L, TimeUnit.MILLISECONDS);
+			acquired = lock.tryLock(waitMs, TimeUnit.MILLISECONDS);
 			if (!acquired) {
 				throw new PayOrderLifecycleBusyException();
 			}

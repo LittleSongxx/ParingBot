@@ -129,10 +129,13 @@ public interface OrderRequestIdempotencyMapper {
      */
     @Select("""
             SELECT * FROM order_request_idempotency
-            WHERE status IN ('INCONCLUSIVE', 'MANUAL_REVIEW')
-              AND (reconcile_deadline IS NULL OR reconcile_deadline <= NOW())
+            WHERE (status IN ('INCONCLUSIVE', 'MANUAL_REVIEW')
+                   AND (reconcile_deadline IS NULL OR reconcile_deadline <= NOW()))
+               OR (status = 'PROCESSING'
+                   AND update_time <= DATE_SUB(NOW(), INTERVAL #{staleMinutes} MINUTE))
             ORDER BY update_time ASC
             LIMIT #{limit}
             """)
-    List<OrderRequestIdempotency> selectStuckForReview(@Param("limit") int limit);
+    List<OrderRequestIdempotency> selectStuckForReview(@Param("limit") int limit,
+                                                       @Param("staleMinutes") int staleMinutes);
 }

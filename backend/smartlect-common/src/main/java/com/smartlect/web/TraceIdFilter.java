@@ -19,6 +19,11 @@ import java.util.UUID;
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class TraceIdFilter extends OncePerRequestFilter {
 
+    /** 32 位十六进制（W3C trace-id 形态）或 UUID 去横线形态。 */
+    static boolean isValidTraceId(String value) {
+        return value != null && value.matches("^[0-9a-fA-F]{32}$");
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -26,7 +31,9 @@ public class TraceIdFilter extends OncePerRequestFilter {
         String correlationId;
         if (w3cTraceId != null) {
             correlationId = w3cTraceId;
-        } else if (!StringTools.isEmpty(request.getHeader(InternalApiHeaders.TRACE_ID))) {
+        } else if (isValidTraceId(request.getHeader(InternalApiHeaders.TRACE_ID))) {
+            // 只接受合法格式：直连服务端口时该头由客户端提供，未校验会把任意内容写进日志
+            // 上下文与响应头（日志伪造/注入，2026-10-16 审计）
             correlationId = request.getHeader(InternalApiHeaders.TRACE_ID);
         } else {
             // 日志关联，不是 OTEL trace_id，也不伪造 traceparent。

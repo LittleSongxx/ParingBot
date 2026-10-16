@@ -50,7 +50,7 @@ class PayOrderRedisComponentTest {
 
     @Test
     void transactionKeepsLifecycleLockUntilAfterCompletion() throws InterruptedException {
-        when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
+        when(lock.tryLock(anyLong(), any(TimeUnit.class))).thenReturn(true);
         TransactionSynchronizationManager.initSynchronization();
         TransactionSynchronizationManager.setActualTransactionActive(true);
 
@@ -66,7 +66,7 @@ class PayOrderRedisComponentTest {
 
     @Test
     void callWithoutTransactionReleasesLifecycleLockImmediately() throws InterruptedException {
-        when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
+        when(lock.tryLock(anyLong(), any(TimeUnit.class))).thenReturn(true);
 
         component.runWithPayOrderLifecycleLock("pay-2", () -> null);
 
@@ -75,7 +75,7 @@ class PayOrderRedisComponentTest {
 
     @Test
     void busyLockThrowsLifecycleBusyException() throws InterruptedException {
-        when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(false);
+        when(lock.tryLock(anyLong(), any(TimeUnit.class))).thenReturn(false);
         org.junit.jupiter.api.Assertions.assertThrows(
                 com.smartlect.exception.PayOrderLifecycleBusyException.class,
                 () -> component.runWithPayOrderLifecycleLock("pay-3", () -> null));
@@ -84,7 +84,7 @@ class PayOrderRedisComponentTest {
 
     @Test
     void unlockFailureAfterCommitIsSwallowedToKeepCommittedResult() throws InterruptedException {
-        when(lock.tryLock(anyLong(), anyLong(), any(TimeUnit.class))).thenReturn(true);
+        when(lock.tryLock(anyLong(), any(TimeUnit.class))).thenReturn(true);
         org.mockito.Mockito.doThrow(new IllegalStateException("lease expired"))
                 .when(lock).unlock();
         TransactionSynchronizationManager.initSynchronization();

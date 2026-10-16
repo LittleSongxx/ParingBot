@@ -223,7 +223,8 @@ public class RefundSagaTransactionService {
                 RocketMqTopics.TOPIC_REFUND,
                 RocketMqTopics.TAG_REFUND_STOCK,
                 payload,
-                MqIdempotencyKeys.refundStock(request.getRefundRequestId(), attempt),
+                MqIdempotencyKeys.refundStock(request.getRefundRequestId(), attempt,
+                        request.getUpdatedAt() == null ? 0L : request.getUpdatedAt().getTime()),
                 MessageReliabilityLevelEnum.STANDARD,
                 null);
         return true;

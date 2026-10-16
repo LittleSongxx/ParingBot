@@ -28,6 +28,7 @@ class OrderIdempotencyReconcileTaskTest {
         ReflectionTestUtils.setField(task, "orderRequestIdempotencyMapper", mapper);
         ReflectionTestUtils.setField(task, "metrics", new SmartlectMetrics(registry));
         ReflectionTestUtils.setField(task, "batchSize", 50);
+        ReflectionTestUtils.setField(task, "staleProcessingMinutes", 10);
         return task;
     }
 
@@ -44,8 +45,9 @@ class OrderIdempotencyReconcileTaskTest {
 
     @Test
     void reportsStuckLedgerRowsAsMetricWithoutMutatingThem() {
-        when(mapper.selectStuckForReview(anyInt())).thenReturn(List.of(
-                row("INCONCLUSIVE", "key-inconclusive"), row("MANUAL_REVIEW", "key-manual")));
+        when(mapper.selectStuckForReview(anyInt(), anyInt())).thenReturn(List.of(
+                row("INCONCLUSIVE", "key-inconclusive"), row("MANUAL_REVIEW", "key-manual"),
+                row("PROCESSING", "key-stale-processing")));
 
         task().reconcile();
 
@@ -53,6 +55,9 @@ class OrderIdempotencyReconcileTaskTest {
                 .tag("status", "INCONCLUSIVE").counter().count());
         assertEquals(1.0, registry.get("smartlect_idempotent_stuck_total")
                 .tag("status", "MANUAL_REVIEW").counter().count());
+        // 陈旧 PROCESSING（进程崩溃遗留）也必须被上报：此前既无 WARN 也无出口
+        assertEquals(1.0, registry.get("smartlect_idempotent_stuck_total")
+                .tag("status", "PROCESSING").counter().count());
         // 任务不得写账本：改判只能由带业务参数的核对（CommerceActionStatusService）来做
         verify(mapper, never()).markCompleted(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
@@ -64,7 +69,7 @@ class OrderIdempotencyReconcileTaskTest {
 
     @Test
     void emptyScanIsANoOp() {
-        when(mapper.selectStuckForReview(anyInt())).thenReturn(List.of());
+        when(mapper.selectStuckForReview(anyInt(), anyInt())).thenReturn(List.of());
 
         task().reconcile();
 

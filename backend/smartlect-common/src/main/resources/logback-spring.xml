@@ -6,6 +6,9 @@
 <configuration>
     <conversionRule conversionWord="maskingMsg"
                     converterClass="com.smartlect.logging.MaskingMessageConverter"/>
+    <!-- 异常堆栈也打码：%ex 默认不过 %maskingMsg，唯一键冲突/SQL 参数会带着 PII 落盘 -->
+    <conversionRule conversionWord="ex"
+                    converterClass="com.smartlect.logging.MaskingThrowableProxyConverter"/>
     <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="app"/>
     <springProperty scope="context" name="ROOT_LEVEL" source="logging.level.root" defaultValue="INFO"/>
 
