@@ -920,6 +920,14 @@ def apps_up(env):
         cluster_endpoint_check(env)
     with ledger_lock():
         records = load_processes()
+        # 自愈：已记录但探活失败的进程先停掉（2026-10-16 实部署事故）——start_app 对
+        # "进程活着且产物未变"的实例会直接返回，于是**半启动的僵死进程会让其后每次 up
+        # 都停在健康等待上超时**，远程只能回滚/再部署，越滚越乱。这里在启动前清掉它们。
+        for service in app_services(env):
+            stale = records.get(service)
+            if stale and owned_process(stale) and not app_health(service, stale):
+                print(f"Stopping unhealthy {service} (PID {stale.get('pid')}) before restart.", flush=True)
+                stop_process(stale)
         for services in (APPS[1:8], ('assistant',), ('admin', 'gateway'), ('web-user', 'web-admin')):
             for service in services:
                 if service not in local:
