@@ -9,6 +9,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import logging
 import math
 import re
 import threading
@@ -19,6 +20,8 @@ import uuid
 from prometheus_client import Counter as PromCounter
 
 import jieba
+
+log = logging.getLogger(__name__)
 
 from smartlect.algo_version import content_hash
 from smartlect.observability import gen_ai_span, prometheus_counter
