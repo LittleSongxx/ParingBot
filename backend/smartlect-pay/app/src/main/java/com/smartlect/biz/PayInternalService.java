@@ -72,17 +72,17 @@ public class PayInternalService {
     }
 
     public PayInfoDTO getPayUrl(PayUrlRequestDTO dto) {
-        // 归属校验（2026-10-16 审计 M-2）：取支付表单也是"用户数据操作"——同文件 tradeStatus
-        // 与渠道完成路径都有 requireOwner，这里此前没有，任意 payOrderId 可换回金额与 orderId。
+        // 先判渠道有效性（退役渠道必须在任何 bean/网络访问之前被拒——既有契约，见
+        // PayChannel4MockTest），再做归属校验（2026-10-16 审计 M-2）：取支付表单也是
+        // "用户数据操作"，同文件 tradeStatus 与渠道完成路径都有校验，这里此前没有。
+        PayChannel channel = resolveChannel(dto.getPayChannel());
+        PayChannelEnum channelEnum = PayChannelEnum.resolve(dto.getPayChannel());
         com.smartlect.entity.po.PayTradeRecord record = payTradeRecordService.findByPayOrderId(dto.getPayOrderId());
         if (record != null) {
-            // 用委托身份头校验（DTO 里没有 userId 字段，且 require() 会在缺头时 fail-closed）：
-            // 调用方必须是该支付单所属用户，否则不返回支付表单。
+            // 用委托身份头校验（DTO 里没有 userId 字段，且 require() 会在缺头时 fail-closed）
             String actor = com.smartlect.security.DelegatedUserIdentity.require();
             com.smartlect.security.DelegatedUserIdentity.requireOwner(actor, record.getUserId());
         }
-        PayChannel channel = resolveChannel(dto.getPayChannel());
-        PayChannelEnum channelEnum = PayChannelEnum.resolve(dto.getPayChannel());
         return channel.getPayUrl(channelEnum, dto.getPayOrderId(), dto.getSubject(), dto.getAmount());
     }
 
