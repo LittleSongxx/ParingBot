@@ -1,0 +1,37 @@
+name: ops
+
+# 只读/应急运维通道：复用部署网关已放行的动词，不重建、不传物、不跑测试。
+#
+# 为什么单独一条：部署核查（"进程是否启于本次部署、跑的是哪个 build"）此前
+# 只能靠重跑整套 CI 的 deploy job（needs backend/assistant/web，~20 分钟）；
+# 应急回滚同理。2026-10-16 部署后核对时，server 侧 restart 阶段的输出进
+# journald、CI 日志看不到，逐服务核对只能靠猜——status 动词把服务状态与当前
+# 版本直接打出来（见 scripts/runtime.py 的 apps_status 增强）。
+on:
+  workflow_dispatch:
+    inputs:
+      verb:
+        description: "受限网关动词：status 只读查询（服务/版本/bundle 列表）；rollback 应急回滚到上一 bundle"
+        type: choice
+        options: [status, rollback]
+        default: status
+        required: true
+
+concurrency:
+  group: ops-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SSH_CMD: ssh -i ~/deploy_key -o BatchMode=yes -o ConnectTimeout=15
+    steps:
+      - name: 配置 deploy key（服务器网关仅放行 upload/upload-dist/deploy/status/rollback）
+        run: |
+          install -m600 /dev/stdin ~/deploy_key <<<"${{ secrets.SMARTLECT_DEPLOY_KEY }}"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ECS_HOST_KEY }}" >> ~/.ssh/known_hosts
+      - name: 调用受限网关动词（${{ inputs.verb }}）
+        run: $SSH_CMD root@39.96.202.14 "${{ inputs.verb }}"
