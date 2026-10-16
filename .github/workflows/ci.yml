@@ -18,7 +18,10 @@ concurrency:
 jobs:
   backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # 2026-10-16：从 `mvn test` 升级为 `-Pintegration verify`（含 7 个 testcontainers 真库 IT、
+    # jacoco 覆盖率地板与棘轮门禁）。此前集成档只在本地手工跑，surefire 盲区里的致命问题
+    # （Outbox 认领 SQL 方言、租约语义）曾两次漏到部署期才发现。
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -26,8 +29,21 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-      - name: mvn test（testcontainers 自带 MySQL）
-        run: mvn -B -f backend/pom.xml test
+      - name: mvn -Pintegration verify（单测 + 真库 IT + 覆盖率门禁）
+        run: mvn -B -f backend/pom.xml -Pintegration verify
+      - name: 覆盖率棘轮（对比 backend/jacoco-baseline.txt，±1pp）
+        run: python3 scripts/coverage_gate.py
+      - name: 上传测试与覆盖率报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-reports
+          retention-days: 7
+          if-no-files-found: ignore
+          path: |
+            backend/**/target/surefire-reports/**
+            backend/**/target/failsafe-reports/**
+            backend/**/target/site/jacoco/**
 
   assistant:
     runs-on: ubuntu-latest

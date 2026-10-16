@@ -393,6 +393,30 @@
               <goal>report</goal>
             </goals>
           </execution>
+          <!-- 覆盖率地板：只做"灾难下限"（删测试/大段无测试代开会撞线），
+               精细的棘轮口径由 scripts/coverage_gate.py 对比 baseline 文件（±1pp） -->
+          <execution>
+            <id>coverage-floor</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <haltOnFailure>true</haltOnFailure>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.15</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
     </plugins>

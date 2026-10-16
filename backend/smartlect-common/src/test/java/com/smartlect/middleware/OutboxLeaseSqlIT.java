@@ -129,8 +129,12 @@ class OutboxLeaseSqlIT {
         row.setStatus(0);
         row.setRetryCount(0);
         row.setDeliveryExpireAt(expireAt);
-        row.setCreateTime(new Date());
-        row.setUpdateTime(new Date());
+        // create_time 列为秒级 DATETIME：应用侧带毫秒的写入会被 MySQL 四舍五入，
+        // 有约一半概率落到"未来 1 秒"。兜底批量选取用的是 create_time <= 传入时刻，
+        // 因此这里刻意回拨 2 秒，让断言与"生产侧用 now-3s 做水位"的口径保持一致。
+        Date created = new Date(System.currentTimeMillis() - 2_000L);
+        row.setCreateTime(created);
+        row.setUpdateTime(created);
         mapper.insert(row);
         return row;
     }
