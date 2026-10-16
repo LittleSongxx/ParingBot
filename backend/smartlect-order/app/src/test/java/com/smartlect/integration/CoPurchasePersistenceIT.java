@@ -260,8 +260,11 @@ class CoPurchasePersistenceIT {
     }
 
     private static OrderCommerceInternalController controller(SqlSession session) {
+        // 控制器不再直连 mapper：聚合查询经 OrderItemService（真实实现 + 真库 mapper）
+        var itemService = new com.smartlect.biz.impl.OrderItemServiceImpl();
+        ReflectionTestUtils.setField(itemService, "orderItemMapper", session.getMapper(OrderItemMapper.class));
         var controller = new OrderCommerceInternalController();
-        ReflectionTestUtils.setField(controller, "orderItemMapper", session.getMapper(OrderItemMapper.class));
+        ReflectionTestUtils.setField(controller, "orderItemService", itemService);
         return controller;
     }
 }
