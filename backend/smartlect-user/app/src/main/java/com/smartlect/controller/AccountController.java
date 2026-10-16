@@ -307,8 +307,10 @@ public class AccountController extends ABaseController{
         return getSuccessResponseVO(null);
     }
 
-    // 找回密码
+    // 找回密码。加 IP 限流：验证码本身已有 5 次失败上限，限流进一步压低分布式穷举速率
+    // （2026-10-16 审计：此前该端点无任何限速、验证码可无限次尝试）。
     @PostMapping("/forgetPassword")
+    @RateLimit(limitType = RateLimit.LimitType.IP, windowSeconds = 60, maxCount = 5, message = "操作过于频繁，请稍后再试")
     public ResponseVO forgetPassword(@NotEmpty @Email @Size(max = 150) String email, @NotEmpty @Pattern(regexp = Constants.REGEX_PASSWORD) String newPassword, @NotEmpty String checkCode){
         // 更新密码
         userInfoService.forgetPassword(email, newPassword, checkCode);

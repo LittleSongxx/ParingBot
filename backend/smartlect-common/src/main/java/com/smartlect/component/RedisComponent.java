@@ -12,6 +12,7 @@ import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
+import com.smartlect.exception.BusinessException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -341,5 +342,42 @@ public class RedisComponent {
     // 清理邮件验证码
     public void cleanEmailCode(@NotEmpty String email) {
         redisTemplate.delete(Constants.REDIS_KEY_EMAIL_CODE + email);
+    }
+
+    /**
+     * 校验邮件验证码：失败累计，超过 {@code maxAttempts} 次即作废验证码。
+     *
+     * <p>6 位数字空间 10^6，若不限次数，5 分钟有效期内可被穷举（2026-10-16 审计）。
+     * 计数器随验证码同周期过期，成功后一并清理。</p>
+     */
+    public void verifyEmailCode(@NotEmpty String email, String provided, int maxAttempts) {
+        String expected = getEmailCode(email);
+        if (expected == null) {
+            throw new BusinessException("验证码已过期，请重新获取！");
+        }
+        if (expected.equals(provided)) {
+            cleanEmailCode(email);
+            cleanEmailCodeAttempts(email);
+            return;
+        }
+        long attempts = increaseEmailCodeAttempts(email);
+        if (attempts >= maxAttempts) {
+            // 作废验证码，逼迫重新获取（同时把累计窗口收敛到这一次验证码的生命周期内）
+            cleanEmailCode(email);
+            cleanEmailCodeAttempts(email);
+            throw new BusinessException("验证码错误次数过多，请重新获取验证码");
+        }
+        throw new BusinessException("验证码错误！");
+    }
+
+    private long increaseEmailCodeAttempts(String email) {
+        String key = Constants.REDIS_KEY_EMAIL_CODE_ATTEMPTS + email;
+        Long attempts = redisTemplate.opsForValue().increment(key);
+        redisTemplate.expire(key, Constants.LENGTH_5 * 60, java.util.concurrent.TimeUnit.SECONDS);
+        return attempts == null ? 1L : attempts;
+    }
+
+    private void cleanEmailCodeAttempts(String email) {
+        redisTemplate.delete(Constants.REDIS_KEY_EMAIL_CODE_ATTEMPTS + email);
     }
 }

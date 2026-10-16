@@ -59,7 +59,7 @@ public class AliEmailServiceImpl implements EmailService {
     // 方法定义：发送验证码邮件，参数toEmail为接收邮箱地址，返回生成的验证码字符串
     public String sendVerificationCode(String toEmail) {
         // 第1步：生成6位随机数字验证码（调用自定义工具类方法）
-        String verificationCode = StringTools.getRandomNumber(6);
+        String verificationCode = StringTools.getSecureRandomNumber(6);
 
         // 第2步：设置邮件内容（这里使用简单的纯文本格式）
         String emailSubject = "【智选 SmartSelect】邮箱验证码"; // 邮件主题

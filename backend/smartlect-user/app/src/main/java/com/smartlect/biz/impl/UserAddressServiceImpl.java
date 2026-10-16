@@ -103,7 +103,13 @@ public class UserAddressServiceImpl implements UserAddressService {
 			}
 			this.add(userAddress);
 		}else {
-			// 否则为修改
+			// 修改：先校验归属——此前的实现直接按 addressId 更新，而更新语句会 SET user_id，
+			// 于是一旦拿到他人 addressId（管理端读取面/枚举）就能把整行"改到自己名下"（2026-10-16 审计，
+			// 与 updateDefault/deleteUserAddress 的既有检查对齐）。
+			UserAddress existing = userAddressMapper.selectByAddressId(userAddress.getAddressId());
+			if (existing == null || !userAddress.getUserId().equals(existing.getUserId())) {
+				throw new BusinessException("当前地址不属于该用户");
+			}
 			// 如果default_type为1，则将所有其他地址的default_type设置为0
 			if (userAddress.getDefaultType() == 1) {
 				cleanDefaultType(userAddress.getUserId());

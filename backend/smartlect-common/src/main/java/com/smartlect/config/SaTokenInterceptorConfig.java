@@ -3,6 +3,7 @@ package com.smartlect.config;
 import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.stp.StpUtil;
 import com.smartlect.constants.AdminPermissions;
+import com.smartlect.interceptor.TrialAdminGuardInterceptor;
 import com.smartlect.security.StpAdminLogic;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
@@ -60,6 +61,13 @@ public class SaTokenInterceptorConfig implements WebMvcConfigurer {
                         }
                     }
                 }))
+                .addPathPatterns("/admin/**")
+                .excludePathPatterns(
+                        "/admin/account/checkCode", "/admin/account/login",
+                        "/admin/file/getResource", "/admin/file/getResource/**");
+        // 展厅（TRIAL_OPERATOR，公开口令）守卫：读默认允许（隐私清单除外）、写默认拒绝
+        // （退款复核显式放行）；@TrialReadable 可显式放宽。见 TrialAdminAccess 的策略说明。
+        registry.addInterceptor(new TrialAdminGuardInterceptor())
                 .addPathPatterns("/admin/**")
                 .excludePathPatterns(
                         "/admin/account/checkCode", "/admin/account/login",

@@ -32,6 +32,7 @@ case "$command" in
     npm --prefix web/admin run build ;;
   check)
     "$runtime_python" scripts/check_independence.py
+    python3 scripts/check_admin_authz.py
     "$runtime_python" scripts/runtime.py self-test
     # assistant is installed non-editable, so the suite imports site-packages: reinstall first
     # or `check` happily tests the previous revision's source.

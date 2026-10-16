@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.smartlect.security.TrialOrderPrivacy;
+
 import jakarta.annotation.Resource;
 
 @RestController("orderLogisticsInfoController")
@@ -18,12 +20,13 @@ public class OrderLogisticsInfoController extends com.smartlect.controller.admin
 
 	@PostMapping("/loadDataList")
 	public ResponseVO loadDataList(OrderLogisticsInfoQuery query){
-		return getSuccessResponseVO(orderLogisticsInfoService.findListByPage(query));
+		return getSuccessResponseVO(TrialOrderPrivacy.redact(orderLogisticsInfoService.findListByPage(query)));
 	}
 
 	@PostMapping("/getOrderLogisticsInfoByOrderId")
 	public ResponseVO getOrderLogisticsInfoByOrderId(String orderId) {
-		return getSuccessResponseVO(orderLogisticsInfoService.getOrderLogisticsInfoByOrderId(orderId));
+		return getSuccessResponseVO(TrialOrderPrivacy.redact(
+				orderLogisticsInfoService.getOrderLogisticsInfoByOrderId(orderId)));
 	}
 
 }

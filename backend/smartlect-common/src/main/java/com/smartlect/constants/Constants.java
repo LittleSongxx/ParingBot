@@ -55,6 +55,7 @@ public class Constants {
 
     // 邮件验证码
     public static final String REDIS_KEY_EMAIL_CODE = REDIS_KEY_PREFIX + "email:code:";
+    public static final String REDIS_KEY_EMAIL_CODE_ATTEMPTS = REDIS_KEY_PREFIX + "email:code:attempts:";
 
     // 接口限流
     public static final String REDIS_RATE_LIMIT = REDIS_KEY_PREFIX + "rate:limit:";

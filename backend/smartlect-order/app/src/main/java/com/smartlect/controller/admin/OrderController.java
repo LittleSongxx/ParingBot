@@ -63,7 +63,8 @@ public class OrderController extends com.smartlect.controller.admin.ABaseControl
     // 获取收货地址
     @PostMapping("/getLogistics")
     public ResponseVO getLogistics(@NotEmpty String orderId){
-        return getSuccessResponseVO(orderLogisticsInfoService.getOrderLogisticsRecords(null, orderId));
+        return getSuccessResponseVO(TrialOrderPrivacy.redact(
+                orderLogisticsInfoService.getOrderLogisticsRecords(null, orderId)));
     }
 
     // 发货

@@ -28,6 +28,9 @@ import com.smartlect.utils.PageUtils;
 @Service("userInfoService")
 public class UserInfoServiceImpl implements UserInfoService {
 
+	/** 邮件验证码最大尝试次数（安全码不作无限制校验）。 */
+	private static final int EMAIL_CODE_MAX_ATTEMPTS = 5;
+
 	@Resource
 	private UserInfoMapper<UserInfo, UserInfoQuery> userInfoMapper;
     @Autowired
@@ -134,14 +137,8 @@ public class UserInfoServiceImpl implements UserInfoService {
 
 	@Override
 	public void register(String email, String nickName, String registerPassword, String checkCode) {
-		// 从redis中读取验证码
-		String trueCode = redisComponent.getEmailCode(email);
-		if (trueCode == null) {
-			throw new BusinessException("验证码已过期，请重新获取！");
-		}
-		if (!trueCode.equals(checkCode)) {
-			throw new BusinessException("验证码错误！");
-		}
+		// 验证码校验（含失败次数上限：6 位数字不允许无限次尝试，超限作废并逼迫重新获取）
+		redisComponent.verifyEmailCode(email, checkCode, EMAIL_CODE_MAX_ATTEMPTS);
 		createEnabledUser(email, nickName, registerPassword);
 		redisComponent.cleanEmailCode(email);
 	}
@@ -219,18 +216,11 @@ public class UserInfoServiceImpl implements UserInfoService {
 		if (this.getUserInfoByEmail(email) == null) {
 			throw new BusinessException("如该邮箱已注册，重置邮件已发送");  // 邮箱枚举缓解：不暴露账号不存在
 		}
-		// 从redis中读取验证码
-		String trueCode = redisComponent.getEmailCode(email);
-		if (trueCode == null) {
-			throw new BusinessException("验证码已过期，请重新获取！");
-		}
-		if (!trueCode.equals(checkCode)) {
-			throw new BusinessException("验证码错误！");
-		}
+		// 验证码校验（含失败次数上限：6 位数字不允许无限次尝试，超限作废并逼迫重新获取）
+		redisComponent.verifyEmailCode(email, checkCode, EMAIL_CODE_MAX_ATTEMPTS);
 		UserInfo userInfo = this.getUserInfoByEmail(email);
 		userInfo.setPassword(passwordService.encode(newPassword));
 		this.userInfoMapper.updateByEmail(userInfo, email);
-		redisComponent.cleanEmailCode(email);
 		redisComponent.cleanAllToken(userInfo.getUserId());
 	}
 

@@ -77,6 +77,19 @@ public class StringTools {
         return suffix;
     }
 
+    /**
+     * 安全随机数字串（验证码等安全码专用）：commons-lang3 的默认实例是 ThreadLocalRandom，
+     * 不是 CSPRNG（2026-10-16 审计）；安全码必须走 SecureRandom。
+     */
+    public static String getSecureRandomNumber(int count) {
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        StringBuilder builder = new StringBuilder(count);
+        for (int i = 0; i < count; i++) {
+            builder.append(random.nextInt(10));
+        }
+        return builder.toString();
+    }
+
     public static final String getRandomNumber(Integer count) {
         return RandomStringUtils.random(count, false, true);
     }
