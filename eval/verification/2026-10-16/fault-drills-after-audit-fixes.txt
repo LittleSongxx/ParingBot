@@ -1,0 +1,69 @@
+# 故障演练（2026-10-16 18:54:49 · 本地 docker 栈 · gateway http://127.0.0.1:18082）
+
+## drill 1 · 并发同幂等键下单（幂等账本 + 条件扣减）
+  基线：库存 557，订单总数 359，幂等键 drill-dup-1792148090
+  8 个并发响应用时 0.09s；HTTP 码分布 [200, 409]；返回的订单标识 ['549646094251945140773599093071']
+  账本：COMPLETED	1；库存 557 → 556；订单总数 359 → 360
+  响应码分布：1×200 + 7×409
+  顺序重复一次：status=200 orderId=549646094251945140773599093071
+  [PASS] 并发响应只出现 200/409（无 5xx、无静默失败） — codes=[200, 409]
+  [PASS] 只落 1 张订单 — Δ=1
+  [PASS] 库存只扣 1 件 — Δ=1
+  [PASS] 账本只有 1 行且为 COMPLETED — COMPLETED	1
+  [PASS] 成功的响应都指向同一订单 — ids=['549646094251945140773599093071']
+  [PASS] 顺序重复拿回同一单（纯重放） — status=200 orderId=549646094251945140773599093071
+  [PASS] 重放不再扣库存 — stock=556
+  ⇒ duplicate-order: PASS
+
+## drill 2 · 停 broker：下单仍成立、事件滞留 Outbox、恢复后自动投递
+  停掉 smartlect-rocketmq-broker-1（RocketMQ broker）
+  Outbox 基线 max(id)=1227
+  下单响应 status=200；本次新增 Outbox 行状态分布：1	1
+  [PASS] broker 停机期间下单仍返回 200（本地事务不依赖 MQ） — status=200, payOrderId=337330944693759885097580059331
+  [PASS] 本次消息已落 Outbox（事务内写入，不随 MQ 可用性丢失） — 1	1
+  [PASS] 停机期间没有一条被标记为 SENT（2） — 分布=1	1
+  [PASS] 滞留状态是 PENDING/SENDING/FAILED 三种之一 — 分布=1	1
+  恢复 smartlect-rocketmq-broker-1，等待 Outbox 兜底投递（xxl-job outboxDispatch 每 5s 一轮）
+  恢复后：SENT=1，未投递剩余=0；最终分布=2	1
+  [PASS] broker 恢复后本次消息全部投递出去（无残留、无人工介入） — SENT=1 残留=0
+  ⇒ mq-down: PASS
+
+## drill 3 · 停 Redis：鉴权 fail-closed、商品详情回源 DB、恢复后会话仍有效
+  基线：带会话访问订单列表 status=200，商品详情 status=200
+  [PASS] 基线两项均 200 — 200/200
+  停掉 smartlect-redis-1
+  Redis 停机：订单列表 status=500 payload=；商品详情 status=200；新登录 status=200
+  [PASS] Redis 不可用时订单列表不放行 — status=500
+  [PASS] Redis 不可用时无法签发新会话（fail-closed 而非 fail-open） — http=200 code=500 info={'status': 'error', 'code': 500, 'info': '服务器返回错误，请联系管理员', 'data': None}
+  [PASS] 商品详情仍可用（缓存不可达→回源 DB） — status=200
+  恢复 smartlect-redis-1
+  恢复后订单列表 status=200（Redis 有 AOF，会话未丢）
+  [PASS] Redis 恢复后原会话继续可用 — status=200
+  ⇒ redis-down: PASS
+
+## 汇总
+- duplicate-order: PASS
+- mq-down: PASS
+- redis-down: PASS
+
+## 审计修复后的复跑（2026-10-16 晚）与现场验收
+
+三个 drill 在修复后的构建上全部 PASS（上面即为完整断言）。另做两项现场验收：
+
+1. **展厅账号越权面（审计阻塞项）**——同一条实测路径，修复前 `/admin-api/order/delivery`
+   会进到业务逻辑，修复后：
+   ```
+   order/delivery            → 403 作品集展厅账号只能查看看板、商品、订单和知识库…
+   sysCategory/saveCategory  → 403
+   user/changeStatus         → 403
+   productInfo/commendProduct→ 403
+   home/getTodayData         → 200（看板可看）
+   refundReview/loadDataList → 200（退款复核是产品上保留给展厅的能力）
+   ```
+2. **订单域 PII 脱敏**——gallery 读物流：`sender*/receiver*` 全为 `***`、`userId=null`；
+   读订单列表：`nickName=作品集买家`、`userId=null`。超管视角保持真值（单测覆盖）。
+3. **Redis 停机 fail-closed**：订单列表 500、**新登录 body.code=500（无法签发新会话）**、
+   商品详情 200（回源 DB）；恢复后原会话继续可用。
+
+注：本平台的 API 约定"业务失败也是 HTTP 200 + body.code≠200"，演练断言据此看 code
+（第一版只看 HTTP 状态码，会把失败当成功——这类口径问题也是演练要暴露的对象之一）。

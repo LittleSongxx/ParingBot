@@ -255,11 +255,14 @@ def drill_redis_down() -> bool:
     # 500/502 也会当通过）。新登录请求必须失败，才说明鉴权真的关上了门。
     login_status, login_payload = api("POST", "/api/account/login", form={
         "email": SHOPPER[0], "password": SHOPPER[1]})
+    # 该 API 约定"业务失败也是 HTTP 200 + body.code != 200"，所以判据看 body 的 code
+    login_code = login_payload.get("code") if isinstance(login_payload, dict) else login_status
     emit(f"  Redis 停机：订单列表 status={status_down} payload={str(payload_down)[:80]}；"
          f"商品详情 status={detail_down}；新登录 status={login_status}")
     ok &= check("Redis 不可用时订单列表不放行", status_down not in (200,), f"status={status_down}")
     ok &= check("Redis 不可用时无法签发新会话（fail-closed 而非 fail-open）",
-                login_status != 200, f"login={login_status}")
+                login_code != 200,
+                f"http={login_status} code={login_code} info={str(login_payload)[:90]}")
     ok &= check("商品详情仍可用（缓存不可达→回源 DB）", detail_down == 200, f"status={detail_down}")
 
     emit(f"  恢复 {REDIS}")
