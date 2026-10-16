@@ -14,7 +14,6 @@ sweep() {
     case "$cmd" in
       *run/apps/*) svc=$(echo "$cmd" | grep -oE 'run/apps/[a-z-]+' | cut -d/ -f3) ;;
       *nacos*)     svc="nacos" ;;
-      *rabbit*)    svc="rabbitmq" ;;
       *redis*)     svc="redis" ;;
       *) continue ;;
     esac

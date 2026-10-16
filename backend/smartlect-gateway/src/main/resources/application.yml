@@ -202,9 +202,6 @@ smartlect:
     # 生产经 runtime.env 的 SMARTLECT_SENTINEL_GATEWAY_RULES_DATA_ID 启用，
     # dataId 内容见 backend/deploy/sentinel/smartlect-sentinel-gateway-rules.json（组 SMARTLECT_GROUP）
     gateway-rules-data-id: ${SMARTLECT_SENTINEL_GATEWAY_RULES_DATA_ID:}
-  feign:
-    connect-timeout-ms: 3000
-    read-timeout-ms: 10000
   gateway:
     auth:
       enabled: true

@@ -30,17 +30,6 @@ admin:
   password: ${SMARTLECT_ADMIN_PASSWORD:}
   emails: ${SMARTLECT_ADMIN_EMAILS:}
 
-alipay:
-  appid: ${SMARTLECT_ALIPAY_APPID:}
-  sellerId: ${SMARTLECT_ALIPAY_SELLER_ID:}
-  appPrivateKey: ${SMARTLECT_ALIPAY_APP_PRIVATE_KEY:}
-  appCertPath: ${SMARTLECT_ALIPAY_APP_CERT_PATH:}
-  alipayPublicCertPath: ${SMARTLECT_ALIPAY_PUBLIC_CERT_PATH:}
-  alipayRootCertPath: ${SMARTLECT_ALIPAY_ROOT_CERT_PATH:}
-  serverUrl: ${SMARTLECT_ALIPAY_SERVER_URL:https://openapi.alipay.com/gateway.do}
-  connectTimeoutMs: ${SMARTLECT_ALIPAY_CONNECT_TIMEOUT_MS:3000}
-  readTimeoutMs: ${SMARTLECT_ALIPAY_READ_TIMEOUT_MS:8000}
-
 order:
   expire:
     minute: ${SMARTLECT_ORDER_EXPIRE_MINUTE:15}
@@ -76,9 +65,6 @@ smartlect:
     # 高风险运维接口使用独立令牌；空值时接口保持关闭。
     ops-token: ${SMARTLECT_INTERNAL_OPS_TOKEN:}
     auth-enabled: ${SMARTLECT_INTERNAL_AUTH_ENABLED:true}
-  feign:
-    connect-timeout-ms: ${SMARTLECT_FEIGN_CONNECT_TIMEOUT_MS:3000}
-    read-timeout-ms: ${SMARTLECT_FEIGN_READ_TIMEOUT_MS:10000}
   sentinel:
     # 键名曾为 feign-rules-enabled，与 Java 读取的 dubbo-rules-enabled 不一致（开关永不生效），
     # 已修复对齐（ADR-0023）

@@ -254,35 +254,6 @@ services:
       timeout: 5s
       retries: 30
       start_period: 60s
-
-  # LiteLLM 网关：统一模型路由/降级/成本追踪，替代 provider.py 厂商分支。
-  # 非硬依赖：assistant 直连上游仍可用（base_url 切换即回退）。
-  # 挂在 litellm profile 下：批次五 provider 回退后暂无消费者，默认不随 infra-up 启动
-  # （docker compose --profile litellm up -d litellm 显式启用）。
-  litellm:
-    profiles: ["litellm"]
-    image: ghcr.io/berriai/litellm:main-v1.78-stable
-    env_file:
-      # required: false —— 缺 model.env 时 compose 会直接报错退出，
-      # 那会连带阻断 `docker compose config` 等全量校验。
-      - path: ./model.env
-        required: false
-    environment:
-      LITELLM_MASTER_KEY: ${SMARTLECT_LITELLM_MASTER_KEY:?run bootstrap}
-    ports:
-      - "127.0.0.1:${SMARTLECT_LITELLM_PORT:-14000}:4000"
-    volumes:
-      - ./litellm/config.yaml:/app/config.yaml:ro
-    command: ["--config", "/app/config.yaml", "--port", "4000"]
-    mem_limit: 384m
-    healthcheck:
-      # python 基础镜像不带 curl，改用解释器自身的 urllib 探活。
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=3)\" || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 40s
-
 volumes:
   mysql:
   redis:

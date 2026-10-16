@@ -77,9 +77,6 @@ smartlect:
   internal:
     token: ${SMARTLECT_INTERNAL_TOKEN:}
     auth-enabled: true
-  feign:
-    connect-timeout-ms: 3000
-    read-timeout-ms: 10000
 
 app:
   common-scheduling:

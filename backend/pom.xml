@@ -72,7 +72,6 @@
     <captcha-plus.version>2.0.1</captcha-plus.version>
     <redisson.version>4.0.0</redisson.version>
     <pagehelper.version>2.1.0</pagehelper.version>
-    <alipay.version>4.40.961.ALL</alipay.version>
     <rocketmq-client-java.version>5.0.8</rocketmq-client-java.version>
     <dubbo.version>3.3.6</dubbo.version>
     <!-- Dubbo 3.3.6 传递 nacos-client 3.0.3 与 Nacos Server 2.5 不兼容（gRPC 握手失败），
@@ -231,11 +230,6 @@
         <groupId>org.redisson</groupId>
         <artifactId>redisson</artifactId>
         <version>${redisson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.alipay.sdk</groupId>
-        <artifactId>alipay-sdk-java</artifactId>
-        <version>${alipay.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.protobuf</groupId>

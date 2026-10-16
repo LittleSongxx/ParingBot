@@ -300,14 +300,6 @@ public class OrderCancellationService {
         if (payChannelEnum == null) {
             return;
         }
-        try {
-            payFeignSupport.closeOrder(orderInfo.getPayOrderId(), payChannelEnum.getPayScene());
-        } catch (RuntimeException ex) {
-            if ("支付宝支付未配置".equals(ex.getMessage())) {
-                log.info("支付渠道未启用，跳过不存在的外部交易关单, payOrderId={}", orderInfo.getPayOrderId());
-                return;
-            }
-            throw ex;
-        }
+        payFeignSupport.closeOrder(orderInfo.getPayOrderId(), payChannelEnum.getPayScene());
     }
 }

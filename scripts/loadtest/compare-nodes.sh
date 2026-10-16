@@ -49,7 +49,7 @@ echo "--- 连接数（按目标端口） ---"
 ss -tn state established 2>/dev/null | awk '{print $4}' | grep -oE ':[0-9]+$' | sort | uniq -c | sort -rn | head -6
 
 echo "--- 本机应用配置（非密钥项） ---"
-grep -E '^SMARTLECT_(APP_SERVICES|APP_BIND_ADDRESS|APP_REGISTER_IP|JAVA_PROCESSORS|JAVA_XMX|DB_POOL_MAX_SIZE|REDIS_HOST|REDIS_PORT|MYSQL_HOST|RABBIT_HOST|NACOS_ADDR|PROJECT_FOLDER)' /opt/smartlect/run/runtime.env 2>/dev/null | sort
+grep -E '^SMARTLECT_(APP_SERVICES|APP_BIND_ADDRESS|APP_REGISTER_IP|JAVA_PROCESSORS|JAVA_XMX|DB_POOL_MAX_SIZE|REDIS_HOST|REDIS_PORT|MYSQL_HOST|NACOS_ADDR|PROJECT_FOLDER)' /opt/smartlect/run/runtime.env 2>/dev/null | sort
 
 echo "--- 系统里跑着的其它东西 ---"
 systemctl list-units --type=service --state=running --no-pager --no-legend 2>/dev/null | awk '{print "  " $1}' | grep -vE "systemd|ssh|cron|dbus|network|agent|polkit|rsyslog|udev|getty|multipath|irqbalance|unattended|snapd|chrony|aliyun|cloud|aegis|docker|containerd|Modem|tuned|udisks|user@|nginx" | head -10
