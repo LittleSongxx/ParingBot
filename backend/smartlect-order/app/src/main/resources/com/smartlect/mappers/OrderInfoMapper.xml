@@ -345,7 +345,8 @@
 			 pay_scene,
 			 pay_order_id,
 			 channel_order_Id,
-			 subject
+			 subject,
+			 idempotency_key
 		 )values
 		 <foreach collection="list" item="item" separator=",">
 			 (
@@ -358,7 +359,8 @@
 				 #{item.payScene},
 				 #{item.payOrderId},
 				 #{item.channelOrderId},
-			  	 #{item.subject}
+			  	 #{item.subject},
+			  	 #{item.idempotencyKey}
 			 )
 		 </foreach>
 	</insert>
@@ -375,7 +377,8 @@
 			 pay_scene,
 			 pay_order_id,
 			 channel_order_Id,
-			 subject
+			 subject,
+			 idempotency_key
 		 )values
 		 <foreach collection="list" item="item" separator=",">
 			 (

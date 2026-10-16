@@ -59,4 +59,13 @@ public interface OrderInfoMapper<T,P> extends BaseMapper<T,P> {
 			@Param("delayMinutes") int delayMinutes,
 			@Param("limit") int limit);
 
-	}
+	
+    /** 按幂等键反查订单号（对账用；V6 起下单会把命令幂等键写到订单行上）。 */
+    @org.apache.ibatis.annotations.Select("""
+            SELECT order_id FROM order_info
+            WHERE idempotency_key = #{idempotencyKey}
+            ORDER BY order_time ASC LIMIT 1
+            """)
+    String selectOrderIdByIdempotencyKey(@org.apache.ibatis.annotations.Param("idempotencyKey")
+                                         String idempotencyKey);
+}

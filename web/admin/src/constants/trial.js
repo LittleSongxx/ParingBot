@@ -6,7 +6,7 @@ export const TRIAL_GALLERY = {
 
 export const TRIAL_ADMIN_DENIED = '作品集展厅账号只能查看看板、商品、订单和知识库，不能改库存、发知识、发券或查看用户隐私。'
 
-// 券管理页需 coupon:manage（展厅没有），服务端会拒读；菜单与服务端策略保持一致，不再展示该入口
+// 券管理页：读接口已放开给展厅（写仍仅超管，且被 TrialAdminAccess 拒绝清单再挡一次）
 
 
 export const TRIAL_MENU_PATHS = new Set([
@@ -17,6 +17,7 @@ export const TRIAL_MENU_PATHS = new Set([
   '/order/orderList',
   '/order/report',
   '/order/refundReview',
+  '/discountCoupon',
   '/merchant',
   '/ads',
   '/knowledge',

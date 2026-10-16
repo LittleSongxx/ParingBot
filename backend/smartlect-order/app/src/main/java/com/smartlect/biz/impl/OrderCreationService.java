@@ -107,7 +107,7 @@ public class OrderCreationService {
                 idempotencyKey,
                 postOrderDTO,
                 PayInfoDTO.class,
-                () -> createOrder(userId, postOrderDTO));
+                () -> createOrder(userId, postOrderDTO, idempotencyKey));
     }
 
     // 方法体里唯一的事务性工作曾是把 couponRpcSupport.preview 的远程调用包住——
@@ -142,7 +142,8 @@ public class OrderCreationService {
             OrderQuoteService.Quote quote =
                     orderQuoteService.claim(userId, quoteId, claimedPayOrderId, request, confirmedAmountCents);
             try {
-                return createOrder(userId, request, quote, confirmedAmountCents, claimedPayOrderId);
+                return createOrder(userId, request, quote, confirmedAmountCents, claimedPayOrderId,
+                        idempotencyKey);
             } catch (RuntimeException ex) {
                 // 建单失败释放占用，报价可重新下单；释放失败则保持已占用（用户重新报价），不放大故障。
                 if (!orderQuoteService.release(quoteId, userId, claimedPayOrderId)) {
@@ -153,12 +154,13 @@ public class OrderCreationService {
         });
     }
 
-    PayInfoDTO createOrder(String userId, PostOrderDTO request) {
-        return createOrder(userId, request, null, null, null);
+    PayInfoDTO createOrder(String userId, PostOrderDTO request, String idempotencyKey) {
+        return createOrder(userId, request, null, null, null, idempotencyKey);
     }
 
     PayInfoDTO createOrder(String userId, PostOrderDTO postOrderDTO,
-            OrderQuoteService.Quote quote, Long confirmedAmountCents, String presetPayOrderId) {
+            OrderQuoteService.Quote quote, Long confirmedAmountCents, String presetPayOrderId,
+            String orderIdempotencyKey) {
         // Phase 1: 只读准备（无本地事务，RPC 查地址/快照/库存预检不占连接）
         PreparedOrder prepared = prepareOrder(userId, postOrderDTO, presetPayOrderId);
         PayChannelEnum payChannelEnum = prepared.channel();
@@ -213,6 +215,11 @@ public class OrderCreationService {
             final OrderCouponRel relToInsert = couponRel;
             transactionTemplate.executeWithoutResult(status -> {
                 if (relToInsert != null) orderCouponRelMapper.insert(relToInsert);
+                // 把下单命令的幂等键盖到每张子单上：对账任务据此反查"这个键有没有成交"
+                // （审计 M8；历史行保持 NULL，迁移不回填）
+                for (OrderInfo orderInfo : orderInfoList) {
+                    orderInfo.setIdempotencyKey(orderIdempotencyKey);
+                }
                 orderInfoMapper.insertBatch(orderInfoList);
                 orderItemMapper.insertBatch(orderItemList);
                 orderLogisticsInfoMapper.insertBatch(orderLogisticsInfoList);

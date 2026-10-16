@@ -21,7 +21,11 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Validates X-Internal-Token for /internal/** before routing to microservices.
+ * /internal/** 的令牌校验**安全网**：网关当前没有任何 /internal 路由（内部流量走本机直连或
+ * Dubbo，见 application.yml 的路由表注释），所以该过滤器在现役配置下**不会执行**。
+ * 保留它是为了"万一有人加了一条 /internal 路由"时不至于静默放行——校验本身是 fail-closed
+ * （令牌为空一律 401）。2026-10-16 审计曾把它标为死代码；结论是保留 + 把注释写实，
+ * 而不是删掉一道潜在的安全闸。
  */
 @Component
 public class InternalTokenGlobalFilter implements GlobalFilter, Ordered {

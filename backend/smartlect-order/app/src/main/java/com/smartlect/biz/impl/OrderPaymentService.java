@@ -308,7 +308,9 @@ public class OrderPaymentService {
         }
         OrderInfo refOrder = orders.get(0);
         PayChannelEnum payChannelEnum = resolveWaitPayChannel(refOrder);
-        String refundRequestNo = "LATE" + StringTools.getRandomNumber(Constants.LENGTH_30);
+        // 退款单号由 payOrderId 派生（而不是每次随机）：渠道侧有唯一约束/累计上限，
+        // 幂等标记过期后重复通知会命中同一单号被判重，而不是再退一笔（2026-10-16 审计 L12）
+        String refundRequestNo = "LATE" + StringTools.encodeByMD5(payOrderId).substring(0, 28);
         try {
             payRpcSupport.refund(payOrderId, refundRequestNo, total, payChannelEnum.getPayScene());
             payRpcSupport.markRefunded(payOrderId);

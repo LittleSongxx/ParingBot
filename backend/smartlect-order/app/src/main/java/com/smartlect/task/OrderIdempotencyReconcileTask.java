@@ -3,6 +3,7 @@ package com.smartlect.task;
 import com.smartlect.entity.po.OrderRequestIdempotency;
 import com.smartlect.mappers.OrderRequestIdempotencyMapper;
 import com.smartlect.metrics.SmartlectMetrics;
+import com.smartlect.mappers.OrderInfoMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +39,8 @@ public class OrderIdempotencyReconcileTask {
     private OrderRequestIdempotencyMapper orderRequestIdempotencyMapper;
     @Resource
     private SmartlectMetrics metrics;
+    @Resource
+    private OrderInfoMapper<com.smartlect.entity.po.OrderInfo, ?> orderInfoMapper;
 
     @Value("${order.idempotency.reconcile-batch-size:50}")
     private int batchSize;
@@ -59,10 +62,18 @@ public class OrderIdempotencyReconcileTask {
         }
         for (OrderRequestIdempotency row : stuck) {
             metrics.idempotentStuck(row.getStatus());
+            // 下单类命令：按幂等键反查订单（V6 起订单行冗余该键）。查到即为"已成交"的决定性
+            // 证据，运维可据此直接把账本收口；仍不自动改判（库存/金额的改判必须有业务依据）。
+            String matchedOrder = null;
+            if (row.getCommandType() != null && row.getCommandType().startsWith("POST_ORDER")) {
+                matchedOrder = orderInfoMapper.selectOrderIdByIdempotencyKey(row.getIdempotencyKey());
+            }
             log.warn("幂等账本待核对：status={} command={} key={} attempts={} deadline={} reason={} "
-                            + "—— 用 scripts/reconcile_idempotency.py 带业务参数驱动出口",
+                            + "matchedOrderId={} —— 用 scripts/reconcile_idempotency.py 带业务参数驱动出口"
+                            + "（matchedOrderId 非空说明该键已成交，可直接收口）",
                     row.getStatus(), row.getCommandType(), row.getIdempotencyKey(),
-                    row.getReconcileAttempts(), row.getReconcileDeadline(), row.getReviewReason());
+                    row.getReconcileAttempts(), row.getReconcileDeadline(), row.getReviewReason(),
+                    matchedOrder);
         }
         log.warn("本轮发现 {} 条待核对幂等记录（见上；不自动改判，避免把 UNKNOWN 猜成结果）", stuck.size());
     }

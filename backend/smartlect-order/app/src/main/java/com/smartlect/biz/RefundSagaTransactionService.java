@@ -345,6 +345,10 @@ public class RefundSagaTransactionService {
             throw new BusinessException("当前订单项状态不能申请退款");
         }
         BigDecimal remaining = item.getRemainingRefundableAmount();
+        // paid_amount 列允许 NULL（确认收货前的脏数据）：给业务错误而不是 NPE（2026-10-16 审计 L14）
+        if (item.getPaidAmount() == null) {
+            throw new BusinessException("订单明细缺少实付金额，无法退款，请人工核对");
+        }
         if (remaining == null || item.getPaidAmount().signum() < 0 || remaining.signum() < 0
                 || (item.getRefundedAmount() != null && item.getRefundedAmount().signum() < 0)) {
             throw new BusinessException("订单明细缺少有效实付记录");

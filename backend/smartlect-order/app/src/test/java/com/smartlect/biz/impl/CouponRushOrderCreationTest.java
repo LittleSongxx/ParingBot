@@ -1,6 +1,7 @@
 package com.smartlect.biz.impl;
 
 import com.smartlect.api.dto.PayOrderMessageDTO;
+import com.smartlect.api.dto.RushingCouponMessageDTO;
 import com.smartlect.api.dto.UserCouponCreateDTO;
 import com.smartlect.api.support.CouponRpcSupport;
 import com.smartlect.api.support.PayRpcSupport;
@@ -138,7 +139,7 @@ class CouponRushOrderCreationTest {
         verify(transactionalMqSender).sendAfterCommit(
                 eq(com.smartlect.mq.RocketMqTopics.TOPIC_DELAY),
                 eq(com.smartlect.mq.RocketMqTopics.TAG_RUSH_TIMEOUT),
-                any(PayOrderMessageDTO.class),
+                any(com.smartlect.api.dto.RushingCouponMessageDTO.class),
                 anyString(), any(), any());
         verify(couponRpcSupport).releaseRushCouponReserve("c1", "user-1");
     }
@@ -166,5 +167,30 @@ class CouponRushOrderCreationTest {
         lenient().when(orderCouponRelMapper.insert(any(OrderCouponRel.class))).thenReturn(1);
         lenient().when(orderInfoMapper.insert(any(OrderInfo.class))).thenReturn(1);
         lenient().when(orderCouponRelMapper.selectList(any())).thenReturn(List.of());
+    }
+
+    @Test
+    void rushTimeoutPayloadCarriesCouponIdentityForRollbackBranches() {
+        // 2026-10-16 审计 L10：此前发的是只填 orderId 的 PayOrderMessageDTO，消费端按
+        // RushingCouponMessageDTO 读到的 userId/couponId/userCouponId 全为 null，
+        // "未建单/建单未落库/券存在订单缺失"三个回补分支全部空转。
+        stubPrepareRemoteCalls();
+        doAnswer(call -> ((TransactionCallback<?>) call.getArgument(0)).doInTransaction(null))
+                .when(transactionTemplate).execute(any());
+        var captor = org.mockito.ArgumentCaptor.forClass(
+                com.smartlect.api.dto.RushingCouponMessageDTO.class);
+        service.prepareCouponRush("user-1", "c1", "rush-key-000000003");
+        org.mockito.Mockito.verify(transactionalMqSender).sendAfterCommit(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(),
+                captor.capture(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+        var payload = captor.getValue();
+        org.junit.jupiter.api.Assertions.assertNotNull(payload.getOrderId(), "订单号必须带上");
+        org.junit.jupiter.api.Assertions.assertNotNull(payload.getUserId(), "userId 必须带上：消费端回补预占要用");
+        org.junit.jupiter.api.Assertions.assertNotNull(payload.getCouponId(), "couponId 必须带上：消费端回补预占要用");
+        org.junit.jupiter.api.Assertions.assertNotNull(payload.getUserCouponId(), "userCouponId 必须带上：消费端查占位券要用");
     }
 }

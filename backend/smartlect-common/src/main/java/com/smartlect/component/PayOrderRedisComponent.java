@@ -134,10 +134,12 @@ public class PayOrderRedisComponent {
 		if (StringTools.isEmpty(payOrderId)) {
 			return false;
 		}
+		// TTL 7 天（原 1 天）：标记过期后同一支付单的重复通知会再次尝试退款；
+		// 退款单号改为从 payOrderId 派生后，渠道唯一约束构成第二道防线（2026-10-16 审计 L12）
 		return setIfAbsent(
 				Constants.REDIS_KEY_PAY_LATE_REFUND_DONE + payOrderId,
 				"1",
-				Constants.REDIS_KEY_EXPIRES_DAY,
+				7 * Constants.REDIS_KEY_EXPIRES_DAY,
 				TimeUnit.SECONDS);
 	}
 

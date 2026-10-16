@@ -129,7 +129,7 @@ class OrderCreationIntegrityTest {
         when(stockRpcSupport.getAvailable("p2", "trusted-hash-2")).thenReturn(10);
         when(redisComponent.getLogisticsInfo()).thenReturn(sender());
 
-        ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request);
+        ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request, "it-key-0001");
 
         verify(stockRpcSupport, never()).getAvailable("p1", "forged-hash-1");
         verify(stockRpcSupport, never()).getAvailable("p2", "forged-hash-2");
@@ -215,7 +215,7 @@ class OrderCreationIntegrityTest {
         when(productRpcSupport.toSkuMapByPropertyValueIds(newerSnapshot)).thenReturn(Map.of("p1v1", sku("p1", "v1", "trusted", "11.00")));
         when(stockRpcSupport.getAvailable("p1", "trusted")).thenReturn(10);
         var error = org.junit.jupiter.api.Assertions.assertThrows(com.smartlect.exception.HttpBusinessException.class,
-                () -> ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request, quote, 1000L, null));
+                () -> ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request, quote, 1000L, null, "it-key-0002"));
         assertEquals("RECONFIRM_REQUIRED", error.getMessage());
         verify(orderInfoMapper, never()).insertBatch(org.mockito.ArgumentMatchers.anyList());
         verify(orderItemMapper, never()).insertBatch(org.mockito.ArgumentMatchers.anyList());
@@ -249,7 +249,7 @@ class OrderCreationIntegrityTest {
                         org.mockito.ArgumentMatchers.eq(800L), org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq(new BigDecimal("9.00")));
         org.junit.jupiter.api.Assertions.assertThrows(com.smartlect.exception.HttpBusinessException.class,
-                () -> ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request, quote, 800L, null));
+                () -> ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request, quote, 800L, null, "it-key-0003"));
         org.mockito.InOrder sequence = org.mockito.Mockito.inOrder(couponRpcSupport, stockRpcSupport, orderQuoteService);
         sequence.verify(couponRpcSupport).validateAndLock("user-1", "uc1", new BigDecimal("10.00"));
         sequence.verify(orderQuoteService).validate(org.mockito.ArgumentMatchers.eq(quote),
@@ -285,7 +285,7 @@ class OrderCreationIntegrityTest {
                         org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyString());
 
         assertThrows(RuntimeException.class,
-                () -> ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request));
+                () -> ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request, "it-key-0001"));
 
         // 库存一步化：扣减是条件更新本身，失败（库存不足）即上抛，无"先锁后扣"中间态，
         // 也不再有 deduct 之外的库存写需要回补。
@@ -325,7 +325,7 @@ class OrderCreationIntegrityTest {
         }).when(transactionTemplate).executeWithoutResult(
                 org.mockito.ArgumentMatchers.<java.util.function.Consumer<org.springframework.transaction.TransactionStatus>>any());
 
-        ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request);
+        ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request, "it-key-0001");
 
         // 单商品单订单：恰好一条关单消息，topic/tag 与 pay:timeout 幂等键正确。
         var dtoCaptor = ArgumentCaptor.forClass(com.smartlect.api.dto.PayOrderMessageDTO.class);

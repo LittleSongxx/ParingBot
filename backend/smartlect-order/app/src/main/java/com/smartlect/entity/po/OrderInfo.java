@@ -62,6 +62,9 @@ public class OrderInfo implements Serializable {
 
 	private Integer couponType;
 
+	/** 下单命令幂等键（仅对账反查用；历史行为 NULL）。 */
+	private String idempotencyKey;
+
 	public BigDecimal getPayTotalAmount() {
 		return payTotalAmount;
 	}
@@ -202,6 +205,14 @@ public class OrderInfo implements Serializable {
 
 	public String getChannelOrderId(){
 		return this.channelOrderId;
+	}
+
+	public void setIdempotencyKey(String idempotencyKey){
+		this.idempotencyKey = idempotencyKey;
+	}
+
+	public String getIdempotencyKey(){
+		return this.idempotencyKey;
 	}
 
 	@Override

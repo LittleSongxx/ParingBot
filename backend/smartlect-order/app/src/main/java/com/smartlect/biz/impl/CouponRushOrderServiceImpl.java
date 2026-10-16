@@ -3,6 +3,7 @@ package com.smartlect.biz.impl;
 import com.smartlect.api.dto.CouponRushPrepareDTO;
 import com.smartlect.api.dto.PayInfoDTO;
 import com.smartlect.api.dto.PayOrderMessageDTO;
+import com.smartlect.api.dto.RushingCouponMessageDTO;
 import com.smartlect.api.dto.UserCouponCreateDTO;
 import com.smartlect.api.enums.OrderFromTypeEnum;
 import com.smartlect.api.enums.OrderItemStatusEnum;
@@ -332,8 +333,16 @@ private CouponRushRedisComponent couponRushRedisComponent;
 
 		// RUSH_TIMEOUT 关单消息与订单同事务写入 Outbox（对齐普通下单 Phase 3，ADR-0018/0019）：
 		// 订单存在则必然有关单收敛路径，占位券失败也不会留下永久挂起的待付款单。
-		PayOrderMessageDTO payTimeoutDto = new PayOrderMessageDTO();
+		// 载荷必须与消费端（RocketMqOrderDeadListListener，payloadType=RushingCouponMessageDTO）
+		// 一致：此前发的是只填 orderId 的 PayOrderMessageDTO，消费端读到的 userId/couponId/
+		// userCouponId 全是 null → "未建单/建单未落库/券存在订单缺失"三个回补分支全部空转，
+		// Redis 预占只能等 TTL 回收（2026-10-16 审计 L10）。
+		RushingCouponMessageDTO payTimeoutDto = new RushingCouponMessageDTO();
 		payTimeoutDto.setOrderId(orderId);
+		payTimeoutDto.setPayOrderId(payOrderId);
+		payTimeoutDto.setUserId(userId);
+		payTimeoutDto.setCouponId(couponId);
+		payTimeoutDto.setUserCouponId(userCouponId);
 		transactionalMqSender.sendAfterCommit(
 				RocketMqTopics.TOPIC_DELAY,
 				RocketMqTopics.TAG_RUSH_TIMEOUT,

@@ -19,6 +19,9 @@ import java.util.List;
 
 @RequestMapping("/admin/discountCoupon")
 @RestController("adminDiscountCouponController")
+// 读/写拆分（2026-10-16 审计）：类级注解此前让"查看券"也要求 coupon:manage，
+// 展厅（TRIAL_OPERATOR）连券列表都读不到、而前端菜单却挂着券管理页。现在读接口放开给
+// 展厅，写接口保持仅超管；展厅的写还会被 TrialAdminAccess 的拒绝清单再挡一次。
 @SaCheckPermission(value = {"coupon:manage"}, orRole = "SUPER_ADMIN", type = "admin")
 public class DiscountCouponController extends com.smartlect.controller.admin.ABaseController{
 
@@ -35,6 +38,7 @@ public class DiscountCouponController extends com.smartlect.controller.admin.ABa
     }
 
     // 获取所有优惠券
+    @SaCheckPermission(value = {"coupon:manage"}, orRole = {"SUPER_ADMIN", "TRIAL_OPERATOR"}, type = "admin")
     @PostMapping("/loadDiscountCoupon")
     public ResponseVO loadDiscountCoupon(Integer pageNo, Integer pageSize, String couponNameFuzzy, Integer couponType, Integer status){
         PaginationResultVO resultVO = discountCouponService.loadDiscountCoupon4Admin(pageNo, pageSize, couponNameFuzzy, couponType, status);
@@ -42,6 +46,7 @@ public class DiscountCouponController extends com.smartlect.controller.admin.ABa
     }
 
     // 获取优惠券详情信息
+    @SaCheckPermission(value = {"coupon:manage"}, orRole = {"SUPER_ADMIN", "TRIAL_OPERATOR"}, type = "admin")
     @PostMapping("/getDiscountCouponInfo")
     public ResponseVO getDiscountCouponInfo(String couponId){
         DiscountCoupon discountCoupon = discountCouponService.getDiscountCouponByCouponId(couponId);
