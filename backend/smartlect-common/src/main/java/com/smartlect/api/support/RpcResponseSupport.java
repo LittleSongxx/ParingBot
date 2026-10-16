@@ -9,11 +9,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * 跨服务调用响应解包与异常翻译（Dubbo 版）：RpcException 按类型映射为与原
- * Feign 降级一致的业务文案；类名保留 FeignResponseSupport 以避免波及十余个
- * Support 门面与其单测。
+ * RPC（Dubbo）降级一致的业务文案：把 RpcException 翻译成调用方约定的业务异常。
  */
 @Component
-public class FeignResponseSupport {
+public class RpcResponseSupport {
 
     public <T> T unwrap(ResponseVO<T> resp, String fallbackMsg) {
         if (resp == null) {
@@ -49,7 +48,7 @@ public class FeignResponseSupport {
         return new BusinessException(StringTools.isEmpty(fallbackMsg) ? "服务调用失败" : fallbackMsg);
     }
 
-    public <T> T call(FeignCallable<T> callable, String fallbackMsg) {
+    public <T> T call(RpcCallable<T> callable, String fallbackMsg) {
         try {
             return unwrap(callable.call(), fallbackMsg);
         } catch (BusinessException e) {
@@ -59,7 +58,7 @@ public class FeignResponseSupport {
         }
     }
 
-    public void run(FeignRunnable runnable, String fallbackMsg) {
+    public void run(RpcRunnable runnable, String fallbackMsg) {
         try {
             unwrap(runnable.run(), fallbackMsg);
         } catch (BusinessException e) {
@@ -70,12 +69,12 @@ public class FeignResponseSupport {
     }
 
     @FunctionalInterface
-    public interface FeignCallable<T> {
+    public interface RpcCallable<T> {
         ResponseVO<T> call() throws Exception;
     }
 
     @FunctionalInterface
-    public interface FeignRunnable {
+    public interface RpcRunnable {
         ResponseVO<?> run() throws Exception;
     }
 }

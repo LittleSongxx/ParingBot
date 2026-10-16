@@ -46,12 +46,12 @@ public class OrderCreationService {
     private final OrderLogisticsInfoMapper<OrderLogisticsInfo, OrderLogisticsInfoQuery> orderLogisticsInfoMapper;
     private final OrderCouponRelMapper<OrderCouponRel, OrderCouponRelQuery> orderCouponRelMapper;
     private final TransactionTemplate transactionTemplate;
-    private final UserFeignSupport userFeignSupport;
-    private final ProductFeignSupport productFeignSupport;
-    private final StockFeignSupport stockFeignSupport;
-    private final CartFeignSupport cartFeignSupport;
-    private final CouponFeignSupport couponFeignSupport;
-    private final PayFeignSupport payFeignSupport;
+    private final UserRpcSupport userRpcSupport;
+    private final ProductRpcSupport productRpcSupport;
+    private final StockRpcSupport stockRpcSupport;
+    private final CartRpcSupport cartRpcSupport;
+    private final CouponRpcSupport couponRpcSupport;
+    private final PayRpcSupport payRpcSupport;
     private final RedisComponent redisComponent;
     private final TransactionalMqSender transactionalMqSender;
     private final RemoteCompensateRecorder remoteCompensateRecorder;
@@ -64,12 +64,12 @@ public class OrderCreationService {
             OrderLogisticsInfoMapper<OrderLogisticsInfo, OrderLogisticsInfoQuery> orderLogisticsInfoMapper,
             OrderCouponRelMapper<OrderCouponRel, OrderCouponRelQuery> orderCouponRelMapper,
             TransactionTemplate transactionTemplate,
-            UserFeignSupport userFeignSupport,
-            ProductFeignSupport productFeignSupport,
-            StockFeignSupport stockFeignSupport,
-            CartFeignSupport cartFeignSupport,
-            CouponFeignSupport couponFeignSupport,
-            PayFeignSupport payFeignSupport,
+            UserRpcSupport userRpcSupport,
+            ProductRpcSupport productRpcSupport,
+            StockRpcSupport stockRpcSupport,
+            CartRpcSupport cartRpcSupport,
+            CouponRpcSupport couponRpcSupport,
+            PayRpcSupport payRpcSupport,
             RedisComponent redisComponent,
             TransactionalMqSender transactionalMqSender,
             RemoteCompensateRecorder remoteCompensateRecorder,
@@ -80,12 +80,12 @@ public class OrderCreationService {
         this.orderLogisticsInfoMapper = orderLogisticsInfoMapper;
         this.orderCouponRelMapper = orderCouponRelMapper;
         this.transactionTemplate = transactionTemplate;
-        this.userFeignSupport = userFeignSupport;
-        this.productFeignSupport = productFeignSupport;
-        this.stockFeignSupport = stockFeignSupport;
-        this.cartFeignSupport = cartFeignSupport;
-        this.couponFeignSupport = couponFeignSupport;
-        this.payFeignSupport = payFeignSupport;
+        this.userRpcSupport = userRpcSupport;
+        this.productRpcSupport = productRpcSupport;
+        this.stockRpcSupport = stockRpcSupport;
+        this.cartRpcSupport = cartRpcSupport;
+        this.couponRpcSupport = couponRpcSupport;
+        this.payRpcSupport = payRpcSupport;
         this.redisComponent = redisComponent;
         this.transactionalMqSender = transactionalMqSender;
         this.remoteCompensateRecorder = remoteCompensateRecorder;
@@ -106,7 +106,7 @@ public class OrderCreationService {
                 () -> createOrder(userId, postOrderDTO));
     }
 
-    // 方法体里唯一的事务性工作曾是把 couponFeignSupport.preview 的远程调用包住——
+    // 方法体里唯一的事务性工作曾是把 couponRpcSupport.preview 的远程调用包住——
     // 远程调用期间数据库连接会被一直占住（同一反模式导致过支付/Outbox 连锁失败，
     // 见 confirmOrderReceipt 的注释）。方法内没有本地写需要原子保护，去掉了外层事务。
     public Map<String, Object> quoteOrder(String userId, PostOrderDTO request) {
@@ -114,7 +114,7 @@ public class OrderCreationService {
         if (!StringTools.isEmpty(request.getUserCouponId())) {
             BigDecimal gross = prepared.orders().stream().map(OrderInfo::getAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            CouponLockResultVO coupon = couponFeignSupport.preview(userId, request.getUserCouponId(), gross);
+            CouponLockResultVO coupon = couponRpcSupport.preview(userId, request.getUserCouponId(), gross);
             if (coupon.getDiscountAmount() != null && coupon.getDiscountAmount().signum() > 0) {
                 distributeCouponDiscount(prepared.orders(), coupon.getDiscountAmount());
                 OrderListPayAmountHelper.ensureOrderListMinTotalPay(prepared.orders());
@@ -155,7 +155,7 @@ public class OrderCreationService {
 
     PayInfoDTO createOrder(String userId, PostOrderDTO postOrderDTO,
             OrderQuoteService.Quote quote, Long confirmedAmountCents, String presetPayOrderId) {
-        // Phase 1: 只读准备（无本地事务，Feign 查地址/快照/库存预检不占连接）
+        // Phase 1: 只读准备（无本地事务，RPC 查地址/快照/库存预检不占连接）
         PreparedOrder prepared = prepareOrder(userId, postOrderDTO, presetPayOrderId);
         PayChannelEnum payChannelEnum = prepared.channel();
         OrderFromTypeEnum orderFromTypeEnum = prepared.from();
@@ -180,7 +180,7 @@ public class OrderCreationService {
         if (!StringTools.isEmpty(userCouponId)) {
             BigDecimal orderAmountBeforeDiscount = orderInfoList.stream()
                     .map(OrderInfo::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-            CouponLockResultVO lockResult = couponFeignSupport.validateAndLock(userId, userCouponId, orderAmountBeforeDiscount);
+            CouponLockResultVO lockResult = couponRpcSupport.validateAndLock(userId, userCouponId, orderAmountBeforeDiscount);
             if (Boolean.TRUE.equals(lockResult.getLocked()) && lockResult.getDiscountAmount() != null
                     && lockResult.getDiscountAmount().compareTo(BigDecimal.ZERO) > 0) {
                 distributeCouponDiscount(orderInfoList, lockResult.getDiscountAmount());
@@ -228,17 +228,17 @@ public class OrderCreationService {
             // Phase 4: 事务外远程写（幂等，失败不回滚订单——订单已随 Phase 3 携带超时关单消息：
             // 库存/券由 Phase 5 补偿回滚，遗留的待付款单由延时消息关闭，且库存服务对
             // "从未扣减过"的支付单不再回补，不会虚增库存）
-            stockFeignSupport.changeStockBatch(deductList, "order-deduct:" + unifiedPayOrderId);
+            stockRpcSupport.changeStockBatch(deductList, "order-deduct:" + unifiedPayOrderId);
             stockDeducted = true;
 
             if (OrderFromTypeEnum.CART == orderFromTypeEnum) {
-                cartFeignSupport.deleteBatch(productCartList);
+                cartRpcSupport.deleteBatch(productCartList);
             }
             BigDecimal totalAmount = orderInfoList.stream().map(OrderInfo::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
             totalAmount = OrderPayAmountUtil.normalizeChannelPayAmount(totalAmount);
             log.info("提交订单,payOrderId={}, 订单数量={}, 总金额={}", unifiedPayOrderId, orderInfoList.size(), totalAmount);
 
-            payFeignSupport.createPending(userId, unifiedPayOrderId, orderInfoList.get(0).getOrderId(),
+            payRpcSupport.createPending(userId, unifiedPayOrderId, orderInfoList.get(0).getOrderId(),
                     totalAmount, postOrderDTO.getPayMethod());
             return requestInitialPayInfoBestEffort(
                     payChannelEnum.getPayScene(), unifiedPayOrderId, subject, totalAmount);
@@ -246,7 +246,7 @@ public class OrderCreationService {
             // Phase 5: 补偿（事务外，可独立重试）
             if (stockDeducted) {
                 try {
-                    stockFeignSupport.restoreOrderStock(
+                    stockRpcSupport.restoreOrderStock(
                             unifiedPayOrderId, copyItemsWithSignedBuyCount(newList, false));
                 } catch (Exception compensateEx) {
                     log.error("下单失败后库存回补失败, payOrderId={}", unifiedPayOrderId, compensateEx);
@@ -256,7 +256,7 @@ public class OrderCreationService {
             }
             if (couponLocked) {
                 try {
-                    couponFeignSupport.changeUserCouponStatus(userCouponId, userId,
+                    couponRpcSupport.changeUserCouponStatus(userCouponId, userId,
                             UserCouponStatusEnum.CANT.getStatus(), UserCouponStatusEnum.NOUSE.getStatus(), null);
                 } catch (Exception compensateEx) {
                     log.error("下单失败后优惠券解锁失败, payOrderId={}, userCouponId={}",
@@ -292,7 +292,7 @@ public class OrderCreationService {
         // 存入order_item表数据有：订单明细Id，订单Id，封面图，商品Id，商品名称，商品属性IdHash，property_info,item总价格，购买数量，订单明细状态，备注，refund_order_id
         // 同一个商品id的放在同一个订单中，分为不同的订单明细，同一个商品属性id的放在同一个订单明细中
         // 根据addressId获取地址信息（user 服务）
-        UserAddressVO userAddress = userFeignSupport.getAddress(postOrderDTO.getAddressId(), userId);
+        UserAddressVO userAddress = userRpcSupport.getAddress(postOrderDTO.getAddressId(), userId);
         // 若地址不存在则抛出异常
         if (userAddress == null || StringTools.isEmpty(userAddress.getAddress())) {
             throw new BusinessException("当前地址不存在");
@@ -305,10 +305,10 @@ public class OrderCreationService {
         Map<String, OrderInfo> productIdOrderInfoMap = new HashMap<>();
         Map<String, OrderItem> productIdOrderItemMap = new HashMap<>();
         Map<String, Integer> productItemCountMap = new HashMap<>();
-        ProductSnapshotBatchVO snapshot = productFeignSupport.snapshotBatch(productIdList);
-        Map<String, ProductInfoSnapshotVO> productInfoMap = productFeignSupport.toProductInfoMap(snapshot);
-        Map<String, ProductPropertyValueSnapshotVO> productPropertyValueMap = productFeignSupport.toPropertyValueMap(snapshot);
-        Map<String, ProductSkuSnapshotVO> productSkuMap = productFeignSupport.toSkuMapByPropertyValueIds(snapshot);
+        ProductSnapshotBatchVO snapshot = productRpcSupport.snapshotBatch(productIdList);
+        Map<String, ProductInfoSnapshotVO> productInfoMap = productRpcSupport.toProductInfoMap(snapshot);
+        Map<String, ProductPropertyValueSnapshotVO> productPropertyValueMap = productRpcSupport.toPropertyValueMap(snapshot);
+        Map<String, ProductSkuSnapshotVO> productSkuMap = productRpcSupport.toSkuMapByPropertyValueIds(snapshot);
         // 获取当前时间
         Date now = new Date();
         List<ProductItem> newList = new ArrayList<>();
@@ -352,7 +352,7 @@ public class OrderCreationService {
             }
             // 判断库存（真相源：smartlect_stock）；同时以服务端快照的 hash 覆盖客户端提交值
             productItem.setPropertyValueIdHash(productSku.getPropertyValueIdHash());
-            int available = stockFeignSupport.getAvailable(productItem.getProductId(), productItem.getPropertyValueIdHash());
+            int available = stockRpcSupport.getAvailable(productItem.getProductId(), productItem.getPropertyValueIdHash());
             if (available < productItem.getBuyCount()) {
                 throw new BusinessException("商品【" + productInfo.getProductName() + "】库存不足");
             }
@@ -480,7 +480,7 @@ public class OrderCreationService {
             return new PayInfoDTO("FREE", payOrderId, BigDecimal.ZERO.setScale(2));
         }
         try {
-            return payFeignSupport.getPayUrl(payScene, payOrderId, subject, amount);
+            return payRpcSupport.getPayUrl(payScene, payOrderId, subject, amount);
         } catch (RuntimeException ex) {
             log.warn("支付表单暂不可用，订单保持待支付并允许支付页重试, payOrderId={}, error={}",
                     payOrderId, ex.getMessage());

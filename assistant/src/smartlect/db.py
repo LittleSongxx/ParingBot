@@ -22,19 +22,19 @@ def required_env(name):
 
 
 def _new_connection():
-    database = required_env("SMARTLECT_GROWTH_MYSQL_DATABASE")
-    user = required_env("SMARTLECT_GROWTH_MYSQL_USER")
+    database = required_env("SMARTLECT_ASSISTANT_MYSQL_DATABASE")
+    user = required_env("SMARTLECT_ASSISTANT_MYSQL_USER")
     if database != "smartlect_growth" or user != "smartlect_growth":
         raise ValueError("Assistant must use its dedicated smartlect_growth database and identity")
     return pymysql.connect(host=required_env("SMARTLECT_MYSQL_HOST"),
                            port=int(required_env("SMARTLECT_MYSQL_PORT")), user=user,
-                           password=required_env("SMARTLECT_GROWTH_MYSQL_PASSWORD"), database=database,
+                           password=required_env("SMARTLECT_ASSISTANT_MYSQL_PASSWORD"), database=database,
                            charset="utf8mb4", cursorclass=pymysql.cursors.DictCursor,
                            autocommit=False, connect_timeout=5, read_timeout=10, write_timeout=10,
                            # MySQL is loopback-only for the assistant. pymysql's PREFERRED mode would
                            # build a fresh TLS context (full system CA load) per connection —
                            # hundreds of ms CPU each — which flattened concurrency to ~3 rps.
-                           ssl_disabled=os.getenv("SMARTLECT_GROWTH_MYSQL_SSL", "0") != "1",
+                           ssl_disabled=os.getenv("SMARTLECT_ASSISTANT_MYSQL_SSL", "0") != "1",
                            init_command="SET time_zone = '+00:00'")
 
 

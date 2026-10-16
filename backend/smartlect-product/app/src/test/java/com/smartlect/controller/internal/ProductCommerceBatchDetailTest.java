@@ -1,6 +1,6 @@
 package com.smartlect.controller.internal;
 
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.entity.po.ProductInfo;
 import com.smartlect.entity.po.ProductPropertyValue;
 import com.smartlect.entity.query.ProductInfoQuery;
@@ -34,14 +34,14 @@ class ProductCommerceBatchDetailTest {
     @SuppressWarnings("unchecked")
     private final ProductPropertyValueMapper<ProductPropertyValue, ProductPropertyValueQuery> propertyValueMapper =
             mock(ProductPropertyValueMapper.class);
-    private final StockFeignSupport stockFeignSupport = mock(StockFeignSupport.class);
+    private final StockRpcSupport stockRpcSupport = mock(StockRpcSupport.class);
 
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(controller, "productInfoMapper", productInfoMapper);
         ReflectionTestUtils.setField(controller, "productSkuMapper", productSkuMapper);
         ReflectionTestUtils.setField(controller, "productPropertyValueMapper", propertyValueMapper);
-        ReflectionTestUtils.setField(controller, "stockFeignSupport", stockFeignSupport);
+        ReflectionTestUtils.setField(controller, "stockRpcSupport", stockRpcSupport);
         when(productSkuMapper.selectList(any())).thenReturn(List.of());
         // Properties carry their product id: the store queries by product, so a row without
         // one could not come back from the real mapper.
@@ -55,7 +55,7 @@ class ProductCommerceBatchDetailTest {
             }
             return rows;
         });
-        when(stockFeignSupport.totalByProducts(anyList())).thenReturn(Map.of());
+        when(stockRpcSupport.totalByProducts(anyList())).thenReturn(Map.of());
     }
 
     private ProductPropertyValue property(String productId, String name, String value) {
@@ -101,7 +101,7 @@ class ProductCommerceBatchDetailTest {
         // The point of the batch endpoint: one stock round trip and two bulk lookups for the
         // whole batch, not three queries per product.
         ArgumentCaptor<List<String>> stockIds = ArgumentCaptor.forClass(List.class);
-        verify(stockFeignSupport, times(1)).totalByProducts(stockIds.capture());
+        verify(stockRpcSupport, times(1)).totalByProducts(stockIds.capture());
         assertEquals(List.of("p1", "p2"), stockIds.getValue());
         verify(productSkuMapper, times(1)).selectList(any());
         verify(propertyValueMapper, times(1)).selectList(any());
@@ -113,7 +113,7 @@ class ProductCommerceBatchDetailTest {
     @Test
     void singleDetailKeepsTheSameShapeAsTheBatchVariant() {
         when(productInfoMapper.selectByProductId("p1")).thenReturn(product("p1", "描述"));
-        when(stockFeignSupport.totalByProducts(List.of("p1"))).thenReturn(Map.of("p1", 7));
+        when(stockRpcSupport.totalByProducts(List.of("p1"))).thenReturn(Map.of("p1", 7));
 
         Map<String, Object> detail = controller.getDetail(Map.of("productId", "p1")).getData();
         assertEquals("p1", detail.get("productId"));

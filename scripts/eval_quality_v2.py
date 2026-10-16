@@ -41,7 +41,7 @@ def growth_up():
     try:
         import httpx
         from runtime import ENV_FILE, parse_env
-        port = parse_env(ENV_FILE)['SMARTLECT_GROWTH_PORT']
+        port = parse_env(ENV_FILE)['SMARTLECT_ASSISTANT_PORT']
         with httpx.Client(timeout=2, trust_env=False) as client:
             return client.get('http://127.0.0.1:' + port + '/health').status_code == 200
     except Exception:

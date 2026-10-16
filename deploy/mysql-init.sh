@@ -4,7 +4,7 @@ for identity in app flyway nacos growth canal xxljob; do
     app) secret="$SMARTLECT_MYSQL_PASSWORD" ;;
     flyway) secret="$SMARTLECT_FLYWAY_PASSWORD" ;;
     nacos) secret="$SMARTLECT_NACOS_MYSQL_PASSWORD" ;;
-    growth) secret="$SMARTLECT_GROWTH_MYSQL_PASSWORD" ;;
+    growth) secret="$SMARTLECT_ASSISTANT_MYSQL_PASSWORD" ;;
     canal) secret="$SMARTLECT_CANAL_MYSQL_PASSWORD" ;;
     xxljob) secret="$SMARTLECT_XXLJOB_MYSQL_PASSWORD" ;;
   esac

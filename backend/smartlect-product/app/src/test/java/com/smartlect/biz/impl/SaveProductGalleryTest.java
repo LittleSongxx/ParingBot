@@ -1,6 +1,6 @@
 package com.smartlect.biz.impl;
 
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.component.ProductBloomFilterComponent;
 import com.smartlect.entity.dto.ProductSaveDTO;
 import com.smartlect.entity.po.ProductInfo;
@@ -50,7 +50,7 @@ class SaveProductGalleryTest {
     @SuppressWarnings("unchecked")
     private final ProductSkuMapper<ProductSku, ProductSkuQuery> productSkuMapper = mock(ProductSkuMapper.class);
     private final ProductBloomFilterComponent bloomFilter = mock(ProductBloomFilterComponent.class);
-    private final StockFeignSupport stockFeignSupport = mock(StockFeignSupport.class);
+    private final StockRpcSupport stockRpcSupport = mock(StockRpcSupport.class);
 
     @BeforeEach
     void setUp() {
@@ -58,7 +58,7 @@ class SaveProductGalleryTest {
         ReflectionTestUtils.setField(service, "productPropertyValueMapper", propertyValueMapper);
         ReflectionTestUtils.setField(service, "productSkuMapper", productSkuMapper);
         ReflectionTestUtils.setField(service, "productBloomFilterComponent", bloomFilter);
-        ReflectionTestUtils.setField(service, "stockFeignSupport", stockFeignSupport);
+        ReflectionTestUtils.setField(service, "stockRpcSupport", stockRpcSupport);
         // saveProduct 末尾注册 afterCommit 同步，单测无事务上下文需手动开启
         TransactionSynchronizationManager.initSynchronization();
     }

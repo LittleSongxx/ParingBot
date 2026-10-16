@@ -4,7 +4,7 @@ import com.smartlect.catalog.IsolatedCatalog;
 import com.smartlect.controller.ABaseController;
 import com.smartlect.constants.Constants;
 import com.smartlect.api.enums.ProductStatusEnum;
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.entity.config.AppConfig;
 import com.smartlect.entity.po.ProductInfo;
 import com.smartlect.entity.po.ProductPropertyValue;
@@ -54,7 +54,7 @@ public class ProductCommerceInternalController extends ABaseController {
     @Resource
     private ProductPropertyValueMapper<ProductPropertyValue, ProductPropertyValueQuery> productPropertyValueMapper;
     @Resource
-    private StockFeignSupport stockFeignSupport;
+    private StockRpcSupport stockRpcSupport;
     @Resource
     private AppConfig appConfig;
     @Resource
@@ -132,7 +132,7 @@ public class ProductCommerceInternalController extends ABaseController {
             for (ProductInfo p : list) {
                 productIds.add(p.getProductId());
             }
-            stockByProduct = stockFeignSupport.totalByProducts(productIds);
+            stockByProduct = stockRpcSupport.totalByProducts(productIds);
             ProductPropertyValueQuery propertyQuery = new ProductPropertyValueQuery();
             propertyQuery.setProductIdList(productIds);
             List<ProductPropertyValue> properties = productPropertyValueMapper.selectList(propertyQuery);
@@ -208,7 +208,7 @@ public class ProductCommerceInternalController extends ABaseController {
     /**
      * Detail payloads for one or more products with three bulk lookups instead of three per
      * product: the batch endpoint exists to avoid per-product round trips, and a per-product
-     * stock Feign call would have reintroduced them.
+     * stock RPC call would have reintroduced them.
      */
     private List<Map<String, Object>> buildDetails(List<ProductInfo> products) {
         List<Map<String, Object>> result = new ArrayList<>();
@@ -221,7 +221,7 @@ public class ProductCommerceInternalController extends ABaseController {
                 ids.add(p.getProductId());
             }
         }
-        Map<String, Integer> stockByProduct = ids.isEmpty() ? Collections.emptyMap() : stockFeignSupport.totalByProducts(ids);
+        Map<String, Integer> stockByProduct = ids.isEmpty() ? Collections.emptyMap() : stockRpcSupport.totalByProducts(ids);
 
         Map<String, List<ProductSku>> skusByProduct = new HashMap<>();
         Map<String, List<ProductPropertyValue>> propertiesByProduct = new HashMap<>();
@@ -334,7 +334,7 @@ public class ProductCommerceInternalController extends ABaseController {
                             && !allowedSkuKeys.contains(sku.getPropertyValueIdHash())) {
                         continue;
                     }
-                    int stock = Math.max(0, stockFeignSupport.getAvailable(
+                    int stock = Math.max(0, stockRpcSupport.getAvailable(
                             productId, sku.getPropertyValueIdHash()));
                     totalStock += stock;
                     if (stock <= 0 || !ProductStatusEnum.ON_SALE.getStatus().equals(product.getStatus())) {

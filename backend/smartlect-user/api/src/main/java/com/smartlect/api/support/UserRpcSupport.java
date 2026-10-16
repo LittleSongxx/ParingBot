@@ -20,22 +20,22 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Component
-public class UserFeignSupport {
+public class UserRpcSupport {
 
     @DubboReference
     private UserDubboService userDubboService;
     @Resource
-    private FeignResponseSupport feignResponseSupport;
+    private RpcResponseSupport rpcResponseSupport;
 
     public UserAddressVO getAddress(String addressId, String userId) {
-        return feignResponseSupport.call(
+        return rpcResponseSupport.call(
                 () -> userDubboService.getAddress(new UserAddressQueryDTO(addressId, userId), userId),
                 "查询收货地址失败");
     }
 
     public List<String> listAllUserIds() {
         try {
-            List<String> ids = feignResponseSupport.call(
+            List<String> ids = rpcResponseSupport.call(
                     () -> userDubboService.listAllUserIds(),
                     "查询用户列表失败");
             return ids == null ? Collections.emptyList() : ids;
@@ -50,7 +50,7 @@ public class UserFeignSupport {
             return Collections.emptyMap();
         }
         try {
-            List<UserBriefVO> list = feignResponseSupport.call(
+            List<UserBriefVO> list = rpcResponseSupport.call(
                     () -> userDubboService.listBriefByUserIds(new UserIdsDTO(userIds)),
                     "批量查询用户信息失败");
             if (list == null || list.isEmpty()) {
@@ -66,7 +66,7 @@ public class UserFeignSupport {
     }
 
     public Integer countByJoinDate(String joinDateStart, String joinDateEnd) {
-        Integer count = feignResponseSupport.call(
+        Integer count = rpcResponseSupport.call(
                 () -> userDubboService.countByJoinDate(new UserJoinCountDTO(joinDateStart, joinDateEnd)),
                 "统计新用户失败");
         return count == null ? 0 : count;

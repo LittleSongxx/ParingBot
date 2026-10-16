@@ -2,7 +2,7 @@
 # 压测后的数据一致性对账（node1 执行，只读）
 #
 # 为什么必须做：本次改动动了三处与"一笔订单走完"直接相关的机制——
-# 事务边界（Feign 移出事务）、MQ 投递方式（发布确认改异步）、幂等账本口径。
+# 事务边界（RPC 移出事务）、MQ 投递方式（发布确认改异步）、幂等账本口径。
 # 只数订单条数看不出问题，要把跨库的账实关系对上。
 set -uo pipefail
 q() { docker exec smartlect-mysql-1 bash -c "MYSQL_PWD=\"\$MYSQL_ROOT_PASSWORD\" mysql -uroot -N $1 -e \"$2\"" 2>/dev/null; }

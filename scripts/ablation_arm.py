@@ -64,7 +64,7 @@ def restart_assistant() -> None:
         subprocess.run(['kill', pid], check=False)
     subprocess.run([str(ROOT / 'scripts' / 'dev.sh'), 'up'], capture_output=True, text=True)
     port = next((line.split('=', 1)[1] for line in ENV_FILE.read_text().splitlines()
-                 if line.startswith('SMARTLECT_GROWTH_PORT=')), '18001')
+                 if line.startswith('SMARTLECT_ASSISTANT_PORT=')), '18001')
     for _ in range(30):
         try:
             with urllib.request.urlopen(f'http://127.0.0.1:{port.strip()}/health', timeout=2) as resp:

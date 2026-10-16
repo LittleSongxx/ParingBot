@@ -7,7 +7,7 @@ import com.smartlect.api.enums.CouponTypeEnum;
 import com.smartlect.api.enums.RushingCouponStatusEnum;
 import com.smartlect.api.enums.RushingStatusEnum;
 import com.smartlect.api.enums.UserCouponStatusEnum;
-import com.smartlect.api.support.OrderFeignSupport;
+import com.smartlect.api.support.OrderRpcSupport;
 import com.smartlect.biz.DiscountCouponService;
 import com.smartlect.component.CouponRushStockService;
 import com.smartlect.component.DiscountCouponCacheComponent;
@@ -48,7 +48,7 @@ public class DiscountCouponServiceImpl implements DiscountCouponService {
 	private CouponRushRedisComponent couponRushRedisComponent;
 
 	@Resource
-	private OrderFeignSupport orderFeignSupport;
+	private OrderRpcSupport orderRpcSupport;
 	@Resource
 	private DiscountCouponCacheComponent discountCouponCacheComponent;
 	@Resource
@@ -303,13 +303,13 @@ public class DiscountCouponServiceImpl implements DiscountCouponService {
 
 	@Override
 	public CouponRushPrepareDTO rushCoupon(String userId, String couponId, String idempotencyKey) {
-		return orderFeignSupport.prepareCouponRush(userId, couponId, idempotencyKey);
+		return orderRpcSupport.prepareCouponRush(userId, couponId, idempotencyKey);
 	}
 
 	@Override
 	public PayInfoDTO buyDiscountCoupon(
 			String userId, String couponId, String payMethod, String idempotencyKey) {
-		return orderFeignSupport.postCouponRushOrder(
+		return orderRpcSupport.postCouponRushOrder(
 				userId, couponId, payMethod, idempotencyKey);
 	}
 

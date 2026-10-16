@@ -56,8 +56,8 @@ updates = {
     "SMARTLECT_PROJECT_FOLDER": "/opt/smartlect/run/uploads/",
     # assistant 仍单实例在 node1，但网关副本跑在三个节点上：base-url 必须指向 node1 的
     # 内网地址，否则副本节点上的网关会把 /api/assistant/** 转发到它本机不存在的 18000。
-    "SMARTLECT_GROWTH_HOST": "0.0.0.0",
-    "SMARTLECT_GROWTH_BASE_URL": f"http://{n1}:18000",
+    "SMARTLECT_ASSISTANT_HOST": "0.0.0.0",
+    "SMARTLECT_ASSISTANT_BASE_URL": f"http://{n1}:18000",
 }
 lines = [line for line in open(path).read().splitlines()
          if line and line.split("=", 1)[0] not in updates and line.split("=", 1)[0] != "SMARTLECT_APP_SERVICES"]

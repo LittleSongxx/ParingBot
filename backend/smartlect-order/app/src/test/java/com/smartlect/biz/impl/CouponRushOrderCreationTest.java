@@ -2,8 +2,8 @@ package com.smartlect.biz.impl;
 
 import com.smartlect.api.dto.PayOrderMessageDTO;
 import com.smartlect.api.dto.UserCouponCreateDTO;
-import com.smartlect.api.support.CouponFeignSupport;
-import com.smartlect.api.support.PayFeignSupport;
+import com.smartlect.api.support.CouponRpcSupport;
+import com.smartlect.api.support.PayRpcSupport;
 import com.smartlect.api.vo.DiscountCouponVO;
 import com.smartlect.biz.OrderRequestIdempotencyService;
 import com.smartlect.component.CouponRushRedisComponent;
@@ -61,9 +61,9 @@ class CouponRushOrderCreationTest {
     @Mock
     private OrderCouponRelMapper<OrderCouponRel, OrderCouponRelQuery> orderCouponRelMapper;
     @Mock
-    private CouponFeignSupport couponFeignSupport;
+    private CouponRpcSupport couponRpcSupport;
     @Mock
-    private PayFeignSupport payFeignSupport;
+    private PayRpcSupport payRpcSupport;
     @Mock
     private CouponRushRedisComponent couponRushRedisComponent;
     @Mock
@@ -83,8 +83,8 @@ class CouponRushOrderCreationTest {
         ReflectionTestUtils.setField(service, "orderInfoMapper", orderInfoMapper);
         ReflectionTestUtils.setField(service, "orderItemMapper", orderItemMapper);
         ReflectionTestUtils.setField(service, "orderCouponRelMapper", orderCouponRelMapper);
-        ReflectionTestUtils.setField(service, "couponFeignSupport", couponFeignSupport);
-        ReflectionTestUtils.setField(service, "payFeignSupport", payFeignSupport);
+        ReflectionTestUtils.setField(service, "couponRpcSupport", couponRpcSupport);
+        ReflectionTestUtils.setField(service, "payRpcSupport", payRpcSupport);
         ReflectionTestUtils.setField(service, "couponRushRedisComponent", couponRushRedisComponent);
         ReflectionTestUtils.setField(service, "appConfig", appConfig);
         ReflectionTestUtils.setField(service, "transactionalMqSender", transactionalMqSender);
@@ -101,13 +101,13 @@ class CouponRushOrderCreationTest {
         doAnswer(call -> {
             TransactionCallback<?> callback = call.getArgument(0);
             int messagesBefore = org.mockito.Mockito.mockingDetails(transactionalMqSender).getInvocations().size();
-            int couponsBefore = org.mockito.Mockito.mockingDetails(couponFeignSupport).getInvocations().size();
+            int couponsBefore = org.mockito.Mockito.mockingDetails(couponRpcSupport).getInvocations().size();
             Object result = callback.doInTransaction(null);
             org.junit.jupiter.api.Assertions.assertEquals(messagesBefore + 1,
                     org.mockito.Mockito.mockingDetails(transactionalMqSender).getInvocations().size(),
                     "RUSH_TIMEOUT 关单消息必须在建单短事务回调内写出");
             org.junit.jupiter.api.Assertions.assertEquals(couponsBefore,
-                    org.mockito.Mockito.mockingDetails(couponFeignSupport).getInvocations().size(),
+                    org.mockito.Mockito.mockingDetails(couponRpcSupport).getInvocations().size(),
                     "创建占位券是远程调用，不得进入短事务回调");
             return result;
         }).when(transactionTemplate).execute(any());
@@ -115,10 +115,10 @@ class CouponRushOrderCreationTest {
         service.prepareCouponRush("user-1", "c1", "rush-key-000000001");
 
         // 占位券在建单事务之后创建（无券关系时 useCoupon 路径不触发其它 coupon 调用）
-        var sequence = inOrder(transactionTemplate, couponFeignSupport);
+        var sequence = inOrder(transactionTemplate, couponRpcSupport);
         sequence.verify(transactionTemplate).execute(any());
-        sequence.verify(couponFeignSupport).createUserCoupon(any(UserCouponCreateDTO.class));
-        verify(couponFeignSupport, org.mockito.Mockito.never()).releaseRushCouponReserve(anyString(), anyString());
+        sequence.verify(couponRpcSupport).createUserCoupon(any(UserCouponCreateDTO.class));
+        verify(couponRpcSupport, org.mockito.Mockito.never()).releaseRushCouponReserve(anyString(), anyString());
     }
 
     @Test
@@ -128,7 +128,7 @@ class CouponRushOrderCreationTest {
             TransactionCallback<?> callback = call.getArgument(0);
             return callback.doInTransaction(null);
         }).when(transactionTemplate).execute(any());
-        doThrow(new BusinessException("券服务不可用")).when(couponFeignSupport).createUserCoupon(any());
+        doThrow(new BusinessException("券服务不可用")).when(couponRpcSupport).createUserCoupon(any());
 
         assertThrows(BusinessException.class,
                 () -> service.prepareCouponRush("user-1", "c1", "rush-key-000000002"));
@@ -140,7 +140,7 @@ class CouponRushOrderCreationTest {
                 eq(com.smartlect.mq.RocketMqTopics.TAG_RUSH_TIMEOUT),
                 any(PayOrderMessageDTO.class),
                 anyString(), any(), any());
-        verify(couponFeignSupport).releaseRushCouponReserve("c1", "user-1");
+        verify(couponRpcSupport).releaseRushCouponReserve("c1", "user-1");
     }
 
     private void stubPrepareRemoteCalls() {
@@ -149,9 +149,9 @@ class CouponRushOrderCreationTest {
         coupon.setCouponName("五元券");
         coupon.setRushingstatus(com.smartlect.api.enums.RushingCouponStatusEnum.YES.getStatus());
         coupon.setRemainCount(100);
-        when(couponFeignSupport.getCoupon("c1")).thenReturn(coupon);
-        lenient().when(couponFeignSupport.hasAvailableRushStock("c1")).thenReturn(true);
-        lenient().when(couponFeignSupport.deductStock("c1", "user-1")).thenReturn(1);
+        when(couponRpcSupport.getCoupon("c1")).thenReturn(coupon);
+        lenient().when(couponRpcSupport.hasAvailableRushStock("c1")).thenReturn(true);
+        lenient().when(couponRpcSupport.deductStock("c1", "user-1")).thenReturn(1);
         when(couponRushRedisComponent.rushingCoupon(eq("c1"), eq("user-1"), anyString())).thenReturn(0);
         when(orderRequestIdempotencyService.execute(
                 eq("user-1"),

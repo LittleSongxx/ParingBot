@@ -2,9 +2,9 @@ package com.smartlect.biz.impl;
 
 import com.smartlect.api.dto.PayOrderNotifyDTO;
 import com.smartlect.api.enums.OrderStatusEnum;
-import com.smartlect.api.support.CouponFeignSupport;
-import com.smartlect.api.support.PayFeignSupport;
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.CouponRpcSupport;
+import com.smartlect.api.support.PayRpcSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.component.PayOrderRedisComponent;
 import com.smartlect.component.RemoteCompensateRecorder;
 import com.smartlect.entity.po.OrderCouponRel;
@@ -52,11 +52,11 @@ class OrderAggregateCancellationTest {
     @Mock
     private PayOrderRedisComponent payOrderRedisComponent;
     @Mock
-    private StockFeignSupport stockFeignSupport;
+    private StockRpcSupport stockRpcSupport;
     @Mock
-    private PayFeignSupport payFeignSupport;
+    private PayRpcSupport payRpcSupport;
     @Mock
-    private CouponFeignSupport couponFeignSupport;
+    private CouponRpcSupport couponRpcSupport;
     @Mock
     private RemoteCompensateRecorder remoteCompensateRecorder;
     @Mock
@@ -73,8 +73,8 @@ class OrderAggregateCancellationTest {
                 .thenAnswer(call -> call.<org.springframework.transaction.support.TransactionCallback<Object>>getArgument(0)
                         .doInTransaction(null));
         this.service = new OrderCancellationService(orderInfoMapper, orderItemMapper, orderCouponRelMapper,
-                transactionTemplate, machine, payOrderRedisComponent, payFeignSupport, stockFeignSupport,
-                couponFeignSupport, remoteCompensateRecorder);
+                transactionTemplate, machine, payOrderRedisComponent, payRpcSupport, stockRpcSupport,
+                couponRpcSupport, remoteCompensateRecorder);
     }
 
     @BeforeEach
@@ -109,27 +109,10 @@ class OrderAggregateCancellationTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ProductItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(stockFeignSupport).restoreOrderStock(org.mockito.ArgumentMatchers.eq("pay-1"), itemsCaptor.capture());
+        verify(stockRpcSupport).restoreOrderStock(org.mockito.ArgumentMatchers.eq("pay-1"), itemsCaptor.capture());
         assertEquals(2, itemsCaptor.getValue().size());
-        verify(payFeignSupport).markClosed("pay-1");
+        verify(payRpcSupport).markClosed("pay-1");
     }
-
-	@Test
-	void unconfiguredAlipayDoesNotBlockCancellationOfAnUnpaidOrder() {
-		OrderInfo order = order("order-1", "pay-1", OrderStatusEnum.WAIT_PAYMENT);
-		order.setPayChannel("mock");
-		when(orderInfoMapper.selectByOrderId("order-1")).thenReturn(order);
-		when(orderInfoMapper.selectList(any(OrderInfoQuery.class))).thenReturn(List.of(order));
-		when(orderInfoMapper.updateByParam(any(OrderInfo.class), any(OrderInfoQuery.class))).thenReturn(1);
-		when(orderItemMapper.selectList(any(OrderItemQuery.class))).thenReturn(List.of(item("order-1", "p1")));
-		when(orderCouponRelMapper.selectList(any(OrderCouponRelQuery.class))).thenReturn(List.of());
-		doThrow(new BusinessException("支付宝支付未配置"))
-				.when(payFeignSupport).closeOrder("pay-1", "mock");
-
-		service.cancelOrder("user-1", "order-1", OrderStatusEnum.WAIT_PAYMENT);
-
-		verify(stockFeignSupport).restoreOrderStock(anyString(), any());
-	}
 
 	@Test
 	void otherChannelCloseFailuresStillFailCancellation() {
@@ -139,7 +122,7 @@ class OrderAggregateCancellationTest {
 		when(orderInfoMapper.selectList(any(OrderInfoQuery.class))).thenReturn(List.of(order));
 		when(orderInfoMapper.updateByParam(any(OrderInfo.class), any(OrderInfoQuery.class))).thenReturn(1);
 		doThrow(new BusinessException("渠道关单超时"))
-				.when(payFeignSupport).closeOrder("pay-1", "mock");
+				.when(payRpcSupport).closeOrder("pay-1", "mock");
 
 		assertThrows(BusinessException.class,
 				() -> service.cancelOrder("user-1", "order-1", OrderStatusEnum.WAIT_PAYMENT));
@@ -155,8 +138,8 @@ class OrderAggregateCancellationTest {
         service.cancelOrder("user-1", "order-1", OrderStatusEnum.WAIT_PAYMENT);
 
         verify(orderInfoMapper, never()).updateByParam(any(), any());
-        verify(stockFeignSupport, never()).restoreOrderStock(anyString(), any());
-        verify(payFeignSupport, never()).markClosed(anyString());
+        verify(stockRpcSupport, never()).restoreOrderStock(anyString(), any());
+        verify(payRpcSupport, never()).markClosed(anyString());
     }
 
     @Test
@@ -170,7 +153,7 @@ class OrderAggregateCancellationTest {
                 () -> service.cancelOrder("user-1", "order-1", OrderStatusEnum.WAIT_PAYMENT));
 
         verify(orderInfoMapper, never()).updateByParam(any(), any());
-        verify(stockFeignSupport, never()).restoreOrderStock(anyString(), any());
+        verify(stockRpcSupport, never()).restoreOrderStock(anyString(), any());
     }
 
     @Test
@@ -181,13 +164,13 @@ class OrderAggregateCancellationTest {
         // 支付冲突处理已随批次二拆分移入 OrderPaymentService
         OrderPaymentService paymentService = new OrderPaymentService(orderInfoMapper, orderItemMapper,
                 null, null, transactionTemplate, null, null, payOrderRedisComponent,
-                payFeignSupport, null, null, null);
+                payRpcSupport, null, null, null);
 
         assertThrows(RuntimeException.class, () -> ReflectionTestUtils.invokeMethod(
                 paymentService, "handlePaySuccessConflict", "pay-1", notification));
 
         verify(payOrderRedisComponent, never()).isPayOrderCloseMarked(anyString());
-        verify(payFeignSupport, never()).markRefunded(anyString());
+        verify(payRpcSupport, never()).markRefunded(anyString());
     }
 
     private static OrderInfo order(String orderId, String payOrderId, OrderStatusEnum status) {

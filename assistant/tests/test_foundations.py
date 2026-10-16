@@ -49,8 +49,8 @@ class FoundationTests(unittest.TestCase):
         with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             port = listener.getsockname()[1]
-        env = {**os.environ, "SMARTLECT_GROWTH_HOST": "127.0.0.1",
-               "SMARTLECT_GROWTH_PORT": str(port), "SMARTLECT_MODEL_MODE": "mock",
+        env = {**os.environ, "SMARTLECT_ASSISTANT_HOST": "127.0.0.1",
+               "SMARTLECT_ASSISTANT_PORT": str(port), "SMARTLECT_MODEL_MODE": "mock",
                "SMARTLECT_INTERNAL_TOKEN": "fixture-internal"}
         with tempfile.TemporaryDirectory() as directory:
             process = subprocess.Popen([sys.executable, "-I", "-m", "smartlect.app"],

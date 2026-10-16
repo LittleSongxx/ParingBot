@@ -81,7 +81,7 @@ public class OrderInternalController extends ABaseController {
 
     @PostMapping("/cancelOrder")
     public ResponseVO<Void> cancelOrder(@RequestBody OrderIdDTO dto) {
-        // Coupon timeout cancel goes through Feign with no delegated user.
+        // Coupon timeout cancel goes through the RPC facade with no delegated user.
         // After /internal is off the public gateway, token on the order port is the gate.
         orderInternalService.cancelOrder(dto);
         return getSuccessResponseVO(null);

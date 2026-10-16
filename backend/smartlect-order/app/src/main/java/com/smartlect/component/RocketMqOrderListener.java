@@ -1,6 +1,6 @@
 package com.smartlect.component;
 
-import com.smartlect.api.support.CouponFeignSupport;
+import com.smartlect.api.support.CouponRpcSupport;
 import com.smartlect.api.dto.RushingCouponMessageDTO;
 import com.smartlect.entity.po.OrderInfo;
 import com.smartlect.entity.query.OrderInfoQuery;
@@ -18,12 +18,12 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-public class RabbitMQOrderListenerComponent implements SmartlectMessageListener<RushingCouponMessageDTO> {
+public class RocketMqOrderListener implements SmartlectMessageListener<RushingCouponMessageDTO> {
 
     @Resource
     private OrderInfoMapper<OrderInfo, OrderInfoQuery> orderInfoMapper;
     @Resource
-    private CouponFeignSupport couponFeignSupport;
+    private CouponRpcSupport couponRpcSupport;
 
     @Override
     public MqSubscription subscription() {
@@ -43,7 +43,7 @@ public class RabbitMQOrderListenerComponent implements SmartlectMessageListener<
             throw new IllegalArgumentException("leftover rush queue message incomplete");
         }
         if (orderInfoMapper.selectByOrderId(message.getOrderId()) != null
-                || couponFeignSupport.getUserCoupon(userCouponId) != null) {
+                || couponRpcSupport.getUserCoupon(userCouponId) != null) {
             return;
         }
         log.warn("drain leftover rush queue, skip order create userCouponId={}", userCouponId);

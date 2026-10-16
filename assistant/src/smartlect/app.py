@@ -211,7 +211,7 @@ def create_app(settings=None, *, config=None, store=None, identity=None, commerc
     settings = settings or Settings.from_env()
     config = dict(os.environ) if config is None else config
     # 无数据库环境（健康探针/纯静态模式）也允许启动：端点按需 503。
-    if store is None and config.get("SMARTLECT_GROWTH_MYSQL_DATABASE"):
+    if store is None and config.get("SMARTLECT_ASSISTANT_MYSQL_DATABASE"):
         store = SessionStore()
     if identity is None and config.get("SMARTLECT_VISITOR_SECRET"):
         identity = IdentityBridge(config, connect=store.connect if store else None)
@@ -228,8 +228,8 @@ def create_app(settings=None, *, config=None, store=None, identity=None, commerc
     tasks = {}
     task_owners = {}  # run_id -> (subject_type, actor_id); admission counts live executors, not stale DB rows
     indexing = None
-    actor_run_limit = bounded(config.get("SMARTLECT_GROWTH_RUNS_PER_ACTOR"), 3, 1, 64)
-    global_run_limit = bounded(config.get("SMARTLECT_GROWTH_RUNS_GLOBAL"), 24, 1, 512)
+    actor_run_limit = bounded(config.get("SMARTLECT_ASSISTANT_RUNS_PER_ACTOR"), 3, 1, 64)
+    global_run_limit = bounded(config.get("SMARTLECT_ASSISTANT_RUNS_GLOBAL"), 24, 1, 512)
 
     from smartlect import prompts as prompt_registry
     from smartlect.agents.shopping import PROMPT_VERSION as SHOPPING_PROMPT_VERSION, SYSTEM_POLICY_BODY

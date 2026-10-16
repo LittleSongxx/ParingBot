@@ -1,6 +1,6 @@
 package com.smartlect.task;
 
-import com.smartlect.api.support.PayFeignSupport;
+import com.smartlect.api.support.PayRpcSupport;
 import com.smartlect.component.RedisComponent;
 import com.smartlect.constants.Constants;
 import com.smartlect.entity.config.AppConfig;
@@ -34,7 +34,7 @@ public class PayOrderTask {
     private OrderInfoService orderInfoService;
 
     @Resource
-    private PayFeignSupport payFeignSupport;
+    private PayRpcSupport payRpcSupport;
 
     @Resource
     private RedisComponent redisComponent;
@@ -86,7 +86,7 @@ public class PayOrderTask {
         try {
             // 渠道侧无结果（PENDING / 意图不存在）返回 null，交由超时关单收敛；
             PayOrderNotifyDTO payOrderNotifyDTO =
-                    payFeignSupport.queryOrder(payOrderId, payChannelEnum.getPayScene());
+                    payRpcSupport.queryOrder(payOrderId, payChannelEnum.getPayScene());
             if (payOrderNotifyDTO == null) {
                 return;
             }

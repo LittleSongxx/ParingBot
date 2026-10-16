@@ -1,6 +1,6 @@
 package com.smartlect.biz.impl;
 
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.component.ProductBloomFilterComponent;
 import com.smartlect.entity.po.ProductInfo;
 import com.smartlect.entity.po.ProductPropertyValue;
@@ -39,7 +39,7 @@ class ProductDetailGalleryTest {
     @SuppressWarnings("unchecked")
     private final ProductSkuMapper<ProductSku, ProductSkuQuery> productSkuMapper = mock(ProductSkuMapper.class);
     private final ProductBloomFilterComponent bloomFilter = mock(ProductBloomFilterComponent.class);
-    private final StockFeignSupport stockFeignSupport = mock(StockFeignSupport.class);
+    private final StockRpcSupport stockRpcSupport = mock(StockRpcSupport.class);
 
     @BeforeEach
     void setUp() {
@@ -47,13 +47,13 @@ class ProductDetailGalleryTest {
         ReflectionTestUtils.setField(service, "productPropertyValueMapper", propertyValueMapper);
         ReflectionTestUtils.setField(service, "productSkuMapper", productSkuMapper);
         ReflectionTestUtils.setField(service, "productBloomFilterComponent", bloomFilter);
-        ReflectionTestUtils.setField(service, "stockFeignSupport", stockFeignSupport);
+        ReflectionTestUtils.setField(service, "stockRpcSupport", stockRpcSupport);
         com.smartlect.component.ProductCacheService cacheService =
                 mock(com.smartlect.component.ProductCacheService.class);
         ReflectionTestUtils.setField(service, "productCacheService", cacheService);
         when(bloomFilter.mightExist(any())).thenReturn(true);
         when(productSkuMapper.selectList(any())).thenReturn(List.of());
-        when(stockFeignSupport.getAvailableBatch(anyList())).thenReturn(java.util.Map.of());
+        when(stockRpcSupport.getAvailableBatch(anyList())).thenReturn(java.util.Map.of());
     }
 
     private ProductPropertyValue value(String propertyId, String valueId, String cover, String gallery) {

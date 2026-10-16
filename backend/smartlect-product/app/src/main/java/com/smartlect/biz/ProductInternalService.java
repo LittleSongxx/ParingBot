@@ -5,7 +5,7 @@ import com.smartlect.api.vo.ProductInfoSnapshotVO;
 import com.smartlect.api.vo.ProductPropertyValueSnapshotVO;
 import com.smartlect.api.vo.ProductSkuSnapshotVO;
 import com.smartlect.api.enums.ProductStatusEnum;
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.entity.po.ProductInfo;
 import com.smartlect.entity.po.ProductPropertyValue;
 import com.smartlect.entity.po.ProductSku;
@@ -38,7 +38,7 @@ public class ProductInternalService {
     @Resource
     private ProductPropertyValueMapper<ProductPropertyValue, ProductPropertyValueQuery> productPropertyValueMapper;
     @Resource
-    private StockFeignSupport stockFeignSupport;
+    private StockRpcSupport stockRpcSupport;
 
     public ProductSnapshotBatchVO snapshotBatch(List<String> productIds) {
         ProductSnapshotBatchVO vo = new ProductSnapshotBatchVO();
@@ -94,7 +94,7 @@ public class ProductInternalService {
             pvVos.add(item);
         }
         vo.setPropertyValues(pvVos);
-        vo.setTotalStocks(stockFeignSupport.totalByProducts(productIds));
+        vo.setTotalStocks(stockRpcSupport.totalByProducts(productIds));
         return vo;
     }
 

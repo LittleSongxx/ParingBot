@@ -1,6 +1,6 @@
 package com.smartlect.controller.admin;
 
-import com.smartlect.api.support.OrderFeignSupport;
+import com.smartlect.api.support.OrderRpcSupport;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.biz.StatisticsInfoService;
@@ -19,7 +19,7 @@ public class ToolController extends com.smartlect.controller.admin.ABaseControll
     @Resource
     private StatisticsInfoService statisticsInfoService;
     @Resource
-    private OrderFeignSupport orderFeignSupport;
+    private OrderRpcSupport orderRpcSupport;
 
     @PostMapping("/statistics")
     public ResponseVO statistics() {
@@ -29,7 +29,7 @@ public class ToolController extends com.smartlect.controller.admin.ABaseControll
 
     @PostMapping("/addAllOrderToDelayQueue")
     public ResponseVO addAllOrderToDelayQueue() {
-        orderFeignSupport.addAllWaitPayToDelayQueue();
+        orderRpcSupport.addAllWaitPayToDelayQueue();
         return getSuccessResponseVO(null);
     }
 }

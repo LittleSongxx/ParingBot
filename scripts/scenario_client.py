@@ -33,7 +33,7 @@ class ScenarioClient:
         if self.config.get('SMARTLECT_PAYMENT_MODE') != 'mock':
             raise ValueError('demo_requires_mock_payment')
         self.base = 'http://127.0.0.1:' + self.config['SMARTLECT_GATEWAY_PORT']
-        assistant = 'http://127.0.0.1:' + self.config['SMARTLECT_GROWTH_PORT']
+        assistant = 'http://127.0.0.1:' + self.config['SMARTLECT_ASSISTANT_PORT']
         with httpx.Client(timeout=10, trust_env=False) as client:
             health = client.get(assistant + '/health')
             health.raise_for_status()
@@ -44,7 +44,7 @@ class ScenarioClient:
         if self.mode == 'live' and not self.config.get('SMARTLECT_MODEL_API_KEY'):
             raise ValueError('live_model_not_configured')
         for key, value in self.config.items():
-            if key.startswith(('SMARTLECT_GROWTH_MYSQL_', 'SMARTLECT_MYSQL_')):
+            if key.startswith(('SMARTLECT_ASSISTANT_MYSQL_', 'SMARTLECT_MYSQL_')):
                 os.environ[key] = value
         self.java = CommerceClient(self.config)
         self.store = AdminScopeStore()

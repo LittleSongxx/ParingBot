@@ -1,6 +1,6 @@
 package com.smartlect.controller.admin;
 
-import com.smartlect.api.support.ProductFeignSupport;
+import com.smartlect.api.support.ProductRpcSupport;
 import com.smartlect.constants.Constants;
 import com.smartlect.entity.vo.PaginationResultVO;
 import com.smartlect.api.vo.ProductSkuListVO;
@@ -30,14 +30,14 @@ public class HomeController extends com.smartlect.controller.admin.ABaseControll
     private StatisticsInfoServiceImpl statisticsInfoService;
 
     @Resource
-    private ProductFeignSupport productFeignSupport;
+    private ProductRpcSupport productRpcSupport;
 
     @PostMapping("/loadLessStockProduct")
     public ResponseVO loadLessStockProduct(Integer pageNo, Integer pageSize) {
         int no = pageNo == null ? 1 : pageNo;
         int size = pageSize == null ? 15 : pageSize;
         try {
-            PaginationResultVO<ProductSkuListVO> result = productFeignSupport.lessStockSkuPage(no, size, Constants.LENGTH_10);
+            PaginationResultVO<ProductSkuListVO> result = productRpcSupport.lessStockSkuPage(no, size, Constants.LENGTH_10);
             return getSuccessResponseVO(result);
         } catch (Exception e) {
             log.warn("loadLessStockProduct degrade: {}", e.getMessage());

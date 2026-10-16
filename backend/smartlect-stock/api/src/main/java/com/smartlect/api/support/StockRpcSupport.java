@@ -28,16 +28,16 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class StockFeignSupport implements StockBatchCompensatePort {
+public class StockRpcSupport implements StockBatchCompensatePort {
 
     @DubboReference
-    private StockDubboService stockFeignClient;
+    private StockDubboService stockDubboService;
     @Resource
-    private FeignResponseSupport feignResponseSupport;
+    private RpcResponseSupport rpcResponseSupport;
 
     public int getAvailable(String productId, String propertyValueIdHash) {
-        SkuStockDTO data = feignResponseSupport.call(
-                () -> stockFeignClient.getStock(new SkuStockQueryDTO(productId, propertyValueIdHash)),
+        SkuStockDTO data = rpcResponseSupport.call(
+                () -> stockDubboService.getStock(new SkuStockQueryDTO(productId, propertyValueIdHash)),
                 "查询库存失败");
         return data == null || data.getStock() == null ? 0 : data.getStock();
     }
@@ -46,8 +46,8 @@ public class StockFeignSupport implements StockBatchCompensatePort {
         if (items == null || items.isEmpty()) {
             return Collections.emptyMap();
         }
-        List<SkuStockDTO> rows = feignResponseSupport.call(
-                () -> stockFeignClient.getStockBatch(items), "批量查询SKU库存失败");
+        List<SkuStockDTO> rows = rpcResponseSupport.call(
+                () -> stockDubboService.getStockBatch(items), "批量查询SKU库存失败");
         Map<String, Integer> result = new HashMap<>();
         for (SkuStockQueryDTO item : items) {
             if (item != null && item.getPropertyValueIdHash() != null) {
@@ -75,8 +75,8 @@ public class StockFeignSupport implements StockBatchCompensatePort {
         if (!StringTools.isEmpty(businessKey)) {
             batch.setBusinessKey(businessKey);
         }
-        StockChangeResultVO result = feignResponseSupport.call(
-                () -> stockFeignClient.changeStockBatch(batch), "库存变更失败");
+        StockChangeResultVO result = rpcResponseSupport.call(
+                () -> stockDubboService.changeStockBatch(batch), "库存变更失败");
         return result == null || result.getAffectedRows() == null ? 0 : result.getAffectedRows();
     }
 
@@ -85,12 +85,12 @@ public class StockFeignSupport implements StockBatchCompensatePort {
         dto.setProductId(productId);
         dto.setPropertyValueIdHash(propertyValueIdHash);
         dto.setChangeAmount(changeAmount);
-        feignResponseSupport.run(() -> stockFeignClient.changeStock(dto), "库存变更失败");
+        rpcResponseSupport.run(() -> stockDubboService.changeStock(dto), "库存变更失败");
     }
 
     public int restoreRefundStock(RefundStockRestoreDTO dto) {
-        StockChangeResultVO result = feignResponseSupport.call(
-                () -> stockFeignClient.restoreRefundStock(dto), "退款库存恢复失败");
+        StockChangeResultVO result = rpcResponseSupport.call(
+                () -> stockDubboService.restoreRefundStock(dto), "退款库存恢复失败");
         return result == null || result.getAffectedRows() == null ? 0 : result.getAffectedRows();
     }
 
@@ -99,8 +99,8 @@ public class StockFeignSupport implements StockBatchCompensatePort {
         OrderStockRestoreDTO dto = new OrderStockRestoreDTO();
         dto.setPayOrderId(payOrderId);
         dto.setItems(toBatch(items, true).getItems());
-        StockChangeResultVO result = feignResponseSupport.call(
-                () -> stockFeignClient.restoreOrderStock(dto), "关单库存恢复失败");
+        StockChangeResultVO result = rpcResponseSupport.call(
+                () -> stockDubboService.restoreOrderStock(dto), "关单库存恢复失败");
         return result == null || result.getAffectedRows() == null ? 0 : result.getAffectedRows();
     }
 
@@ -108,28 +108,28 @@ public class StockFeignSupport implements StockBatchCompensatePort {
         OrderStockRestoreDTO dto = new OrderStockRestoreDTO();
         dto.setPayOrderId(referenceId);
         dto.setItems(toBatch(items, true).getItems());
-        Boolean applied = feignResponseSupport.call(
-                () -> stockFeignClient.isOrderStockApplied(dto), "查询关单库存恢复状态失败");
+        Boolean applied = rpcResponseSupport.call(
+                () -> stockDubboService.isOrderStockApplied(dto), "查询关单库存恢复状态失败");
         return Boolean.TRUE.equals(applied);
     }
 
     public boolean isRefundStockApplied(String businessKey) {
         RefundStockRestoreDTO dto = new RefundStockRestoreDTO();
         dto.setBusinessKey(businessKey);
-        Boolean result = feignResponseSupport.call(
-                () -> stockFeignClient.isRefundStockApplied(dto), "查询退款库存恢复状态失败");
+        Boolean result = rpcResponseSupport.call(
+                () -> stockDubboService.isRefundStockApplied(dto), "查询退款库存恢复状态失败");
         return Boolean.TRUE.equals(result);
     }
 
     public void setStock(String productId, String propertyValueIdHash, int stock) {
-        feignResponseSupport.run(
-                () -> stockFeignClient.setStock(new SkuStockSetDTO(productId, propertyValueIdHash, stock)),
+        rpcResponseSupport.run(
+                () -> stockDubboService.setStock(new SkuStockSetDTO(productId, propertyValueIdHash, stock)),
                 "设置库存失败");
     }
 
     public int totalByProduct(String productId) {
-        ProductTotalStockVO vo = feignResponseSupport.call(
-                () -> stockFeignClient.totalByProduct(new ProductIdDTO(productId)), "查询商品总库存失败");
+        ProductTotalStockVO vo = rpcResponseSupport.call(
+                () -> stockDubboService.totalByProduct(new ProductIdDTO(productId)), "查询商品总库存失败");
         return vo == null || vo.getTotalStock() == null ? 0 : vo.getTotalStock();
     }
 
@@ -138,8 +138,8 @@ public class StockFeignSupport implements StockBatchCompensatePort {
             return Collections.emptyMap();
         }
         try {
-            List<ProductTotalStockVO> rows = feignResponseSupport.call(
-                    () -> stockFeignClient.totalByProducts(productIds),
+            List<ProductTotalStockVO> rows = rpcResponseSupport.call(
+                    () -> stockDubboService.totalByProducts(productIds),
                     "批量查询商品库存失败");
             Map<String, Integer> result = new HashMap<>();
             if (rows != null) {
@@ -159,8 +159,8 @@ public class StockFeignSupport implements StockBatchCompensatePort {
     }
 
     public PaginationResultVO<SkuStockDTO> listLessThan(Integer pageNo, Integer pageSize, Integer threshold) {
-        PaginationResultVO<SkuStockDTO> page = feignResponseSupport.call(
-                () -> stockFeignClient.listLessThan(new LessStockPageDTO(pageNo, pageSize, threshold)),
+        PaginationResultVO<SkuStockDTO> page = rpcResponseSupport.call(
+                () -> stockDubboService.listLessThan(new LessStockPageDTO(pageNo, pageSize, threshold)),
                 "查询低库存SKU失败");
         if (page == null) {
             return new PaginationResultVO<>(0, pageSize == null ? 15 : pageSize,

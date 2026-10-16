@@ -4,8 +4,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.smartlect.api.support.OrderFeignSupport;
-import com.smartlect.api.support.UserFeignSupport;
+import com.smartlect.api.support.OrderRpcSupport;
+import com.smartlect.api.support.UserRpcSupport;
 import com.smartlect.api.vo.OrderDailyStatsVO;
 import com.smartlect.api.vo.OrderRangeStatsVO;
 import com.smartlect.biz.StatisticsInfoService;
@@ -35,9 +35,9 @@ public class StatisticsInfoServiceImpl implements StatisticsInfoService {
 	@Resource
 	private StatisticsInfoMapper<StatisticsInfo, StatisticsInfoQuery> statisticsInfoMapper;
 	@Resource
-	private OrderFeignSupport orderFeignSupport;
+	private OrderRpcSupport orderRpcSupport;
 	@Resource
-	private UserFeignSupport userFeignSupport;
+	private UserRpcSupport userRpcSupport;
 
 	@Override
 	public PaginationResultVO<StatisticsInfo> findListByPage(StatisticsInfoQuery param) {
@@ -53,8 +53,8 @@ public class StatisticsInfoServiceImpl implements StatisticsInfoService {
 		String yesterdayStart = yesterdayDate + " 00:00:00";
 		String yesterdayEnd = yesterdayDate + " 23:59:59";
 
-		OrderRangeStatsVO yesterdaySale = orderFeignSupport.aggregateRange(yesterdayStart, yesterdayEnd);
-		OrderRangeStatsVO todaySale = orderFeignSupport.aggregateRange(todayStart, nowEnd);
+		OrderRangeStatsVO yesterdaySale = orderRpcSupport.aggregateRange(yesterdayStart, yesterdayEnd);
+		OrderRangeStatsVO todaySale = orderRpcSupport.aggregateRange(todayStart, nowEnd);
 		if (yesterdaySale == null) {
 			yesterdaySale = new OrderRangeStatsVO();
 		}
@@ -62,8 +62,8 @@ public class StatisticsInfoServiceImpl implements StatisticsInfoService {
 			todaySale = new OrderRangeStatsVO();
 		}
 
-		BigDecimal yesterdayUserCount = new BigDecimal(userFeignSupport.countByJoinDate(yesterdayDate, yesterdayDate));
-		BigDecimal todayUserCount = new BigDecimal(userFeignSupport.countByJoinDate(todayDate, todayDate));
+		BigDecimal yesterdayUserCount = new BigDecimal(userRpcSupport.countByJoinDate(yesterdayDate, yesterdayDate));
+		BigDecimal todayUserCount = new BigDecimal(userRpcSupport.countByJoinDate(todayDate, todayDate));
 
 		List<TodayDataVO> todayDataVOList = new ArrayList<>();
 		todayDataVOList.add(new TodayDataVO("orderAmount", todaySale.getSaleAmount(), yesterdaySale.getSaleAmount()));
@@ -101,7 +101,7 @@ public class StatisticsInfoServiceImpl implements StatisticsInfoService {
 		List<String> dateList = new ArrayList<>();
 		String today = java.time.LocalDate.now().format(fmt);
 		String nowEnd = DateUtil.getTimeOnParttern(0, DateTimePatternEnum.YYYY_MM_DD_HH_MM_SS.getPattern());
-		OrderRangeStatsVO liveToday = orderFeignSupport.aggregateRange(today + " 00:00:00", nowEnd);
+		OrderRangeStatsVO liveToday = orderRpcSupport.aggregateRange(today + " 00:00:00", nowEnd);
 		if (liveToday == null) {
 			liveToday = new OrderRangeStatsVO();
 		}
@@ -148,7 +148,7 @@ public class StatisticsInfoServiceImpl implements StatisticsInfoService {
 	}
 
 	@Override
-	// 不标 @Transactional：方法开头要调 orderFeignSupport.aggregateDaily 拉跨服务聚合，
+	// 不标 @Transactional：方法开头要调 orderRpcSupport.aggregateDaily 拉跨服务聚合，
 	// 放在事务里会让数据库连接在整个聚合查询期间被占住（日结只跑一次，但聚合可能数秒）。
 	// 后续 saveStatistics 是主键 upsert、逐日幂等，去掉整体事务后各日各自提交，
 	// 即便中途失败，下次跑该任务会重算覆盖，不会留下半成品。
@@ -159,7 +159,7 @@ public class StatisticsInfoServiceImpl implements StatisticsInfoService {
 		if (endTime == null) {
 			endTime = DateUtil.getTimeOnParttern(0, DateTimePatternEnum.YYYY_MM_DD.getPattern()) + " 01:00:00";
 		}
-		List<OrderDailyStatsVO> dailyList = orderFeignSupport.aggregateDaily(startTime, endTime);
+		List<OrderDailyStatsVO> dailyList = orderRpcSupport.aggregateDaily(startTime, endTime);
 		if (dailyList == null || dailyList.isEmpty()) {
 			log.info("statistics() no order buckets for {} ~ {}", startTime, endTime);
 			return;

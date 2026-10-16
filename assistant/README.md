@@ -43,14 +43,14 @@ assistant/.venv/bin/python -m smartlect.app
 Any Python >=3.11 may replace `python3.11`; the current WSL verification uses
 `/home/song/miniconda3/bin/python` (3.13.11) to create the clean virtual environment.
 Run from the Smartlect root. `GET /health` listens on `127.0.0.1:18000` by default.
-`SMARTLECT_GROWTH_HOST` and `SMARTLECT_GROWTH_PORT` change the bind address.
+`SMARTLECT_ASSISTANT_HOST` and `SMARTLECT_ASSISTANT_PORT` change the bind address.
 `SMARTLECT_MODEL_MODE` accepts `mock`, `rule-fallback`, or `live`.
 Use `./scripts/dev.sh model-mode live` then `up` after configuring the provider.
 
 Direct dependencies are declared in `pyproject.toml`; the single
 `requirements.lock` pins their full closure, including MySQL RSA authentication
 and the FastAPI/Pydantic/LangGraph stack plus bounded text-PDF parsing with pypdf.
-The growth event consumer and its `SMARTLECT_GROWTH_EVENTS_ENABLED` switch were
+The growth event consumer and its `SMARTLECT_ASSISTANT_EVENTS_ENABLED` switch were
 retired with the attribution line (ADR-0008); retention cleanup now runs inside
 the API process.
 

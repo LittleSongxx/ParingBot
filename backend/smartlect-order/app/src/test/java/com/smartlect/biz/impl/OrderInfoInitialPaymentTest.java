@@ -1,7 +1,7 @@
 package com.smartlect.biz.impl;
 
 import com.smartlect.api.dto.PayInfoDTO;
-import com.smartlect.api.support.PayFeignSupport;
+import com.smartlect.api.support.PayRpcSupport;
 import com.smartlect.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,23 +21,23 @@ import static org.mockito.Mockito.when;
 class OrderInfoInitialPaymentTest {
 
     @Mock
-    private PayFeignSupport payFeignSupport;
+    private PayRpcSupport payRpcSupport;
 
     private OrderCreationService service;
 
     @BeforeEach
     void setUp() {
         // requestInitialPayInfoBestEffort 已随批次二拆分移入 OrderCreationService；
-        // 该方法只依赖 payFeignSupport，其余依赖传 null 即可。
+        // 该方法只依赖 payRpcSupport，其余依赖传 null 即可。
         service = new OrderCreationService(null, null, null, null, null,
-                null, null, null, null, null, payFeignSupport, null, null, null, null, null);
+                null, null, null, null, null, payRpcSupport, null, null, null, null, null);
     }
 
     @Test
     void successfulPaymentFormIsReturnedUnchanged() {
         BigDecimal amount = new BigDecimal("19.90");
         PayInfoDTO expected = new PayInfoDTO("<form>pay</form>", "pay-1", amount);
-        when(payFeignSupport.getPayUrl("mock", "pay-1", "subject", amount))
+        when(payRpcSupport.getPayUrl("mock", "pay-1", "subject", amount))
                 .thenReturn(expected);
 
         PayInfoDTO actual = service.requestInitialPayInfoBestEffort(
@@ -49,7 +49,7 @@ class OrderInfoInitialPaymentTest {
     @Test
     void unavailablePaymentFormKeepsPayableOrderIdentity() {
         BigDecimal amount = new BigDecimal("19.90");
-        when(payFeignSupport.getPayUrl("mock", "pay-2", "subject", amount))
+        when(payRpcSupport.getPayUrl("mock", "pay-2", "subject", amount))
                 .thenThrow(new BusinessException("provider unavailable"));
 
         PayInfoDTO actual = service.requestInitialPayInfoBestEffort(

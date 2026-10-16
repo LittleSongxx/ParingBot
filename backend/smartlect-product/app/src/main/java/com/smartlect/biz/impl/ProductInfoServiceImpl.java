@@ -2,7 +2,7 @@ package com.smartlect.biz.impl;
 
 import com.smartlect.api.enums.CommendTypeEnum;
 import com.smartlect.api.enums.ProductStatusEnum;
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.api.dto.SkuStockQueryDTO;
 import com.smartlect.api.vo.ProductPropertyVO;
 import com.smartlect.api.vo.ProductPropertyValueVO;
@@ -64,7 +64,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 	@Resource
 	private com.smartlect.component.ProductCacheService productCacheService;
 	@Resource
-	private StockFeignSupport stockFeignSupport;
+	private StockRpcSupport stockRpcSupport;
 
 	@Override
 	public List<ProductInfo> findListByParam(ProductInfoQuery param) {
@@ -254,7 +254,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 					resultVO.getPageNo(), resultVO.getPageTotal(), product4LoadList);
 		}
 		List<String> productIds = list.stream().map(ProductInfo::getProductId).toList();
-		Map<String, Integer> stockByProduct = stockFeignSupport.totalByProducts(productIds);
+		Map<String, Integer> stockByProduct = stockRpcSupport.totalByProducts(productIds);
 		Map<String, Integer> skuCountByProduct = new HashMap<>();
 		List<ProductSkuCountVO> skuCounts = productSkuMapper.selectCountByProductIds(productIds);
 		if (skuCounts != null) {
@@ -363,7 +363,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 		List<SkuStockQueryDTO> stockQueries = productSkuList.stream()
 				.map(sku -> new SkuStockQueryDTO(sku.getProductId(), sku.getPropertyValueIdHash()))
 				.toList();
-		Map<String, Integer> stockBySku = stockFeignSupport.getAvailableBatch(stockQueries);
+		Map<String, Integer> stockBySku = stockRpcSupport.getAvailableBatch(stockQueries);
 		for (ProductSku sku : productSkuList) {
 			sku.setStock(stockBySku.getOrDefault(sku.getPropertyValueIdHash(), 0));
 		}
@@ -377,7 +377,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 		return product4VO;
 	}
 
-	/** 缓存命中的快照库存已清零，实时补库存（Feign 查 stock，与 miss 路径同源）。 */
+	/** 缓存里的快照库存已清零，这里实时补库存（RPC 查 stock，与 miss 路径同源）。 */
 	private Product4VO replenishRealtimeStock(Product4VO cached) {
 		if (cached.getSkuList() == null || cached.getSkuList().isEmpty()) {
 			return cached;
@@ -386,7 +386,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 				.map(sku -> new com.smartlect.api.dto.SkuStockQueryDTO(
 						sku.getProductId(), sku.getPropertyValueIdHash()))
 				.toList();
-		java.util.Map<String, Integer> stockBySku = stockFeignSupport.getAvailableBatch(queries);
+		java.util.Map<String, Integer> stockBySku = stockRpcSupport.getAvailableBatch(queries);
 		for (var sku : cached.getSkuList()) {
 			sku.setStock(stockBySku.getOrDefault(sku.getPropertyValueIdHash(), 0));
 		}

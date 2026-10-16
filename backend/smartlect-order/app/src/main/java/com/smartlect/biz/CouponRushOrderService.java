@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotEmpty;
  * 优惠券秒杀下单。
  * <p>从 OrderInfoServiceImpl 拆出来的：秒杀和普通下单只共用"订单"这张表，
  * 校验、预占、建单、支付、券激活全是另一套规则，混在一个类里让下单主流程更难读。
- * <p>OrderInfoService 上的同名方法保留为委托，调用方（含 Feign）不受影响。
+ * <p>OrderInfoService 上的同名方法保留为委托，调用方（含 RPC 门面）不受影响。
  */
 public interface CouponRushOrderService {
 

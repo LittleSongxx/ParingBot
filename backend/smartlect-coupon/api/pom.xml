@@ -11,7 +11,7 @@
   </parent>
   <artifactId>smartlect-coupon-api</artifactId>
   <name>smartlect-coupon-api</name>
-  <description>对外 Feign 契约库（不启动）</description>
+  <description>对外 RPC 契约库（不启动）</description>
   <dependencies>
     <dependency>
       <groupId>com.smartlect</groupId>

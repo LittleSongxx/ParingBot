@@ -93,7 +93,7 @@ spring:
                   factor: 2
                   basedOnPreviousValue: false
           routes:
-            # Assistant and Java Feign call 127.0.0.1 / lb:// directly.
+            # Assistant and Java services call 127.0.0.1 / lb:// directly.
             # Public /internal/** used to let a leaked token impersonate any user.
             - id: admin-user
               uri: lb://smartlect-user
@@ -132,7 +132,7 @@ spring:
               filters:
                 - RewritePath=/admin-api/(?<segment>.*), /admin/$\{segment}
             - id: assistant
-              uri: ${SMARTLECT_GROWTH_BASE_URL:http://127.0.0.1:18000}
+              uri: ${SMARTLECT_ASSISTANT_BASE_URL:http://127.0.0.1:18000}
               predicates:
                 - Path=/api/assistant/**,/admin-api/assistant/**
               metadata:

@@ -16,7 +16,7 @@ public class SkuStockBatchChangeDTO implements Serializable {
 
     /**
      * Optional idempotency key for the whole batch (order deduct). Restore already
-     * uses per-SKU keys; deduct must not double-apply after a Feign timeout replay.
+     * uses per-SKU keys; deduct must not double-apply after an RPC timeout replay.
      */
     private String businessKey;
 

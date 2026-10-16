@@ -2,8 +2,8 @@ package com.smartlect.biz.impl;
 
 import com.smartlect.api.dto.PayOrderNotifyDTO;
 import com.smartlect.api.enums.OrderStatusEnum;
-import com.smartlect.api.support.CouponFeignSupport;
-import com.smartlect.api.support.PayFeignSupport;
+import com.smartlect.api.support.CouponRpcSupport;
+import com.smartlect.api.support.PayRpcSupport;
 import com.smartlect.biz.CouponRushOrderService;
 import com.smartlect.component.PayOrderRedisComponent;
 import com.smartlect.component.RedisComponent;
@@ -63,9 +63,9 @@ class OrderPaymentServiceTest {
     @Mock
     private PayOrderRedisComponent payOrderRedisComponent;
     @Mock
-    private PayFeignSupport payFeignSupport;
+    private PayRpcSupport payRpcSupport;
     @Mock
-    private CouponFeignSupport couponFeignSupport;
+    private CouponRpcSupport couponRpcSupport;
     @Mock
     private CouponRushOrderService couponRushOrderService;
     @Mock
@@ -77,7 +77,7 @@ class OrderPaymentServiceTest {
     void setUp() {
         service = new OrderPaymentService(orderInfoMapper, orderItemMapper,
                 orderLogisticsInfoMapper, orderCouponRelMapper, transactionTemplate, orderStateMachine,
-                redisComponent, payOrderRedisComponent, payFeignSupport, couponFeignSupport,
+                redisComponent, payOrderRedisComponent, payRpcSupport, couponRpcSupport,
                 couponRushOrderService, transactionalMqSender);
         lenient().doAnswer(invocation -> {
             invocation.getArgument(1, Runnable.class).run();
@@ -109,10 +109,10 @@ class OrderPaymentServiceTest {
 
         // 顺序锚定：assertSettled（事务外远程读）→ 短事务内状态机翻单 → markSuccess（事务外远程写）。
         // 本用例订单无券关系，券核销路径不产生 coupon 调用。
-        var sequence = inOrder(payFeignSupport, orderStateMachine);
-        sequence.verify(payFeignSupport).assertSettled("pay-1");
+        var sequence = inOrder(payRpcSupport, orderStateMachine);
+        sequence.verify(payRpcSupport).assertSettled("pay-1");
         sequence.verify(orderStateMachine).transition(eq("order-1"), eq(OrderStatusEnum.WAIT_PAYMENT),
                 eq(OrderStateEvent.PAY_SUCCESS), any(OrderInfo.class));
-        sequence.verify(payFeignSupport).markSuccess(eq("pay-1"), eq("channel-1"));
+        sequence.verify(payRpcSupport).markSuccess(eq("pay-1"), eq("channel-1"));
     }
 }

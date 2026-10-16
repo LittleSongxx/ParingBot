@@ -6,8 +6,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.smartlect.api.dto.ProductSnapshotBatchVO;
-import com.smartlect.api.support.ProductFeignSupport;
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.ProductRpcSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.api.enums.ProductStatusEnum;
 import com.smartlect.api.vo.ProductInfoSnapshotVO;
 import com.smartlect.api.vo.ProductPropertyValueSnapshotVO;
@@ -39,10 +39,10 @@ public class ProductCartServiceImpl implements ProductCartService {
 	private ProductCartMapper<ProductCart, ProductCartQuery> productCartMapper;
 
 	@Resource
-	private StockFeignSupport stockFeignSupport;
+	private StockRpcSupport stockRpcSupport;
 
 	@Resource
-	private ProductFeignSupport productFeignSupport;
+	private ProductRpcSupport productRpcSupport;
 
 	@Override
 	public List<ProductCart> findListByParam(ProductCartQuery param) {
@@ -210,11 +210,11 @@ public class ProductCartServiceImpl implements ProductCartService {
 		// 先查product_info表获得Cover,productOnSale
 		// 通过productId查询,创建productId数组,从list逐一取出productId
 		 List<String> productIdList = listVO.stream().map(ProductCartVO::getProductId).collect(Collectors.toList());
-		 ProductSnapshotBatchVO snapshot = productFeignSupport.snapshotBatch(productIdList);
-		 Map<String, ProductInfoSnapshotVO> productInfoMap = productFeignSupport.toProductInfoMap(snapshot);
-		 Map<String, ProductPropertyValueSnapshotVO> productPropertyValueMap = productFeignSupport.toPropertyValueMap(snapshot);
-		 Map<String, ProductSkuSnapshotVO> productSkuMap = productFeignSupport.toSkuMapByPropertyValueIds(snapshot);
-		 Map<String, ProductSkuSnapshotVO> defaultSkuByProductId = productFeignSupport.toDefaultSkuByProductId(snapshot);
+		 ProductSnapshotBatchVO snapshot = productRpcSupport.snapshotBatch(productIdList);
+		 Map<String, ProductInfoSnapshotVO> productInfoMap = productRpcSupport.toProductInfoMap(snapshot);
+		 Map<String, ProductPropertyValueSnapshotVO> productPropertyValueMap = productRpcSupport.toPropertyValueMap(snapshot);
+		 Map<String, ProductSkuSnapshotVO> productSkuMap = productRpcSupport.toSkuMapByPropertyValueIds(snapshot);
+		 Map<String, ProductSkuSnapshotVO> defaultSkuByProductId = productRpcSupport.toDefaultSkuByProductId(snapshot);
 		 // 创建新的List<ProductCartVO>
 		 List<ProductCartVO> newListVO = new ArrayList<ProductCartVO>();
 		 // 遍历listVO，获取缺失的数据
@@ -249,7 +249,7 @@ public class ProductCartServiceImpl implements ProductCartService {
 				 if (newProductCartVO.getAddPrice() == null) {
 					 newProductCartVO.setAddPrice(productSku.getPrice());
 				 }
-				 newProductCartVO.setStock(stockFeignSupport.getAvailable(
+				 newProductCartVO.setStock(stockRpcSupport.getAvailable(
 						 productSku.getProductId(), productSku.getPropertyValueIdHash()));
 				 if (StringTools.isEmpty(cartPropertyValueIds) && !StringTools.isEmpty(productSku.getPropertyValueIds())) {
 					 newProductCartVO.setPropertyValueIds(productSku.getPropertyValueIds());
@@ -296,7 +296,7 @@ public class ProductCartServiceImpl implements ProductCartService {
 		if (StringTools.isEmpty(productId)) {
 			throw new BusinessException("商品不存在");
 		}
-		ProductSkuSnapshotVO defaultSku = productFeignSupport.defaultSku(productId);
+		ProductSkuSnapshotVO defaultSku = productRpcSupport.defaultSku(productId);
 		if (defaultSku == null) {
 			throw new BusinessException("该商品暂不可加入购物车");
 		}
@@ -305,13 +305,13 @@ public class ProductCartServiceImpl implements ProductCartService {
 	}
 
 	private BigDecimal resolveSkuPrice(String productId, String propertyValueIds) {
-		ProductSnapshotBatchVO snapshot = productFeignSupport.snapshotBatch(Collections.singletonList(productId));
+		ProductSnapshotBatchVO snapshot = productRpcSupport.snapshotBatch(Collections.singletonList(productId));
 		ProductSkuSnapshotVO productSku = null;
 		if (!StringTools.isEmpty(propertyValueIds)) {
-			productSku = productFeignSupport.toSkuMapByPropertyValueIds(snapshot).get(productId + propertyValueIds);
+			productSku = productRpcSupport.toSkuMapByPropertyValueIds(snapshot).get(productId + propertyValueIds);
 		}
 		if (productSku == null) {
-			productSku = productFeignSupport.toDefaultSkuByProductId(snapshot).get(productId);
+			productSku = productRpcSupport.toDefaultSkuByProductId(snapshot).get(productId);
 		}
 		if (productSku == null || productSku.getPrice() == null) {
 			throw new BusinessException("该商品暂不可加入购物车");

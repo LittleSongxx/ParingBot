@@ -10,19 +10,19 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-public class CartFeignSupport {
+public class CartRpcSupport {
 
     @DubboReference
-    private CartDubboService cartFeignClient;
+    private CartDubboService cartDubboService;
     @Resource
-    private FeignResponseSupport feignResponseSupport;
+    private RpcResponseSupport rpcResponseSupport;
 
     public void deleteBatch(List<CartDeleteItemDTO> items) {
         if (items == null || items.isEmpty()) {
             return;
         }
-        feignResponseSupport.run(
-                () -> cartFeignClient.deleteBatch(new CartDeleteBatchDTO(items)),
+        rpcResponseSupport.run(
+                () -> cartDubboService.deleteBatch(new CartDeleteBatchDTO(items)),
                 "清理购物车失败");
     }
 }

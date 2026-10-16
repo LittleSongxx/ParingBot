@@ -1,7 +1,7 @@
 package com.smartlect.task;
 
 import com.smartlect.api.dto.PayOrderNotifyDTO;
-import com.smartlect.api.support.PayFeignSupport;
+import com.smartlect.api.support.PayRpcSupport;
 import com.smartlect.biz.OrderInfoService;
 import com.smartlect.component.RedisComponent;
 import com.smartlect.entity.config.AppConfig;
@@ -37,7 +37,7 @@ class PayOrderTaskTest {
     @Mock
     private OrderInfoService orderInfoService;
     @Mock
-    private PayFeignSupport payFeignSupport;
+    private PayRpcSupport payRpcSupport;
     @Mock
     private RedisComponent redisComponent;
 
@@ -60,7 +60,7 @@ class PayOrderTaskTest {
         order.setPayOrderId("pay-1");
         order.setPayChannel("mock");
         when(orderInfoService.findWaitPaymentPollList(3, 200)).thenReturn(List.of(order));
-        when(payFeignSupport.queryOrder("pay-1", "mock")).thenReturn(new PayOrderNotifyDTO("pay-1", "ch-1"));
+        when(payRpcSupport.queryOrder("pay-1", "mock")).thenReturn(new PayOrderNotifyDTO("pay-1", "ch-1"));
 
         task.pollPayOrders();
 
@@ -75,7 +75,7 @@ class PayOrderTaskTest {
         order.setPayOrderId("pay-1");
         order.setPayChannel("mock");
         when(orderInfoService.findWaitPaymentPollList(anyInt(), anyInt())).thenReturn(List.of(order));
-        when(payFeignSupport.queryOrder("pay-1", "mock")).thenReturn(null);
+        when(payRpcSupport.queryOrder("pay-1", "mock")).thenReturn(null);
 
         task.pollPayOrders();
 
@@ -87,8 +87,8 @@ class PayOrderTaskTest {
         OrderInfo bad = order("o1", "pay-1", "mock");
         OrderInfo good = order("o2", "pay-2", "mock");
         when(orderInfoService.findWaitPaymentPollList(anyInt(), anyInt())).thenReturn(List.of(bad, good));
-        when(payFeignSupport.queryOrder("pay-1", "mock")).thenThrow(new BusinessException("渠道暂时不可用"));
-        when(payFeignSupport.queryOrder("pay-2", "mock")).thenReturn(new PayOrderNotifyDTO("pay-2", "ch-2"));
+        when(payRpcSupport.queryOrder("pay-1", "mock")).thenThrow(new BusinessException("渠道暂时不可用"));
+        when(payRpcSupport.queryOrder("pay-2", "mock")).thenReturn(new PayOrderNotifyDTO("pay-2", "ch-2"));
 
         task.pollPayOrders();
 
@@ -103,7 +103,7 @@ class PayOrderTaskTest {
 
         task.pollPayOrders();
 
-        verify(payFeignSupport, never()).queryOrder(anyString(), anyString());
+        verify(payRpcSupport, never()).queryOrder(anyString(), anyString());
         verify(orderInfoService, never()).paySuccess(any());
     }
 

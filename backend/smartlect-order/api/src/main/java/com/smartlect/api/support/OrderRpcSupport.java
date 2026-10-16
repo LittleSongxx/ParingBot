@@ -20,63 +20,63 @@ import java.util.Collections;
 import java.util.List;
 
 @Component
-public class OrderFeignSupport {
+public class OrderRpcSupport {
 
     @DubboReference
-    private OrderDubboService orderFeignClient;
+    private OrderDubboService orderDubboService;
     @Resource
-    private FeignResponseSupport feignResponseSupport;
+    private RpcResponseSupport rpcResponseSupport;
 
     public OrderBriefVO getOrder(String orderId) {
-        return feignResponseSupport.call(() -> orderFeignClient.getOrder(new OrderIdDTO(orderId)), "查询订单失败");
+        return rpcResponseSupport.call(() -> orderDubboService.getOrder(new OrderIdDTO(orderId)), "查询订单失败");
     }
 
     public void paySuccess(PayOrderNotifyDTO dto) {
-        feignResponseSupport.run(() -> orderFeignClient.paySuccess(dto), "支付成功处理失败");
+        rpcResponseSupport.run(() -> orderDubboService.paySuccess(dto), "支付成功处理失败");
     }
 
     public CouponRushPrepareDTO prepareCouponRush(
             String userId, String couponId, String idempotencyKey) {
-        return feignResponseSupport.call(
-                () -> orderFeignClient.prepareCouponRush(
+        return rpcResponseSupport.call(
+                () -> orderDubboService.prepareCouponRush(
                         new CouponRushPrepareRequestDTO(userId, couponId), idempotencyKey),
                 "秒杀预占失败");
     }
 
     public PayInfoDTO postCouponRushOrder(
             String userId, String couponId, String payMethod, String idempotencyKey) {
-        return feignResponseSupport.call(
-                () -> orderFeignClient.postCouponRushOrder(
+        return rpcResponseSupport.call(
+                () -> orderDubboService.postCouponRushOrder(
                         new CouponRushPayRequestDTO(userId, couponId, payMethod), idempotencyKey),
                 "秒杀下单支付失败");
     }
 
     public void syncPaidCouponRushUserCoupons(String userId) {
-        feignResponseSupport.run(
-                () -> orderFeignClient.syncPaidCouponRushUserCoupons(new UserIdDTO(userId)),
+        rpcResponseSupport.run(
+                () -> orderDubboService.syncPaidCouponRushUserCoupons(new UserIdDTO(userId)),
                 "同步秒杀用户券失败");
     }
 
     public void cancelOrder(String orderId, String userId) {
-        feignResponseSupport.run(
-                () -> orderFeignClient.cancelOrder(new OrderIdDTO(orderId, userId)),
+        rpcResponseSupport.run(
+                () -> orderDubboService.cancelOrder(new OrderIdDTO(orderId, userId)),
                 "取消订单失败");
     }
 
     public OrderRangeStatsVO aggregateRange(String startTime, String endTime) {
-        return feignResponseSupport.call(
-                () -> orderFeignClient.aggregateRange(new OrderStatsRangeDTO(startTime, endTime)),
+        return rpcResponseSupport.call(
+                () -> orderDubboService.aggregateRange(new OrderStatsRangeDTO(startTime, endTime)),
                 "订单区间统计失败");
     }
 
     public List<OrderDailyStatsVO> aggregateDaily(String startTime, String endTime) {
-        List<OrderDailyStatsVO> list = feignResponseSupport.call(
-                () -> orderFeignClient.aggregateDaily(new OrderStatsRangeDTO(startTime, endTime)),
+        List<OrderDailyStatsVO> list = rpcResponseSupport.call(
+                () -> orderDubboService.aggregateDaily(new OrderStatsRangeDTO(startTime, endTime)),
                 "订单按日统计失败");
         return list == null ? Collections.emptyList() : list;
     }
 
     public void addAllWaitPayToDelayQueue() {
-        feignResponseSupport.run(orderFeignClient::addAllWaitPayToDelayQueue, "待付款订单加入延时队列失败");
+        rpcResponseSupport.run(orderDubboService::addAllWaitPayToDelayQueue, "待付款订单加入延时队列失败");
     }
 }

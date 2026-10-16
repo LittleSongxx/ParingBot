@@ -2,8 +2,8 @@ package com.smartlect.biz;
 
 import com.smartlect.api.dto.PayInfoDTO;
 import com.smartlect.api.enums.OrderStatusEnum;
-import com.smartlect.api.support.PayFeignSupport;
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.PayRpcSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.entity.po.OrderInfo;
 import com.smartlect.entity.po.OrderItem;
 import com.smartlect.entity.po.OrderRequestIdempotency;
@@ -36,13 +36,13 @@ public class CommerceV2Service {
     private final OrderItemService items;
     private final RefundSagaService refunds;
     private final RefundSagaTransactionService refundTransactions;
-    private final StockFeignSupport stocks;
-    private final PayFeignSupport payments;
+    private final StockRpcSupport stocks;
+    private final PayRpcSupport payments;
 
     public CommerceV2Service(OrderRequestIdempotencyService idempotency, OrderInfoService orders,
                             OrderItemService items, RefundSagaService refunds,
                             RefundSagaTransactionService refundTransactions,
-                            StockFeignSupport stocks, PayFeignSupport payments) {
+                            StockRpcSupport stocks, PayRpcSupport payments) {
         this.idempotency = idempotency;
         this.orders = orders;
         this.items = items;

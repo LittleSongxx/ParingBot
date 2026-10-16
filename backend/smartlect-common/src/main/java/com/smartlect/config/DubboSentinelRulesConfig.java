@@ -117,6 +117,6 @@ public class DubboSentinelRulesConfig {
             rules.add(rule);
         }
         DegradeRuleManager.loadRules(rules);
-        log.info("已加载 Feign Sentinel 熔断规则 {} 条", rules.size());
+        log.info("已加载 Dubbo Sentinel 熔断规则 {} 条", rules.size());
     }
 }

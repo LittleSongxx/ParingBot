@@ -26,8 +26,8 @@ PROCESS_FILE = ROOT / "run/processes.json"
 PROCESS_LOCK = ROOT / "run/processes.lock"
 DATABASES = ("admin", "user", "product", "stock", "cart", "order", "pay", "coupon")
 APPS = ("assistant", "user", "product", "stock", "order", "pay", "cart", "coupon", "admin", "gateway", "web-user", "web-admin")
-PORTS = {"MYSQL": 13306, "REDIS": 16379, "ROCKETMQ_NAMESRV": 9876, "ROCKETMQ_GRPC": 8081, "NACOS": 18848, "ES": 9200, "QDRANT": 6333, "CANAL": 11111, "XXLJOB": 18090, "LITELLM": 14000,
-         "GATEWAY": 18080, "GROWTH": 18000, "DASHBOARD": 18501,
+PORTS = {"MYSQL": 13306, "REDIS": 16379, "ROCKETMQ_NAMESRV": 9876, "ROCKETMQ_GRPC": 8081, "NACOS": 18848, "ES": 9200, "QDRANT": 6333, "CANAL": 11111, "XXLJOB": 18090,
+         "GATEWAY": 18080, "ASSISTANT": 18000, "DASHBOARD": 18501,
          "ADMIN": 18101, "USER": 18105, "PRODUCT": 18106, "STOCK": 18108,
          "CART": 18102, "ORDER": 18104, "PAY": 18103, "COUPON": 18107, "WEB_USER": 18180, "WEB_ADMIN": 18181}
 
@@ -107,7 +107,7 @@ def bootstrap():
             "SMARTLECT_ALLOWED_ORIGINS": "http://127.0.0.1:" + env["SMARTLECT_GATEWAY_PORT"],
             "SMARTLECT_WEB_USER_PORT": web_port,
             "SMARTLECT_WEB_ADMIN_PORT": admin_port,
-            "SMARTLECT_GROWTH_MYSQL_SSL": "0",
+            "SMARTLECT_ASSISTANT_MYSQL_SSL": "0",
         }
         additions = {key: value for key, value in candidate.items() if key not in env}
         if additions:
@@ -135,18 +135,17 @@ def bootstrap():
         "SMARTLECT_NACOS_GROUP": "SMARTLECT_GROUP",
         "SMARTLECT_ES_URL": "http://127.0.0.1:9200",
         "SMARTLECT_QDRANT_URL": "http://127.0.0.1:6333",
-        "SMARTLECT_GROWTH_MYSQL_USER": "smartlect_growth",
-        "SMARTLECT_GROWTH_MYSQL_DATABASE": "smartlect_growth",
-        "SMARTLECT_GROWTH_MYSQL_SSL": "0",
+        "SMARTLECT_ASSISTANT_MYSQL_USER": "smartlect_growth",
+        "SMARTLECT_ASSISTANT_MYSQL_DATABASE": "smartlect_growth",
+        "SMARTLECT_ASSISTANT_MYSQL_SSL": "0",
         "SMARTLECT_MODEL_MODE": "mock", "SMARTLECT_PAYMENT_MODE": "mock", "SMARTLECT_DEMO_ENABLED": "true",
     }
     password_keys = ["MYSQL_ROOT_PASSWORD", "MYSQL_PASSWORD", "FLYWAY_PASSWORD",
                      "REDIS_PASSWORD", "NACOS_PASSWORD",
                      "NACOS_MYSQL_PASSWORD", "NACOS_IDENTITY",
                      "INTERNAL_TOKEN", "INTERNAL_OPS_TOKEN",
-                     "GROWTH_MYSQL_PASSWORD", "CANAL_MYSQL_PASSWORD",
+                     "ASSISTANT_MYSQL_PASSWORD", "CANAL_MYSQL_PASSWORD",
                      "XXLJOB_MYSQL_PASSWORD", "XXLJOB_TOKEN",
-                     "LITELLM_MASTER_KEY",
                      "ADMIN_PASSWORD", "DEMO_PASSWORD", "VISITOR_SECRET", "ATTRIBUTION_SECRET"]
     for key in password_keys:
         env[f"SMARTLECT_{key}"] = secrets.token_hex(24)
@@ -160,7 +159,7 @@ def bootstrap():
         occupied.update(port + offset for offset in offsets)
     env["SMARTLECT_NACOS_GRPC_PORT"] = str(int(env["SMARTLECT_NACOS_PORT"]) + 1000)
     env["SMARTLECT_NACOS_ADDR"] = "127.0.0.1:" + env["SMARTLECT_NACOS_PORT"]
-    env["SMARTLECT_GROWTH_BASE_URL"] = "http://127.0.0.1:" + env["SMARTLECT_GROWTH_PORT"]
+    env["SMARTLECT_ASSISTANT_BASE_URL"] = "http://127.0.0.1:" + env["SMARTLECT_ASSISTANT_PORT"]
     env["SMARTLECT_ALLOWED_ORIGINS"] = ','.join('http://127.0.0.1:' + env[k] for k in ('SMARTLECT_GATEWAY_PORT', 'SMARTLECT_WEB_USER_PORT', 'SMARTLECT_WEB_ADMIN_PORT'))
     with ENV_FILE.open("x") as target:
         os.chmod(ENV_FILE, 0o600)
@@ -801,9 +800,7 @@ def start_app(service, env, records):
                 and records[service]["cmdline"] == command):
             return
         stop_process(records[service])
-    # env 前缀沿用历史 growth 命名（线上 .env/数据库不随服务改名），这里显式映射。
-    port_env = {"assistant": "SMARTLECT_GROWTH_PORT"}.get(service, f"SMARTLECT_{service.upper().replace('-', '_')}_PORT")
-    port = int(env[port_env])
+    port = int(env[f"SMARTLECT_{service.upper().replace('-', '_')}_PORT"])
     if port is not None:
         # 预检端口占用：按实际绑定地址探测（绑 0.0.0.0 时通配探测，能同时挡住
         # 别的进程占着某个具体地址的情况）
@@ -1030,7 +1027,7 @@ def self_test():
     test_env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"),
                 **{f"SMARTLECT_{key}": "a" * 48 for key in
                    ("MYSQL_PASSWORD", "FLYWAY_PASSWORD", "NACOS_MYSQL_PASSWORD",
-                    "GROWTH_MYSQL_PASSWORD", "CANAL_MYSQL_PASSWORD",
+                    "ASSISTANT_MYSQL_PASSWORD", "CANAL_MYSQL_PASSWORD",
                     "XXLJOB_MYSQL_PASSWORD")}}
     script = 'docker_process_sql() { cat; }; source "$1"'
     args = ["bash", "-ec", script, "self-test", str(ROOT / "deploy/mysql-init.sh")]

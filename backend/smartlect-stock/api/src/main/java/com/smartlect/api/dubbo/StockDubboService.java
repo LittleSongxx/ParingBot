@@ -31,7 +31,7 @@ import com.smartlect.entity.vo.PaginationResultVO;
 import java.util.List;
 
 /**
- * 库存域内部 Dubbo 契约（取代 StockFeignClient，方法签名一致；HTTP /internal/stock
+ * 库存域内部 Dubbo 契约（取代 StockDubboService，方法签名一致；HTTP /internal/stock
  * 端点保留给 assistant 与运维，双通道共用同一 Service 层）。
  */
 public interface StockDubboService {

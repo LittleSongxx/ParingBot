@@ -1,8 +1,8 @@
 package com.smartlect.biz;
 
 import com.smartlect.api.enums.PayChannelEnum;
-import com.smartlect.api.support.PayFeignSupport;
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.PayRpcSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.entity.enums.RefundSagaStatus;
 import com.smartlect.entity.po.OrderItem;
 import com.smartlect.entity.po.RefundRequest;
@@ -21,9 +21,9 @@ public class RefundSagaService {
     @Resource
     private RefundSagaTransactionService transactionService;
     @Resource
-    private PayFeignSupport payFeignSupport;
+    private PayRpcSupport payRpcSupport;
     @Resource
-    private StockFeignSupport stockFeignSupport;
+    private StockRpcSupport stockRpcSupport;
 
     public void requestRefund(OrderItem item, String userId) {
         if (item == null || item.getOrderItemId() == null) {
@@ -88,7 +88,7 @@ public class RefundSagaService {
 
         try {
             PayChannelEnum channel = PayChannelEnum.resolve(current.getPayChannel());
-            payFeignSupport.refund(
+            payRpcSupport.refund(
                     current.getSourcePayOrderId(),
                     current.getRefundOrderNo(),
                     current.getRefundAmount(),
@@ -105,7 +105,7 @@ public class RefundSagaService {
     }
 
     private void reconcileStock(RefundRequest request) {
-        if (stockFeignSupport.isRefundStockApplied(request.getRefundRequestId())) {
+        if (stockRpcSupport.isRefundStockApplied(request.getRefundRequestId())) {
             transactionService.markCompleted(request.getRefundRequestId());
             return;
         }

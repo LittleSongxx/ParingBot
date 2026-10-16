@@ -100,7 +100,7 @@ public class ProductCacheService {
         l1.invalidate(productId);
     }
 
-    /** 库存清零：缓存的是静态快照，库存字段设 0 防调用方误用旧值（真实库存由调用方实时 Feign 查）。 */
+    /** 库存清零：缓存的是静态快照，库存字段设 0 防调用方误用旧值（真实库存由调用方实时 RPC 查）。 */
     private Product4VO stripVolatileStock(Product4VO value) {
         if (value.getSkuList() != null) {
             value.getSkuList().forEach(sku -> sku.setStock(0));

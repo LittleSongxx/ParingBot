@@ -8,7 +8,7 @@ import com.smartlect.api.dto.ImageUploadResultDTO;
 import com.smartlect.api.dubbo.OrderDubboService;
 import org.apache.dubbo.config.annotation.DubboReference;
 import com.smartlect.api.dto.OrderIdDTO;
-import com.smartlect.api.support.FeignResponseSupport;
+import com.smartlect.api.support.RpcResponseSupport;
 import com.smartlect.api.vo.OrderBriefVO;
 import com.smartlect.api.enums.ImageModerationSceneEnum;
 import com.smartlect.api.enums.ImageModerationStatusEnum;
@@ -53,9 +53,9 @@ public class ImageModerationServiceImpl implements ImageModerationService {
     @Resource
     private ImageModerationRecordMapper<ImageModerationRecord, ImageModerationRecordQuery> imageModerationRecordMapper;
     @DubboReference
-    private OrderDubboService orderFeignClient;
+    private OrderDubboService orderDubboService;
     @Resource
-    private FeignResponseSupport feignResponseSupport;
+    private RpcResponseSupport rpcResponseSupport;
     @Value("${image-moderation.orphan-upload-hours:24}")
     private int orphanUploadHours;
 
@@ -223,7 +223,7 @@ public class ImageModerationServiceImpl implements ImageModerationService {
     }
 
     private void publishPendingOrderComment(String orderId) {
-        // 评论发布属 order 域；审核通过后由运营在订单侧处理或后续 Feign 补齐
+        // 评论发布属 order 域；审核通过后由运营在订单侧处理，或后续补 order 域内部接口
         log.warn("审核通过后发布待审评论需订单服务配合，已跳过自动发布 orderId={}", orderId);
     }
 
@@ -299,8 +299,8 @@ public class ImageModerationServiceImpl implements ImageModerationService {
             return true;
         }
         try {
-            OrderBriefVO order = feignResponseSupport.call(
-                    () -> orderFeignClient.getOrder(new OrderIdDTO(orderId)),
+            OrderBriefVO order = rpcResponseSupport.call(
+                    () -> orderDubboService.getOrder(new OrderIdDTO(orderId)),
                     "查询订单失败");
             // 订单不存在视为孤立；存在则保守不删（评论状态跨服务暂不可见）
             return order == null;

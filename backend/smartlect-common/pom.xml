@@ -158,12 +158,13 @@
       <groupId>com.github.ben-manes.caffeine</groupId>
       <artifactId>caffeine</artifactId>
     </dependency>
-    <!-- Feign + LoadBalancer 在连接失败时切换下一实例需要 spring-retry -->
+    <!-- LoadBalancer（网关与内部 lb:// 路由）切换下一实例需要 spring-retry；Dubbo 侧由
+         自身重试与 Sentinel 熔断负责 -->
     <dependency>
       <groupId>org.springframework.retry</groupId>
       <artifactId>spring-retry</artifactId>
     </dependency>
-    <!-- 可选：Feign Sentinel 默认熔断规则（服务模块引入 sentinel starter 后生效） -->
+    <!-- 可选：Dubbo Sentinel 默认熔断规则（服务模块引入 sentinel starter 后生效） -->
     <dependency>
       <groupId>com.alibaba.csp</groupId>
       <artifactId>sentinel-core</artifactId>

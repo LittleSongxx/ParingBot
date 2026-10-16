@@ -2,8 +2,8 @@ package com.smartlect.biz;
 
 import com.smartlect.api.dto.PayInfoDTO;
 import com.smartlect.api.enums.OrderStatusEnum;
-import com.smartlect.api.support.PayFeignSupport;
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.PayRpcSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.entity.po.OrderInfo;
 import com.smartlect.entity.po.OrderItem;
 import com.smartlect.entity.po.OrderRequestIdempotency;
@@ -33,8 +33,8 @@ class CommerceV2ServiceTest {
     @Mock private OrderItemService items;
     @Mock private RefundSagaService refunds;
     @Mock private RefundSagaTransactionService refundTransactions;
-    @Mock private StockFeignSupport stocks;
-    @Mock private PayFeignSupport payments;
+    @Mock private StockRpcSupport stocks;
+    @Mock private PayRpcSupport payments;
     @InjectMocks private CommerceV2Service service;
 
     @Test

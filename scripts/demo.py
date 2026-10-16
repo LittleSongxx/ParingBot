@@ -138,7 +138,7 @@ def transaction_scenario(seed):
             "pay_order_id": pay_id, "paid_cents": expected_cents,
             "refunded_cents": cents(refunds[0]["refundAmount"]), "initial_stock": before,
             "final_stock": [stock(sku) for sku in selected], "model_mode": "mock"}
-    # ADR-0008 退役 growth 事件消费线：原 SMARTLECT_GROWTH_EVENTS_ENABLED 分支调用
+    # ADR-0008 退役 growth 事件消费线：原 SMARTLECT_ASSISTANT_EVENTS_ENABLED 分支调用
     # 已删除的 /internal/ledger/summary 对账（demo 必失败），随退役一并移除。
     return result
 

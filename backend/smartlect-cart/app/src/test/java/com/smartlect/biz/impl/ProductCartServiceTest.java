@@ -1,6 +1,6 @@
 package com.smartlect.biz.impl;
 
-import com.smartlect.api.support.ProductFeignSupport;
+import com.smartlect.api.support.ProductRpcSupport;
 import com.smartlect.entity.po.ProductCart;
 import com.smartlect.exception.BusinessException;
 import com.smartlect.mappers.ProductCartMapper;
@@ -31,14 +31,14 @@ class ProductCartServiceTest {
     @Mock
     private ProductCartMapper<ProductCart, ProductCartQuery> productCartMapper;
     @Mock
-    private ProductFeignSupport productFeignSupport;
+    private ProductRpcSupport productRpcSupport;
 
     @InjectMocks
     private ProductCartServiceImpl service;
 
     @BeforeEach
     void lenientSnapshot() {
-        lenient().when(productFeignSupport.snapshotBatch(any())).thenReturn(null);
+        lenient().when(productRpcSupport.snapshotBatch(any())).thenReturn(null);
     }
 
     private static ProductCart cart(String userId, String productId, String propertyValueIds, Integer buyCount) {
@@ -56,7 +56,7 @@ class ProductCartServiceTest {
         existing.setAddPrice(new BigDecimal("9.90"));
         when(productCartMapper.selectByProductIdAndPropertyValueIdHashAndUserId(
                 eq("p1"), anyString(), eq("u1"))).thenReturn(existing);
-        lenient().when(productFeignSupport.toSkuMapByPropertyValueIds(any())).thenReturn(java.util.Map.of());
+        lenient().when(productRpcSupport.toSkuMapByPropertyValueIds(any())).thenReturn(java.util.Map.of());
 
         service.add2Cart(cart("u1", "p1", "101-202", 3));
 

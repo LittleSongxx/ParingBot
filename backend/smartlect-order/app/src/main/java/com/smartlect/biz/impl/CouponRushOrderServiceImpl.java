@@ -10,8 +10,8 @@ import com.smartlect.api.enums.OrderStatusEnum;
 import com.smartlect.api.enums.PayChannelEnum;
 import com.smartlect.api.enums.RushingCouponStatusEnum;
 import com.smartlect.api.enums.UserCouponStatusEnum;
-import com.smartlect.api.support.CouponFeignSupport;
-import com.smartlect.api.support.PayFeignSupport;
+import com.smartlect.api.support.CouponRpcSupport;
+import com.smartlect.api.support.PayRpcSupport;
 import com.smartlect.api.vo.DiscountCouponVO;
 import com.smartlect.api.vo.UserCouponVO;
 import com.smartlect.biz.CouponRushOrderService;
@@ -64,10 +64,10 @@ public class CouponRushOrderServiceImpl implements CouponRushOrderService {
 	private OrderCouponRelMapper<OrderCouponRel, OrderCouponRelQuery> orderCouponRelMapper;
 
 	@Resource
-	private CouponFeignSupport couponFeignSupport;
+	private CouponRpcSupport couponRpcSupport;
 
 	@Resource
-	private PayFeignSupport payFeignSupport;
+	private PayRpcSupport payRpcSupport;
 
 @Resource
 private CouponRushRedisComponent couponRushRedisComponent;
@@ -120,26 +120,26 @@ private CouponRushRedisComponent couponRushRedisComponent;
 		// Phase 2: Redis 预占 + 远程库存扣减（各自事务，本地不持连接）
 		int rushCode = couponRushRedisComponent.rushingCoupon(couponId, userId, userCouponId);
 		if (rushCode == 1) {
-			couponFeignSupport.syncRushStockFromDbIfRedisZero(couponId);
+			couponRpcSupport.syncRushStockFromDbIfRedisZero(couponId);
 			throw new BusinessException("库存不足！");
 		}
 		assertRushCode(rushCode);
 
 		try {
-			DiscountCouponVO lockedCoupon = couponFeignSupport.getCoupon(couponId);
+			DiscountCouponVO lockedCoupon = couponRpcSupport.getCoupon(couponId);
 			boolean unlimited = lockedCoupon != null && lockedCoupon.isUnlimitedStock();
 			if (lockedCoupon == null
 					|| (!unlimited && (lockedCoupon.getRemainCount() == null || lockedCoupon.getRemainCount() <= 0))) {
-				couponFeignSupport.releaseRushRedisReserve(couponId, userId);
+				couponRpcSupport.releaseRushRedisReserve(couponId, userId);
 				throw new BusinessException("库存不足");
 			}
 
-			int affected = couponFeignSupport.deductStock(couponId, userId);
+			int affected = couponRpcSupport.deductStock(couponId, userId);
 			if (affected == 0) {
-				couponFeignSupport.releaseRushRedisReserve(couponId, userId);
+				couponRpcSupport.releaseRushRedisReserve(couponId, userId);
 				throw new BusinessException("库存不足或并发冲突");
 			}
-			couponFeignSupport.invalidateCouponCache(couponId);
+			couponRpcSupport.invalidateCouponCache(couponId);
 
 			// Phase 3: 短本地事务建单（order + rel + item + RUSH_TIMEOUT Outbox 原子落库，零远程调用）。
 			// 曾经的 @Transactional 整体包裹既占连接又把远程调用卷进本地事务；
@@ -149,7 +149,7 @@ private CouponRushRedisComponent couponRushRedisComponent;
 				orderInfo = transactionTemplate.execute(status ->
 						insertCouponRushOrder(userId, couponId, userCouponId, discountCoupon, payAmount));
 			} catch (Exception e) {
-				couponFeignSupport.releaseRushCouponReserve(couponId, userId);
+				couponRpcSupport.releaseRushCouponReserve(couponId, userId);
 				if (e instanceof BusinessException businessException) {
 					throw businessException;
 				}
@@ -166,9 +166,9 @@ private CouponRushRedisComponent couponRushRedisComponent;
 				createDTO.setUserId(userId);
 				createDTO.setCouponId(couponId);
 				createDTO.setStatus(UserCouponStatusEnum.CANT.getStatus());
-				couponFeignSupport.createUserCoupon(createDTO);
+				couponRpcSupport.createUserCoupon(createDTO);
 			} catch (Exception e) {
-				couponFeignSupport.releaseRushCouponReserve(couponId, userId);
+				couponRpcSupport.releaseRushCouponReserve(couponId, userId);
 				log.error("优惠券秒杀创建占位券失败，订单交由超时关单收敛 couponId={}, orderId={}",
 						couponId, orderInfo.getOrderId(), e);
 				throw new BusinessException("下单失败，请稍后重试");
@@ -187,7 +187,7 @@ private CouponRushRedisComponent couponRushRedisComponent;
 			log.info("优惠券秒杀预占并建单成功 couponId={}, orderId={}", couponId, orderInfo.getOrderId());
 			return dto;
 		} finally {
-			couponFeignSupport.syncRushStockFromDbIfRedisZero(couponId);
+			couponRpcSupport.syncRushStockFromDbIfRedisZero(couponId);
 		}
 	}
 
@@ -197,14 +197,14 @@ private CouponRushRedisComponent couponRushRedisComponent;
 		if (payChannelEnum == null) {
 			throw new BusinessException("支付方式无效");
 		}
-		couponFeignSupport.assertRushNotBlocked(couponId);
+		couponRpcSupport.assertRushNotBlocked(couponId);
 
 		String userCouponId = couponRushRedisComponent.getRushUserCouponId(userId, couponId);
 		if (StringTools.isEmpty(userCouponId)) {
 			throw new BusinessException("抢购资格已失效，请返回重新抢购");
 		}
 
-		DiscountCouponVO discountCoupon = couponFeignSupport.getCoupon(couponId);
+		DiscountCouponVO discountCoupon = couponRpcSupport.getCoupon(couponId);
 		if (discountCoupon == null) {
 			throw new BusinessException("优惠券不存在");
 		}
@@ -232,17 +232,17 @@ private CouponRushRedisComponent couponRushRedisComponent;
 		// 事务外远程写（幂等）
 		orderInfo.setPayChannel(payMethod);
 		BigDecimal payAmount = OrderPayAmountUtil.normalizeChannelPayAmount(orderInfo.getAmount());
-		PayInfoDTO payInfoDTO = payFeignSupport.getPayUrl(
+		PayInfoDTO payInfoDTO = payRpcSupport.getPayUrl(
 				payChannelEnum.getPayScene(), orderInfo.getPayOrderId(), orderInfo.getSubject(), payAmount);
 		payInfoDTO.setOrderId(orderInfo.getOrderId());
-		payFeignSupport.createPending(userId, orderInfo.getPayOrderId(), orderInfo.getOrderId(),
+		payRpcSupport.createPending(userId, orderInfo.getPayOrderId(), orderInfo.getOrderId(),
 				payAmount, payMethod);
 		log.info("优惠券秒杀发起支付 orderId={}, payOrderId={}", orderInfo.getOrderId(), orderInfo.getPayOrderId());
 		return payInfoDTO;
 	}
 
 	private DiscountCouponVO validateCouponRush(String couponId) {
-		DiscountCouponVO discountCoupon = couponFeignSupport.getCoupon(couponId);
+		DiscountCouponVO discountCoupon = couponRpcSupport.getCoupon(couponId);
 		if (discountCoupon == null) {
 			throw new BusinessException("优惠券不存在");
 		}
@@ -256,10 +256,10 @@ private CouponRushRedisComponent couponRushRedisComponent;
 		if (discountCoupon.getRushingEndTime() != null && now.after(discountCoupon.getRushingEndTime())) {
 			throw new BusinessException("该优惠券已结束抢购");
 		}
-		couponFeignSupport.assertRushNotBlocked(couponId);
-		if (!couponFeignSupport.hasAvailableRushStock(couponId)) {
-			couponFeignSupport.syncRushStockFromDbIfRedisZero(couponId);
-			if (!couponFeignSupport.hasAvailableRushStock(couponId)) {
+		couponRpcSupport.assertRushNotBlocked(couponId);
+		if (!couponRpcSupport.hasAvailableRushStock(couponId)) {
+			couponRpcSupport.syncRushStockFromDbIfRedisZero(couponId);
+			if (!couponRpcSupport.hasAvailableRushStock(couponId)) {
 				throw new BusinessException("库存不足！");
 			}
 		}
@@ -364,7 +364,7 @@ private CouponRushRedisComponent couponRushRedisComponent;
 			return;
 		}
 		try {
-			couponFeignSupport.changeUserCouponStatus(userCouponId, userId,
+			couponRpcSupport.changeUserCouponStatus(userCouponId, userId,
 					UserCouponStatusEnum.CANT.getStatus(), UserCouponStatusEnum.NOUSE.getStatus(), null);
 		} catch (BusinessException ignore) {
 			// 幂等：已激活则忽略
@@ -394,7 +394,7 @@ private CouponRushRedisComponent couponRushRedisComponent;
 				if (StringTools.isEmpty(rel.getUserCouponId())) {
 					continue;
 				}
-				UserCouponVO uc = couponFeignSupport.getUserCoupon(rel.getUserCouponId());
+				UserCouponVO uc = couponRpcSupport.getUserCoupon(rel.getUserCouponId());
 				if (uc != null && UserCouponStatusEnum.CANT.getStatus().equals(uc.getStatus())) {
 					activateUserCoupon(orderInfo.getUserId(), rel.getUserCouponId());
 					activated++;

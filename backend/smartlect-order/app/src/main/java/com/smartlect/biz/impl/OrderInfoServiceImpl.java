@@ -8,9 +8,9 @@ import com.smartlect.api.dto.PostOrderDTO;
 import com.smartlect.api.enums.OrderItemStatusEnum;
 import com.smartlect.api.enums.OrderStatusEnum;
 import com.smartlect.api.enums.PayChannelEnum;
-import com.smartlect.api.support.CouponFeignSupport;
-import com.smartlect.api.support.ProductFeignSupport;
-import com.smartlect.api.support.UserFeignSupport;
+import com.smartlect.api.support.CouponRpcSupport;
+import com.smartlect.api.support.ProductRpcSupport;
+import com.smartlect.api.support.UserRpcSupport;
 import com.smartlect.api.vo.CouponBriefVO;
 import com.smartlect.api.vo.OrderCountVO;
 import com.smartlect.api.vo.UserBriefVO;
@@ -63,11 +63,11 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 	@Resource
 	private OrderStateMachine orderStateMachine;
 	@Resource
-	private ProductFeignSupport productFeignSupport;
+	private ProductRpcSupport productRpcSupport;
 	@Resource
-	private UserFeignSupport userFeignSupport;
+	private UserRpcSupport userRpcSupport;
 	@Resource
-	private CouponFeignSupport couponFeignSupport;
+	private CouponRpcSupport couponRpcSupport;
 	@Resource
 	private OrderItemMapper<OrderItem, OrderItemQuery> orderItemMapper;
 	@Resource
@@ -89,7 +89,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 
 	// getPayInfo 需要拉取支付表单（远程）
 	@Resource
-	private com.smartlect.api.support.PayFeignSupport payFeignSupport;
+	private com.smartlect.api.support.PayRpcSupport payRpcSupport;
 
 	@Override
 	public List<OrderInfo> findListByParam(OrderInfoQuery param) {
@@ -218,7 +218,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 		amount = OrderPayAmountUtil.normalizeChannelPayAmount(amount);
 		String payOrderId = orderInfo.getPayOrderId();
 
-		PayInfoDTO payInfoDTO = payFeignSupport.getPayUrl(payChannelEnum.getPayScene(), payOrderId, subject, amount);
+		PayInfoDTO payInfoDTO = payRpcSupport.getPayUrl(payChannelEnum.getPayScene(), payOrderId, subject, amount);
 		if (payChannelEnum != PayChannelEnum.MOCK) {
 			orderCancellationService.cancelOrder4Channel(orderInfo);
 		}
@@ -376,7 +376,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 		if (rel == null || StringTools.isEmpty(rel.getCouponId())) {
 			return;
 		}
-		CouponBriefVO coupon = couponFeignSupport.getCouponBrief(rel.getCouponId());
+		CouponBriefVO coupon = couponRpcSupport.getCouponBrief(rel.getCouponId());
 		if (coupon != null) {
 			orderInfo.setCouponName(coupon.getCouponName());
 			orderInfo.setCouponType(coupon.getCouponType());
@@ -399,7 +399,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 				.filter(id -> !StringTools.isEmpty(id))
 				.distinct()
 				.collect(Collectors.toList());
-		Map<String, UserBriefVO> map = userFeignSupport.mapBriefByUserIds(userIds);
+		Map<String, UserBriefVO> map = userRpcSupport.mapBriefByUserIds(userIds);
 		for (OrderInfo order : list) {
 			UserBriefVO brief = map.get(order.getUserId());
 			if (brief != null) {
@@ -526,7 +526,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 		}
 		for (Map.Entry<String, Integer> entry : qtyByProduct.entrySet()) {
 			try {
-				productFeignSupport.increaseSales(entry.getKey(), entry.getValue());
+				productRpcSupport.increaseSales(entry.getKey(), entry.getValue());
 			} catch (BusinessException e) {
 				log.warn("确认收货加销量跳过 productId={}, msg={}", entry.getKey(), e.getMessage());
 			}

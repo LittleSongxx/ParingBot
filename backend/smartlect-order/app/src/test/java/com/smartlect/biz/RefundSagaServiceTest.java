@@ -1,7 +1,7 @@
 package com.smartlect.biz;
 
-import com.smartlect.api.support.PayFeignSupport;
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.PayRpcSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.entity.po.OrderItem;
 import com.smartlect.entity.po.RefundRequest;
 import com.smartlect.exception.BusinessException;
@@ -24,16 +24,16 @@ class RefundSagaServiceTest {
 
     private final RefundSagaTransactionService transactionService =
             mock(RefundSagaTransactionService.class);
-    private final PayFeignSupport payFeignSupport = mock(PayFeignSupport.class);
-    private final StockFeignSupport stockFeignSupport = mock(StockFeignSupport.class);
+    private final PayRpcSupport payRpcSupport = mock(PayRpcSupport.class);
+    private final StockRpcSupport stockRpcSupport = mock(StockRpcSupport.class);
     private RefundSagaService service;
 
     @BeforeEach
     void setUp() {
         service = new RefundSagaService();
         ReflectionTestUtils.setField(service, "transactionService", transactionService);
-        ReflectionTestUtils.setField(service, "payFeignSupport", payFeignSupport);
-        ReflectionTestUtils.setField(service, "stockFeignSupport", stockFeignSupport);
+        ReflectionTestUtils.setField(service, "payRpcSupport", payRpcSupport);
+        ReflectionTestUtils.setField(service, "stockRpcSupport", stockRpcSupport);
     }
 
     private static OrderItem item() {
@@ -87,7 +87,7 @@ class RefundSagaServiceTest {
 
         service.reconcile();
 
-        verify(payFeignSupport).refund(
+        verify(payRpcSupport).refund(
                 org.mockito.ArgumentMatchers.nullable(String.class),
                 org.mockito.ArgumentMatchers.nullable(String.class),
                 org.mockito.ArgumentMatchers.nullable(java.math.BigDecimal.class),
@@ -97,7 +97,7 @@ class RefundSagaServiceTest {
 
         // 库存侧确认恢复，reconcile 收敛到完成态。
         when(transactionService.selectDue(30)).thenReturn(List.of(request("STOCK_PENDING")));
-        when(stockFeignSupport.isRefundStockApplied("r1")).thenReturn(true);
+        when(stockRpcSupport.isRefundStockApplied("r1")).thenReturn(true);
 
         service.reconcile();
 
@@ -113,7 +113,7 @@ class RefundSagaServiceTest {
 
         service.requestRefund(item(), "u1");
 
-        verify(payFeignSupport).refund(
+        verify(payRpcSupport).refund(
                 org.mockito.ArgumentMatchers.nullable(String.class),
                 org.mockito.ArgumentMatchers.nullable(String.class),
                 org.mockito.ArgumentMatchers.nullable(java.math.BigDecimal.class),

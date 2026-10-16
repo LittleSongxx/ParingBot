@@ -6,8 +6,8 @@ import com.smartlect.api.enums.LogisticsStatusEnum;
 import com.smartlect.api.enums.OrderStatusEnum;
 import com.smartlect.api.enums.PayChannelEnum;
 import com.smartlect.api.enums.UserCouponStatusEnum;
-import com.smartlect.api.support.CouponFeignSupport;
-import com.smartlect.api.support.PayFeignSupport;
+import com.smartlect.api.support.CouponRpcSupport;
+import com.smartlect.api.support.PayRpcSupport;
 import com.smartlect.biz.CouponRushOrderService;
 import com.smartlect.component.PayOrderRedisComponent;
 import com.smartlect.component.RedisComponent;
@@ -67,8 +67,8 @@ public class OrderPaymentService {
     private final OrderStateMachine orderStateMachine;
     private final RedisComponent redisComponent;
     private final PayOrderRedisComponent payOrderRedisComponent;
-    private final PayFeignSupport payFeignSupport;
-    private final CouponFeignSupport couponFeignSupport;
+    private final PayRpcSupport payRpcSupport;
+    private final CouponRpcSupport couponRpcSupport;
     private final CouponRushOrderService couponRushOrderService;
     private final TransactionalMqSender transactionalMqSender;
 
@@ -81,8 +81,8 @@ public class OrderPaymentService {
             OrderStateMachine orderStateMachine,
             RedisComponent redisComponent,
             PayOrderRedisComponent payOrderRedisComponent,
-            PayFeignSupport payFeignSupport,
-            CouponFeignSupport couponFeignSupport,
+            PayRpcSupport payRpcSupport,
+            CouponRpcSupport couponRpcSupport,
             CouponRushOrderService couponRushOrderService,
             TransactionalMqSender transactionalMqSender) {
         this.orderInfoMapper = orderInfoMapper;
@@ -93,8 +93,8 @@ public class OrderPaymentService {
         this.orderStateMachine = orderStateMachine;
         this.redisComponent = redisComponent;
         this.payOrderRedisComponent = payOrderRedisComponent;
-        this.payFeignSupport = payFeignSupport;
-        this.couponFeignSupport = couponFeignSupport;
+        this.payRpcSupport = payRpcSupport;
+        this.couponRpcSupport = couponRpcSupport;
         this.couponRushOrderService = couponRushOrderService;
         this.transactionalMqSender = transactionalMqSender;
     }
@@ -113,7 +113,7 @@ public class OrderPaymentService {
     private void paySuccessInLock(PayOrderNotifyDTO payOrderNotifyDTO) {
         String payOrderId = payOrderNotifyDTO.getPayOrderId();
         // 远程读校验：事务外（不占本地连接）
-        payFeignSupport.assertSettled(payOrderId);
+        payRpcSupport.assertSettled(payOrderId);
         List<OrderInfo> orderInfoList = OrderFacts.loadOrdersByPayOrderId(orderInfoMapper, payOrderId);
         if (orderInfoList.isEmpty()) {
             throw new BusinessException("订单不存在");
@@ -170,7 +170,7 @@ public class OrderPaymentService {
         // 事务外远程写（幂等）：券核销失败抛出由支付事件重投重试；markSuccess 在 mock 渠道
         // 已由 completePayment 先行标记，此处为幂等双保险。
         useCouponIfNeeded(orderInfoList);
-        payFeignSupport.markSuccess(payOrderId, payOrderNotifyDTO.getChannelOrderId());
+        payRpcSupport.markSuccess(payOrderId, payOrderNotifyDTO.getChannelOrderId());
     }
 
     private void upsertLogisticsForOrders(List<OrderInfo> orderInfoList) {
@@ -269,7 +269,7 @@ public class OrderPaymentService {
         for (CouponActivation activation : pendingActivation) {
             couponRushOrderService.activateUserCoupon(activation.userId(), activation.userCouponId());
         }
-        payFeignSupport.markSuccess(payOrderId, payOrderNotifyDTO.getChannelOrderId());
+        payRpcSupport.markSuccess(payOrderId, payOrderNotifyDTO.getChannelOrderId());
         log.info("优惠券秒杀支付成功 payOrderId={}, 券数量={}", payOrderId, orderInfoList.size());
     }
 
@@ -310,8 +310,8 @@ public class OrderPaymentService {
         PayChannelEnum payChannelEnum = resolveWaitPayChannel(refOrder);
         String refundRequestNo = "LATE" + StringTools.getRandomNumber(Constants.LENGTH_30);
         try {
-            payFeignSupport.refund(payOrderId, refundRequestNo, total, payChannelEnum.getPayScene());
-            payFeignSupport.markRefunded(payOrderId);
+            payRpcSupport.refund(payOrderId, refundRequestNo, total, payChannelEnum.getPayScene());
+            payRpcSupport.markRefunded(payOrderId);
             log.warn("关单后迟到的支付已原路退款 payOrderId={}, channelOrderId={}, amount={}",
                     payOrderId, payOrderNotifyDTO.getChannelOrderId(), total);
         } catch (Exception e) {
@@ -334,13 +334,13 @@ public class OrderPaymentService {
                     continue;
                 }
                 try {
-                    couponFeignSupport.changeUserCouponStatus(rel.getUserCouponId(), o.getUserId(),
+                    couponRpcSupport.changeUserCouponStatus(rel.getUserCouponId(), o.getUserId(),
                             UserCouponStatusEnum.CANT.getStatus(), UserCouponStatusEnum.USED.getStatus(), now);
                 } catch (BusinessException ex) {
                     // 幂等：券已是 USED 时忽略；其它业务失败需抛出以便支付回调重试
                     com.smartlect.api.vo.UserCouponVO uc = null;
                     try {
-                        uc = couponFeignSupport.getUserCoupon(rel.getUserCouponId());
+                        uc = couponRpcSupport.getUserCoupon(rel.getUserCouponId());
                     } catch (Exception ignore) {
                     }
                     if (uc != null && UserCouponStatusEnum.USED.getStatus().equals(uc.getStatus())) {

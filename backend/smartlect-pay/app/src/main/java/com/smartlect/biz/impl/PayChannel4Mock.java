@@ -75,7 +75,7 @@ public class PayChannel4Mock implements PayChannel {
             throw new BusinessException("支付状态发生变化，请重新查询");
         }
         if (Objects.equals(record.getTradeStatus(), 1)) {
-            // 支付成功经 Outbox 事件通知 order（幂等键=payOrderId），取代同步 Feign 回调，
+            // 支付成功经 Outbox 事件通知 order（幂等键=payOrderId），取代同步 RPC 回调，
             // 断开 pay→order 运行时调用环；order 侧消费与重放都由同一幂等键去重。
             transactionalMqSender.sendAfterCommit(
                     RocketMqTopics.TOPIC_PAY,

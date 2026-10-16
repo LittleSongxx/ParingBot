@@ -39,17 +39,17 @@ import java.util.stream.Collectors;
 
 @Component
 
-public class ProductFeignSupport {
+public class ProductRpcSupport {
 
 
 
     @DubboReference
 
-    private ProductDubboService productFeignClient;
+    private ProductDubboService productDubboService;
 
     @Resource
 
-    private FeignResponseSupport feignResponseSupport;
+    private RpcResponseSupport rpcResponseSupport;
 
 
 
@@ -69,9 +69,9 @@ public class ProductFeignSupport {
 
         }
 
-        return feignResponseSupport.call(
+        return rpcResponseSupport.call(
 
-                () -> productFeignClient.snapshotBatch(new ProductIdListDTO(productIds)),
+                () -> productDubboService.snapshotBatch(new ProductIdListDTO(productIds)),
 
                 "查询商品快照失败");
 
@@ -163,9 +163,9 @@ public class ProductFeignSupport {
 
     public ProductSkuSnapshotVO defaultSku(String productId) {
 
-        return feignResponseSupport.call(
+        return rpcResponseSupport.call(
 
-                () -> productFeignClient.defaultSku(new ProductIdDTO(productId)), "查询默认SKU失败");
+                () -> productDubboService.defaultSku(new ProductIdDTO(productId)), "查询默认SKU失败");
 
     }
 
@@ -173,23 +173,23 @@ public class ProductFeignSupport {
 
     public void increaseSales(String productId, int qty) {
 
-        feignResponseSupport.run(
+        rpcResponseSupport.run(
 
-                () -> productFeignClient.increaseSales(new ProductSalesIncreaseDTO(productId, qty)),
+                () -> productDubboService.increaseSales(new ProductSalesIncreaseDTO(productId, qty)),
 
                 "增加销量失败");
 
     }
 
     public PaginationResultVO<ProductSkuListVO> lessStockSkuPage(Integer pageNo, Integer pageSize, Integer threshold) {
-        return feignResponseSupport.call(
-                () -> productFeignClient.lessStockSkuPage(new LessStockPageDTO(pageNo, pageSize, threshold)),
+        return rpcResponseSupport.call(
+                () -> productDubboService.lessStockSkuPage(new LessStockPageDTO(pageNo, pageSize, threshold)),
                 "查询低库存商品失败");
     }
 
     public List<String> listOnSaleProductIds() {
-        List<String> ids = feignResponseSupport.call(
-                productFeignClient::listOnSaleProductIds,
+        List<String> ids = rpcResponseSupport.call(
+                productDubboService::listOnSaleProductIds,
                 "查询在售商品ID失败");
         return ids == null ? Collections.emptyList() : ids;
     }

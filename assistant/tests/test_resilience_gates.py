@@ -72,8 +72,8 @@ def message_app(actors, *, per_actor, total):
     memory = MagicMock()
     memory.recover_handoff_run.return_value = None
     return create_app(Settings(model_mode="mock"),
-                      config={"SMARTLECT_GROWTH_RUNS_PER_ACTOR": str(per_actor),
-                              "SMARTLECT_GROWTH_RUNS_GLOBAL": str(total)},
+                      config={"SMARTLECT_ASSISTANT_RUNS_PER_ACTOR": str(per_actor),
+                              "SMARTLECT_ASSISTANT_RUNS_GLOBAL": str(total)},
                       store=store, memory=memory, identity=Identity(actors), provider=MagicMock())
 
 

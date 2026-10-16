@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-public class RabbitMQUserTempBanListenerComponent implements SmartlectMessageListener<UserTempBanDTO> {
+public class RocketMqUserTempBanListener implements SmartlectMessageListener<UserTempBanDTO> {
 
     @Resource
     private UserTempBanService userTempBanService;

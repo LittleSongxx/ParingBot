@@ -6,7 +6,7 @@ import java.util.List;
 
 import com.smartlect.catalog.IsolatedCatalog;
 import com.smartlect.api.dto.SkuStockDTO;
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.api.enums.ProductStatusEnum;
 import com.smartlect.entity.po.ProductInfo;
 import com.smartlect.entity.po.ProductPropertyValue;
@@ -40,7 +40,7 @@ public class ProductSkuServiceImpl implements ProductSkuService {
 	@Resource
 	private ProductSkuMapper<ProductSku, ProductSkuQuery> productSkuMapper;
 	@Resource
-	private StockFeignSupport stockFeignSupport;
+	private StockRpcSupport stockRpcSupport;
 	@Resource
 	private ProductInfoService productInfoService;
     @Autowired
@@ -112,14 +112,14 @@ public class ProductSkuServiceImpl implements ProductSkuService {
 	}
 
 	@Override
-	// 不标 @Transactional：方法内只有一次本地读 + 一次远程调用（stockFeignSupport.changeStock），
+	// 不标 @Transactional：方法内只有一次本地读 + 一次远程调用（stockRpcSupport.changeStock），
 	// 没有任何本地写需要原子保护。保留事务只会让数据库连接在整个远程调用期间被占住。
 	public void updateStock(String productId, String propertyValueIdHash, Integer changeStock) {
 		ProductSku productSku = this.getProductSkuByProductIdAndPropertyValueIdHash(productId, propertyValueIdHash);
 		if (productSku == null) {
 			throw new BusinessException("商品sku不存在");
 		}
-		stockFeignSupport.changeStock(productId, propertyValueIdHash, changeStock);
+		stockRpcSupport.changeStock(productId, propertyValueIdHash, changeStock);
 	}
 
 	@Override
@@ -135,7 +135,7 @@ public class ProductSkuServiceImpl implements ProductSkuService {
 			}
 			ProductSkuListVO productSkuListVO = new ProductSkuListVO();
 			BeanUtils.copyProperties(productSku, productSkuListVO);
-			productSkuListVO.setStock(stockFeignSupport.getAvailable(
+			productSkuListVO.setStock(stockRpcSupport.getAvailable(
 					productSku.getProductId(), productSku.getPropertyValueIdHash()));
 			productSkuListVO.setProductName(productInfo.getProductName());
 			productSkuListVO.setProductOnsale(ProductStatusEnum.ON_SALE.getStatus().equals(productInfo.getStatus()));
@@ -175,7 +175,7 @@ public class ProductSkuServiceImpl implements ProductSkuService {
 		final int batch = 100;
 		final int maxStockPages = 20;
 		while (true) {
-			PaginationResultVO<SkuStockDTO> stockPage = stockFeignSupport.listLessThan(stockPageNo, batch, threshold);
+			PaginationResultVO<SkuStockDTO> stockPage = stockRpcSupport.listLessThan(stockPageNo, batch, threshold);
 			if (stockPage == null || stockPage.getList() == null || stockPage.getList().isEmpty()) {
 				break;
 			}

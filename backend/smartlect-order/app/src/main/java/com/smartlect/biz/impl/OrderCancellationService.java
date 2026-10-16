@@ -3,9 +3,9 @@ package com.smartlect.biz.impl;
 import com.smartlect.api.enums.OrderStatusEnum;
 import com.smartlect.api.enums.PayChannelEnum;
 import com.smartlect.api.enums.UserCouponStatusEnum;
-import com.smartlect.api.support.CouponFeignSupport;
-import com.smartlect.api.support.PayFeignSupport;
-import com.smartlect.api.support.StockFeignSupport;
+import com.smartlect.api.support.CouponRpcSupport;
+import com.smartlect.api.support.PayRpcSupport;
+import com.smartlect.api.support.StockRpcSupport;
 import com.smartlect.api.vo.UserCouponVO;
 import com.smartlect.component.PayOrderRedisComponent;
 import com.smartlect.component.RemoteCompensateRecorder;
@@ -49,9 +49,9 @@ public class OrderCancellationService {
     private final TransactionTemplate transactionTemplate;
     private final OrderStateMachine orderStateMachine;
     private final PayOrderRedisComponent payOrderRedisComponent;
-    private final PayFeignSupport payFeignSupport;
-    private final StockFeignSupport stockFeignSupport;
-    private final CouponFeignSupport couponFeignSupport;
+    private final PayRpcSupport payRpcSupport;
+    private final StockRpcSupport stockRpcSupport;
+    private final CouponRpcSupport couponRpcSupport;
     private final RemoteCompensateRecorder remoteCompensateRecorder;
 
     public OrderCancellationService(
@@ -61,9 +61,9 @@ public class OrderCancellationService {
             TransactionTemplate transactionTemplate,
             OrderStateMachine orderStateMachine,
             PayOrderRedisComponent payOrderRedisComponent,
-            PayFeignSupport payFeignSupport,
-            StockFeignSupport stockFeignSupport,
-            CouponFeignSupport couponFeignSupport,
+            PayRpcSupport payRpcSupport,
+            StockRpcSupport stockRpcSupport,
+            CouponRpcSupport couponRpcSupport,
             RemoteCompensateRecorder remoteCompensateRecorder) {
         this.orderInfoMapper = orderInfoMapper;
         this.orderItemMapper = orderItemMapper;
@@ -71,9 +71,9 @@ public class OrderCancellationService {
         this.transactionTemplate = transactionTemplate;
         this.orderStateMachine = orderStateMachine;
         this.payOrderRedisComponent = payOrderRedisComponent;
-        this.payFeignSupport = payFeignSupport;
-        this.stockFeignSupport = stockFeignSupport;
-        this.couponFeignSupport = couponFeignSupport;
+        this.payRpcSupport = payRpcSupport;
+        this.stockRpcSupport = stockRpcSupport;
+        this.couponRpcSupport = couponRpcSupport;
         this.remoteCompensateRecorder = remoteCompensateRecorder;
     }
 
@@ -164,7 +164,7 @@ public class OrderCancellationService {
 
         // 事务外远程收敛（幂等/可补偿）：单点失败不影响关单事实，重试路径按已关单幂等跳过
         markPayOrderClosedIfNeeded(payOrderId);
-        payFeignSupport.markClosed(payOrderId);
+        payRpcSupport.markClosed(payOrderId);
         cancelOrder4Channel(waitingOrders.get(0));
         releaseCouponIfNeeded(payOrderId);
         restoreStockForOrders(payOrderId, waitingOrders);
@@ -193,7 +193,7 @@ public class OrderCancellationService {
         }
         // 事务外远程收敛
         markPayOrderClosedIfNeeded(payOrderId);
-        payFeignSupport.markClosed(payOrderId);
+        payRpcSupport.markClosed(payOrderId);
         OrderInfo channelRef = orderList.stream()
                 .filter(o -> !StringTools.isEmpty(o.getChannelOrderId()))
                 .findFirst()
@@ -221,7 +221,7 @@ public class OrderCancellationService {
         List<OrderCouponRel> rels = orderCouponRelMapper.selectList(relQuery);
         for (OrderCouponRel rel : rels) {
             if (!StringTools.isEmpty(rel.getCouponId())) {
-                couponFeignSupport.releaseRushCouponReserve(rel.getCouponId(), orderInfo.getUserId());
+                couponRpcSupport.releaseRushCouponReserve(rel.getCouponId(), orderInfo.getUserId());
             }
         }
     }
@@ -247,7 +247,7 @@ public class OrderCancellationService {
             throw new BusinessException("商品列表为空");
         }
         try {
-            stockFeignSupport.restoreOrderStock(restoreReferenceId, newList);
+            stockRpcSupport.restoreOrderStock(restoreReferenceId, newList);
         } catch (Exception e) {
             log.error("关单库存回补失败, referenceId={}", restoreReferenceId, e);
             remoteCompensateRecorder.recordOrderStockRestore(restoreReferenceId, newList, e);
@@ -270,10 +270,10 @@ public class OrderCancellationService {
                 if (StringTools.isEmpty(rel.getUserCouponId())) {
                     continue;
                 }
-                UserCouponVO uc = couponFeignSupport.getUserCoupon(rel.getUserCouponId());
+                UserCouponVO uc = couponRpcSupport.getUserCoupon(rel.getUserCouponId());
                 if (uc != null && UserCouponStatusEnum.CANT.getStatus().equals(uc.getStatus())) {
                     try {
-                        couponFeignSupport.changeUserCouponStatus(uc.getUserCouponId(), uc.getUserId(),
+                        couponRpcSupport.changeUserCouponStatus(uc.getUserCouponId(), uc.getUserId(),
                                 UserCouponStatusEnum.CANT.getStatus(), UserCouponStatusEnum.NOUSE.getStatus(), null);
                     } catch (Exception compensateEx) {
                         log.error("关单优惠券解锁失败, payOrderId={}, userCouponId={}",
@@ -300,6 +300,6 @@ public class OrderCancellationService {
         if (payChannelEnum == null) {
             return;
         }
-        payFeignSupport.closeOrder(orderInfo.getPayOrderId(), payChannelEnum.getPayScene());
+        payRpcSupport.closeOrder(orderInfo.getPayOrderId(), payChannelEnum.getPayScene());
     }
 }

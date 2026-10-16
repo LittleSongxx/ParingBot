@@ -1,6 +1,6 @@
 package com.smartlect.component;
 
-import com.smartlect.api.support.OrderFeignSupport;
+import com.smartlect.api.support.OrderRpcSupport;
 import com.smartlect.api.vo.OrderBriefVO;
 import com.smartlect.api.dto.RushingCouponMessageDTO;
 import com.smartlect.api.enums.OrderStatusEnum;
@@ -23,14 +23,14 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-public class RabbitMQOrderDeadListListenerComponent implements SmartlectMessageListener<RushingCouponMessageDTO> {
+public class RocketMqOrderDeadListListener implements SmartlectMessageListener<RushingCouponMessageDTO> {
 
     @Resource
     private DiscountCouponService discountCouponService;
     @Resource
     private UserCouponService userCouponService;
     @Resource
-    private OrderFeignSupport orderFeignSupport;
+    private OrderRpcSupport orderRpcSupport;
 
     @Override
     public MqSubscription subscription() {
@@ -54,7 +54,7 @@ public class RabbitMQOrderDeadListListenerComponent implements SmartlectMessageL
         UserCoupon userCoupon = userCouponService.getUserCouponByUserCouponId(userCouponId);
         OrderBriefVO orderInfo = StringTools.isEmpty(message.getOrderId())
                 ? null
-                : orderFeignSupport.getOrder(message.getOrderId());
+                : orderRpcSupport.getOrder(message.getOrderId());
 
         if (StringTools.isEmpty(message.getOrderId())) {
             if (userCoupon == null) {
@@ -72,7 +72,7 @@ public class RabbitMQOrderDeadListListenerComponent implements SmartlectMessageL
 
         if (orderInfo != null
                 && OrderStatusEnum.WAIT_PAYMENT.getStatus().equals(orderInfo.getOrderStatus())) {
-            orderFeignSupport.cancelOrder(message.getOrderId(), null);
+            orderRpcSupport.cancelOrder(message.getOrderId(), null);
         } else if (userCoupon != null
                 && UserCouponStatusEnum.CANT.getStatus().equals(userCoupon.getStatus())
                 && orderInfo == null) {

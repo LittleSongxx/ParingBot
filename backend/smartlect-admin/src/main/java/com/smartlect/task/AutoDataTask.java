@@ -40,7 +40,7 @@ public class AutoDataTask {
      * 启动补齐：机器在 01:00 停机时会漏掉当日日结，靠启动时补一次。
      *
      * <p>原先这是 {@code @PostConstruct}，两个问题在多副本下都会放大：装配期跑日结
-     * 意味着聚合失败会直接让实例起不来（Feign 打不通 order 就整台起不来），
+     * 意味着聚合失败会直接让实例起不来（RPC 打不通 order 就整台起不来），
      * 而滚动重启又会让每个副本各补一次。改为就绪事件 + 共用同一把锁。
      */
     @EventListener(ApplicationReadyEvent.class)

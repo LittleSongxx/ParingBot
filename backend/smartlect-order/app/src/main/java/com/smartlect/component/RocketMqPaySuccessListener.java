@@ -13,17 +13,17 @@ import org.springframework.stereotype.Component;
 /**
  * 消费 pay 服务发来的支付成功事件（Outbox → smartlect-pay/pay-success）。
  *
- * <p>取代 pay→order 的同步 Feign 回调。paySuccess 的推进本身是条件更新
+ * <p>取代 pay→order 的同步 RPC 回调。paySuccess 的推进本身是条件更新
  * （仅待付款订单可迁移），事件重投或 outbox 重放天然幂等，再叠加消费租约
  * 去重与定时回投重试链。</p>
  */
 @Slf4j
 @Component
-public class RabbitMQPaySuccessListenerComponent implements SmartlectMessageListener<PayOrderNotifyDTO> {
+public class RocketMqPaySuccessListener implements SmartlectMessageListener<PayOrderNotifyDTO> {
 
     private final OrderInternalService orderInternalService;
 
-    public RabbitMQPaySuccessListenerComponent(OrderInternalService orderInternalService) {
+    public RocketMqPaySuccessListener(OrderInternalService orderInternalService) {
         this.orderInternalService = orderInternalService;
     }
 

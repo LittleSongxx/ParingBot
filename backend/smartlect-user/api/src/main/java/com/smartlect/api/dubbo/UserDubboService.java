@@ -13,7 +13,7 @@ import com.smartlect.entity.vo.ResponseVO;
 import java.util.List;
 
 /**
- * 用户域内部 Dubbo 契约（取代 UserFeignClient，方法签名一致；HTTP /internal/user
+ * 用户域内部 Dubbo 契约（取代 UserDubboService，方法签名一致；HTTP /internal/user
  * 端点保留给 assistant 与运维工具，双通道共用同一 Service 层）。
  *
  * <p>getAddress 的 userId 显式参数延续 HTTP 通道「委托用户头」的信任边界语义：

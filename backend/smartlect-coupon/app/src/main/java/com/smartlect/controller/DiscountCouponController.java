@@ -14,7 +14,7 @@ import com.smartlect.api.enums.UserCouponStatusEnum;
 import com.smartlect.entity.vo.PaginationResultVO;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.api.vo.UserCouponDetailVO;
-import com.smartlect.api.support.OrderFeignSupport;
+import com.smartlect.api.support.OrderRpcSupport;
 import com.smartlect.biz.DiscountCouponService;
 import com.smartlect.biz.UserCouponService;
 import jakarta.annotation.Resource;
@@ -36,7 +36,7 @@ public class DiscountCouponController extends ABaseController{
     @Resource
     private UserCouponService userCouponService;
     @Resource
-    private OrderFeignSupport orderFeignSupport;
+    private OrderRpcSupport orderRpcSupport;
 
     @PostMapping("/getDiscountCouponDetail")
     public ResponseVO getDiscountCouponDetail(@NotEmpty String couponId) {
@@ -93,7 +93,7 @@ public class DiscountCouponController extends ABaseController{
     @SaCheckLogin
     public ResponseVO loadUserCoupon(@NotNull Integer pageNo, Integer status) {
         String userId = getTokenUserInfo().getUserId();
-        orderFeignSupport.syncPaidCouponRushUserCoupons(userId);
+        orderRpcSupport.syncPaidCouponRushUserCoupons(userId);
         UserCouponQuery query = new UserCouponQuery();
         query.setUserId(userId);
         query.setPageNo(pageNo);

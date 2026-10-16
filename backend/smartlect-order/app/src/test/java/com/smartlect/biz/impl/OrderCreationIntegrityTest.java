@@ -6,10 +6,10 @@ import com.smartlect.api.enums.LogisticsStatusEnum;
 import com.smartlect.api.enums.OrderFromTypeEnum;
 import com.smartlect.api.enums.OrderStatusEnum;
 import com.smartlect.api.enums.ProductStatusEnum;
-import com.smartlect.api.support.PayFeignSupport;
-import com.smartlect.api.support.ProductFeignSupport;
-import com.smartlect.api.support.StockFeignSupport;
-import com.smartlect.api.support.UserFeignSupport;
+import com.smartlect.api.support.PayRpcSupport;
+import com.smartlect.api.support.ProductRpcSupport;
+import com.smartlect.api.support.StockRpcSupport;
+import com.smartlect.api.support.UserRpcSupport;
 import com.smartlect.api.vo.ProductInfoSnapshotVO;
 import com.smartlect.api.vo.ProductPropertyValueSnapshotVO;
 import com.smartlect.api.vo.ProductSkuSnapshotVO;
@@ -58,15 +58,15 @@ class OrderCreationIntegrityTest {
     @Mock
     private OrderLogisticsInfoMapper<OrderLogisticsInfo, OrderLogisticsInfoQuery> orderLogisticsInfoMapper;
     @Mock
-    private ProductFeignSupport productFeignSupport;
+    private ProductRpcSupport productRpcSupport;
     @Mock
-    private StockFeignSupport stockFeignSupport;
+    private StockRpcSupport stockRpcSupport;
     @Mock
-    private UserFeignSupport userFeignSupport;
+    private UserRpcSupport userRpcSupport;
     @Mock
     private RedisComponent redisComponent;
     @Mock
-    private PayFeignSupport payFeignSupport;
+    private PayRpcSupport payRpcSupport;
     @Mock
     private TransactionalMqSender transactionalMqSender;
 
@@ -75,9 +75,9 @@ class OrderCreationIntegrityTest {
     @Mock
     private com.smartlect.biz.OrderQuoteService orderQuoteService;
     @Mock
-    private com.smartlect.api.support.CouponFeignSupport couponFeignSupport;
+    private com.smartlect.api.support.CouponRpcSupport couponRpcSupport;
     @Mock
-    private com.smartlect.api.support.CartFeignSupport cartFeignSupport;
+    private com.smartlect.api.support.CartRpcSupport cartRpcSupport;
     @Mock
     private com.smartlect.mappers.OrderCouponRelMapper<com.smartlect.entity.po.OrderCouponRel,
             com.smartlect.entity.query.OrderCouponRelQuery> orderCouponRelMapper;
@@ -111,30 +111,30 @@ class OrderCreationIntegrityTest {
         PostOrderDTO request = request(List.of(first, second));
         ProductSnapshotBatchVO snapshot = new ProductSnapshotBatchVO();
 
-        when(userFeignSupport.getAddress("address-1", "user-1")).thenReturn(address());
-        when(productFeignSupport.snapshotBatch(List.of("p1", "p2"))).thenReturn(snapshot);
-        when(productFeignSupport.toProductInfoMap(snapshot)).thenReturn(Map.of(
+        when(userRpcSupport.getAddress("address-1", "user-1")).thenReturn(address());
+        when(productRpcSupport.snapshotBatch(List.of("p1", "p2"))).thenReturn(snapshot);
+        when(productRpcSupport.toProductInfoMap(snapshot)).thenReturn(Map.of(
                 "p1", product("p1", "Headphones"),
                 "p2", product("p2", "Coat")));
-        when(productFeignSupport.toPropertyValueMap(snapshot)).thenReturn(Map.of(
+        when(productRpcSupport.toPropertyValueMap(snapshot)).thenReturn(Map.of(
                 "p1v1", property("p1", "v1"),
                 "p2v2", property("p2", "v2")));
-        when(productFeignSupport.toSkuMapByPropertyValueIds(snapshot)).thenReturn(Map.of(
+        when(productRpcSupport.toSkuMapByPropertyValueIds(snapshot)).thenReturn(Map.of(
                 "p1v1", sku("p1", "v1", "trusted-hash-1", "10.00"),
                 "p2v2", sku("p2", "v2", "trusted-hash-2", "20.00")));
-        when(stockFeignSupport.getAvailable("p1", "trusted-hash-1")).thenReturn(10);
-        when(stockFeignSupport.getAvailable("p2", "trusted-hash-2")).thenReturn(10);
+        when(stockRpcSupport.getAvailable("p1", "trusted-hash-1")).thenReturn(10);
+        when(stockRpcSupport.getAvailable("p2", "trusted-hash-2")).thenReturn(10);
         when(redisComponent.getLogisticsInfo()).thenReturn(sender());
 
         ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request);
 
-        verify(stockFeignSupport, never()).getAvailable("p1", "forged-hash-1");
-        verify(stockFeignSupport, never()).getAvailable("p2", "forged-hash-2");
+        verify(stockRpcSupport, never()).getAvailable("p1", "forged-hash-1");
+        verify(stockRpcSupport, never()).getAvailable("p2", "forged-hash-2");
         assertEquals("trusted-hash-1", first.getPropertyValueIdHash());
         assertEquals("trusted-hash-2", second.getPropertyValueIdHash());
 
         ArgumentCaptor<List<ProductItem>> stockCaptor = listCaptor();
-        verify(stockFeignSupport).changeStockBatch(stockCaptor.capture(), org.mockito.ArgumentMatchers.anyString());
+        verify(stockRpcSupport).changeStockBatch(stockCaptor.capture(), org.mockito.ArgumentMatchers.anyString());
         assertEquals(Set.of("trusted-hash-1", "trusted-hash-2"), hashes(stockCaptor.getValue()));
 
         ArgumentCaptor<List<OrderInfo>> orderCaptor = listCaptor();
@@ -177,8 +177,8 @@ class OrderCreationIntegrityTest {
                 .thenReturn(replay);
         assertEquals("original-pay", service.createConfirmed("user-1", request, "a".repeat(32), 1000L,
                 "original-command-key").getPayOrderId());
-        org.mockito.Mockito.verifyNoInteractions(orderQuoteService, productFeignSupport, stockFeignSupport,
-                couponFeignSupport, payFeignSupport, userFeignSupport);
+        org.mockito.Mockito.verifyNoInteractions(orderQuoteService, productRpcSupport, stockRpcSupport,
+                couponRpcSupport, payRpcSupport, userRpcSupport);
     }
 
     @Test
@@ -205,20 +205,20 @@ class OrderCreationIntegrityTest {
                 (String) issued.get("requestHash"), fingerprint.getValue(), 1000L,
                 java.time.Instant.parse((String) issued.get("expiresAt")), null);
         ProductSnapshotBatchVO newerSnapshot = new ProductSnapshotBatchVO();
-        when(userFeignSupport.getAddress("address-1", "user-1")).thenReturn(address());
-        when(productFeignSupport.snapshotBatch(List.of("p1"))).thenReturn(newerSnapshot);
-        when(productFeignSupport.toProductInfoMap(newerSnapshot)).thenReturn(Map.of("p1", product("p1", "Headphones")));
-        when(productFeignSupport.toPropertyValueMap(newerSnapshot)).thenReturn(Map.of("p1v1", property("p1", "v1")));
-        when(productFeignSupport.toSkuMapByPropertyValueIds(newerSnapshot)).thenReturn(Map.of("p1v1", sku("p1", "v1", "trusted", "11.00")));
-        when(stockFeignSupport.getAvailable("p1", "trusted")).thenReturn(10);
+        when(userRpcSupport.getAddress("address-1", "user-1")).thenReturn(address());
+        when(productRpcSupport.snapshotBatch(List.of("p1"))).thenReturn(newerSnapshot);
+        when(productRpcSupport.toProductInfoMap(newerSnapshot)).thenReturn(Map.of("p1", product("p1", "Headphones")));
+        when(productRpcSupport.toPropertyValueMap(newerSnapshot)).thenReturn(Map.of("p1v1", property("p1", "v1")));
+        when(productRpcSupport.toSkuMapByPropertyValueIds(newerSnapshot)).thenReturn(Map.of("p1v1", sku("p1", "v1", "trusted", "11.00")));
+        when(stockRpcSupport.getAvailable("p1", "trusted")).thenReturn(10);
         var error = org.junit.jupiter.api.Assertions.assertThrows(com.smartlect.exception.HttpBusinessException.class,
                 () -> ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request, quote, 1000L, null));
         assertEquals("RECONFIRM_REQUIRED", error.getMessage());
         verify(orderInfoMapper, never()).insertBatch(org.mockito.ArgumentMatchers.anyList());
         verify(orderItemMapper, never()).insertBatch(org.mockito.ArgumentMatchers.anyList());
-        verify(stockFeignSupport, never()).changeStockBatch(
+        verify(stockRpcSupport, never()).changeStockBatch(
                 org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any());
-        org.mockito.Mockito.verifyNoInteractions(payFeignSupport);
+        org.mockito.Mockito.verifyNoInteractions(payRpcSupport);
     }
 
     @Test
@@ -227,17 +227,17 @@ class OrderCreationIntegrityTest {
         PostOrderDTO request = request(List.of(line));
         request.setUserCouponId("uc1");
         ProductSnapshotBatchVO snapshot = new ProductSnapshotBatchVO();
-        when(userFeignSupport.getAddress("address-1", "user-1")).thenReturn(address());
-        when(productFeignSupport.snapshotBatch(List.of("p1"))).thenReturn(snapshot);
-        when(productFeignSupport.toProductInfoMap(snapshot)).thenReturn(Map.of("p1", product("p1", "Headphones")));
-        when(productFeignSupport.toPropertyValueMap(snapshot)).thenReturn(Map.of("p1v1", property("p1", "v1")));
-        when(productFeignSupport.toSkuMapByPropertyValueIds(snapshot)).thenReturn(Map.of("p1v1", sku("p1", "v1", "trusted", "10.00")));
-        when(stockFeignSupport.getAvailable("p1", "trusted")).thenReturn(10);
+        when(userRpcSupport.getAddress("address-1", "user-1")).thenReturn(address());
+        when(productRpcSupport.snapshotBatch(List.of("p1"))).thenReturn(snapshot);
+        when(productRpcSupport.toProductInfoMap(snapshot)).thenReturn(Map.of("p1", product("p1", "Headphones")));
+        when(productRpcSupport.toPropertyValueMap(snapshot)).thenReturn(Map.of("p1v1", property("p1", "v1")));
+        when(productRpcSupport.toSkuMapByPropertyValueIds(snapshot)).thenReturn(Map.of("p1v1", sku("p1", "v1", "trusted", "10.00")));
+        when(stockRpcSupport.getAvailable("p1", "trusted")).thenReturn(10);
         com.smartlect.api.vo.CouponLockResultVO coupon = new com.smartlect.api.vo.CouponLockResultVO();
         coupon.setLocked(true);
         coupon.setCouponId("c1");
         coupon.setDiscountAmount(new BigDecimal("1.00"));
-        when(couponFeignSupport.validateAndLock("user-1", "uc1", new BigDecimal("10.00"))).thenReturn(coupon);
+        when(couponRpcSupport.validateAndLock("user-1", "uc1", new BigDecimal("10.00"))).thenReturn(coupon);
         com.smartlect.biz.OrderQuoteService.Quote quote = new com.smartlect.biz.OrderQuoteService.Quote(
                 "a".repeat(32), "user-1", "request", "offer", 800, java.time.Instant.now().plusSeconds(60), null);
         org.mockito.Mockito.doThrow(new com.smartlect.exception.HttpBusinessException(409, "RECONFIRM_REQUIRED"))
@@ -247,21 +247,21 @@ class OrderCreationIntegrityTest {
                         org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq(new BigDecimal("9.00")));
         org.junit.jupiter.api.Assertions.assertThrows(com.smartlect.exception.HttpBusinessException.class,
                 () -> ReflectionTestUtils.invokeMethod(service, "createOrder", "user-1", request, quote, 800L, null));
-        org.mockito.InOrder sequence = org.mockito.Mockito.inOrder(couponFeignSupport, stockFeignSupport, orderQuoteService);
-        sequence.verify(couponFeignSupport).validateAndLock("user-1", "uc1", new BigDecimal("10.00"));
+        org.mockito.InOrder sequence = org.mockito.Mockito.inOrder(couponRpcSupport, stockRpcSupport, orderQuoteService);
+        sequence.verify(couponRpcSupport).validateAndLock("user-1", "uc1", new BigDecimal("10.00"));
         sequence.verify(orderQuoteService).validate(org.mockito.ArgumentMatchers.eq(quote),
                 org.mockito.ArgumentMatchers.eq("user-1"), org.mockito.ArgumentMatchers.eq(request),
                 org.mockito.ArgumentMatchers.eq(800L), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.eq(new BigDecimal("9.00")));
-        verify(couponFeignSupport).changeUserCouponStatus("uc1", "user-1",
+        verify(couponRpcSupport).changeUserCouponStatus("uc1", "user-1",
                 com.smartlect.api.enums.UserCouponStatusEnum.CANT.getStatus(),
                 com.smartlect.api.enums.UserCouponStatusEnum.NOUSE.getStatus(), null);
         verify(orderInfoMapper, never()).insertBatch(org.mockito.ArgumentMatchers.anyList());
         verify(orderItemMapper, never()).insertBatch(org.mockito.ArgumentMatchers.anyList());
         verify(orderCouponRelMapper, never()).insert(org.mockito.ArgumentMatchers.any());
-        verify(stockFeignSupport, never()).changeStockBatch(
+        verify(stockRpcSupport, never()).changeStockBatch(
                 org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any());
-        org.mockito.Mockito.verifyNoInteractions(payFeignSupport);
+        org.mockito.Mockito.verifyNoInteractions(payRpcSupport);
     }
 
     @Test
@@ -269,16 +269,16 @@ class OrderCreationIntegrityTest {
         ProductItem line = item("p1", "v1", "ignored");
         PostOrderDTO request = request(List.of(line));
         ProductSnapshotBatchVO snapshot = new ProductSnapshotBatchVO();
-        when(userFeignSupport.getAddress("address-1", "user-1")).thenReturn(address());
-        when(productFeignSupport.snapshotBatch(List.of("p1"))).thenReturn(snapshot);
-        when(productFeignSupport.toProductInfoMap(snapshot)).thenReturn(Map.of("p1", product("p1", "Headphones")));
-        when(productFeignSupport.toPropertyValueMap(snapshot)).thenReturn(Map.of("p1v1", property("p1", "v1")));
-        when(productFeignSupport.toSkuMapByPropertyValueIds(snapshot)).thenReturn(Map.of(
+        when(userRpcSupport.getAddress("address-1", "user-1")).thenReturn(address());
+        when(productRpcSupport.snapshotBatch(List.of("p1"))).thenReturn(snapshot);
+        when(productRpcSupport.toProductInfoMap(snapshot)).thenReturn(Map.of("p1", product("p1", "Headphones")));
+        when(productRpcSupport.toPropertyValueMap(snapshot)).thenReturn(Map.of("p1v1", property("p1", "v1")));
+        when(productRpcSupport.toSkuMapByPropertyValueIds(snapshot)).thenReturn(Map.of(
                 "p1v1", sku("p1", "v1", "trusted", "10.00")));
-        when(stockFeignSupport.getAvailable("p1", "trusted")).thenReturn(10);
+        when(stockRpcSupport.getAvailable("p1", "trusted")).thenReturn(10);
         when(redisComponent.getLogisticsInfo()).thenReturn(sender());
         doThrow(new RuntimeException("stock_deduct_failed"))
-                .when(stockFeignSupport).changeStockBatch(
+                .when(stockRpcSupport).changeStockBatch(
                         org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyString());
 
         assertThrows(RuntimeException.class,
@@ -286,11 +286,11 @@ class OrderCreationIntegrityTest {
 
         // 库存一步化：扣减是条件更新本身，失败（库存不足）即上抛，无"先锁后扣"中间态，
         // 也不再有 deduct 之外的库存写需要回补。
-        verify(stockFeignSupport).changeStockBatch(
+        verify(stockRpcSupport).changeStockBatch(
                 org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyString());
-        verify(stockFeignSupport, org.mockito.Mockito.times(1))
+        verify(stockRpcSupport, org.mockito.Mockito.times(1))
                 .changeStockBatch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyString());
-        verify(stockFeignSupport, never()).restoreOrderStock(
+        verify(stockRpcSupport, never()).restoreOrderStock(
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyList());
     }
 
@@ -301,12 +301,12 @@ class OrderCreationIntegrityTest {
         ProductItem line = item("p1", "v1", "ignored");
         PostOrderDTO request = request(List.of(line));
         ProductSnapshotBatchVO snapshot = new ProductSnapshotBatchVO();
-        when(userFeignSupport.getAddress("address-1", "user-1")).thenReturn(address());
-        when(productFeignSupport.snapshotBatch(List.of("p1"))).thenReturn(snapshot);
-        when(productFeignSupport.toProductInfoMap(snapshot)).thenReturn(Map.of("p1", product("p1", "Headphones")));
-        when(productFeignSupport.toPropertyValueMap(snapshot)).thenReturn(Map.of("p1v1", property("p1", "v1")));
-        when(productFeignSupport.toSkuMapByPropertyValueIds(snapshot)).thenReturn(Map.of("p1v1", sku("p1", "v1", "trusted", "10.00")));
-        when(stockFeignSupport.getAvailable("p1", "trusted")).thenReturn(10);
+        when(userRpcSupport.getAddress("address-1", "user-1")).thenReturn(address());
+        when(productRpcSupport.snapshotBatch(List.of("p1"))).thenReturn(snapshot);
+        when(productRpcSupport.toProductInfoMap(snapshot)).thenReturn(Map.of("p1", product("p1", "Headphones")));
+        when(productRpcSupport.toPropertyValueMap(snapshot)).thenReturn(Map.of("p1v1", property("p1", "v1")));
+        when(productRpcSupport.toSkuMapByPropertyValueIds(snapshot)).thenReturn(Map.of("p1v1", sku("p1", "v1", "trusted", "10.00")));
+        when(stockRpcSupport.getAvailable("p1", "trusted")).thenReturn(10);
         when(redisComponent.getLogisticsInfo()).thenReturn(sender());
 
         // 捕获 Phase 3 事务回调：回调执行前不允许有任何关单消息写出（消息在事务块内）。

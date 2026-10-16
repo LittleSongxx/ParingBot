@@ -1,7 +1,7 @@
 package com.smartlect.component;
 
 import com.smartlect.api.dto.RushingCouponMessageDTO;
-import com.smartlect.api.support.OrderFeignSupport;
+import com.smartlect.api.support.OrderRpcSupport;
 import com.smartlect.biz.DiscountCouponService;
 import com.smartlect.biz.UserCouponService;
 import com.smartlect.mq.RocketMqTopics;
@@ -21,16 +21,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class RabbitMQOrderDeadListListenerComponentTest {
+class RocketMqOrderDeadListListenerTest {
 
     @Mock
     private DiscountCouponService discountCouponService;
     @Mock
     private UserCouponService userCouponService;
     @Mock
-    private OrderFeignSupport orderFeignSupport;
+    private OrderRpcSupport orderRpcSupport;
     @InjectMocks
-    private RabbitMQOrderDeadListListenerComponent listener;
+    private RocketMqOrderDeadListListener listener;
 
     @Test
     void preOrderTimeoutReleasesCouponReserveWhenNoOrderWasCreated() {
@@ -46,7 +46,7 @@ class RabbitMQOrderDeadListListenerComponentTest {
     void missingOrderRollbackOnlyReleasesRedisReserve() {
         RushingCouponMessageDTO payload = payload("order-1");
         when(userCouponService.getUserCouponByUserCouponId("uc-1")).thenReturn(null);
-        when(orderFeignSupport.getOrder("order-1")).thenReturn(null);
+        when(orderRpcSupport.getOrder("order-1")).thenReturn(null);
 
         listener.onMessage(payload, message());
 
@@ -55,7 +55,7 @@ class RabbitMQOrderDeadListListenerComponentTest {
 
     @Test
     void listenerDoesNotWrapRemoteCallsInOneDatabaseTransaction() throws NoSuchMethodException {
-        assertNull(RabbitMQOrderDeadListListenerComponent.class
+        assertNull(RocketMqOrderDeadListListener.class
                 .getMethod("onMessage", RushingCouponMessageDTO.class, SmartlectMqMessage.class)
                 .getAnnotation(Transactional.class));
     }
