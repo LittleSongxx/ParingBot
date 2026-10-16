@@ -173,6 +173,13 @@ public class RefundSagaTransactionService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    /** 登记 PAYMENT_CONFIRMED 阶段的收尾失败（累计到上限转人工复核）。 */
+    public void recordStockQueueFailure(String refundRequestId, Throwable error) {
+        refundRequestMapper.recordStockQueueFailure(
+                refundRequestId, retrySeconds, maxRetries,
+                error == null || error.getMessage() == null ? "stock queue failed" : truncate(error.getMessage()));
+    }
+
     public boolean queueStockRestore(String refundRequestId, boolean retry) {
         RefundRequest request = refundRequestMapper.selectByIdForUpdate(refundRequestId);
         if (request == null) {
@@ -285,8 +292,11 @@ public class RefundSagaTransactionService {
                 RocketMqTopics.TAG_REFUND_COUPON_RETURN,
                 new RefundCouponReturnDTO(order.getOrderId(), order.getPayOrderId(),
                         rel.getUserCouponId(), rel.getCouponId()),
-                "refund-return-coupon:" + (StringTools.isEmpty(order.getPayOrderId())
-                        ? order.getOrderId() : order.getPayOrderId()),
+                // 键按 orderId（不是 payOrderId）：一次购物车结算会在同一支付单下拆出多张订单，
+                // 用 payOrderId 当键时第二单全额退款会命中 Outbox 的"同键不同载荷"断言并抛错，
+                // 整笔退款事务回滚 → 卡在 PAYMENT_CONFIRMED（2026-10-16 审计 H2）。
+                // 消费端对同一张券的重复返还幂等（条件更新 USED→NOUSE），多单各发一次是安全的。
+                "refund-return-coupon:" + order.getOrderId(),
                 MessageReliabilityLevelEnum.STANDARD,
                 null);
     }

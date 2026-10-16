@@ -29,9 +29,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -115,17 +117,26 @@ class OrderAggregateCancellationTest {
     }
 
 	@Test
-	void otherChannelCloseFailuresStillFailCancellation() {
+	void channelCloseFailureDoesNotBlockCouponReleaseOrStockRestore() {
+		// 契约（2026-10-16 审计 H1 后）：本地关单事实已提交，远程收敛的每一步都必须独立容错。
+		// 此前渠道关单抛错会直接跳过解券与库存回补，而重试又因状态已 CANCELLED 短路，
+		// 造成库存永久虚少、券永久 CANT 且无台账。
 		OrderInfo order = order("order-1", "pay-1", OrderStatusEnum.WAIT_PAYMENT);
 		order.setPayChannel("mock");
 		when(orderInfoMapper.selectByOrderId("order-1")).thenReturn(order);
 		when(orderInfoMapper.selectList(any(OrderInfoQuery.class))).thenReturn(List.of(order));
 		when(orderInfoMapper.updateByParam(any(OrderInfo.class), any(OrderInfoQuery.class))).thenReturn(1);
+		when(orderItemMapper.selectList(any(OrderItemQuery.class)))
+				.thenReturn(List.of(item("order-1", "p1")));
+		when(orderCouponRelMapper.selectList(any(OrderCouponRelQuery.class))).thenReturn(List.of());
 		doThrow(new BusinessException("渠道关单超时"))
 				.when(payRpcSupport).closeOrder("pay-1", "mock");
 
-		assertThrows(BusinessException.class,
-				() -> service.cancelOrder("user-1", "order-1", OrderStatusEnum.WAIT_PAYMENT));
+		assertDoesNotThrow(() ->
+				service.cancelOrder("user-1", "order-1", OrderStatusEnum.WAIT_PAYMENT),
+				"渠道侧失败不应把整个取消流程打回（本地已取消）");
+		verify(stockRpcSupport).restoreOrderStock(eq("pay-1"), any());
+		verify(payRpcSupport).markClosed("pay-1");
 	}
 
     @Test

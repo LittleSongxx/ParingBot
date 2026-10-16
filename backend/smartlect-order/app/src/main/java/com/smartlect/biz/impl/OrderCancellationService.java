@@ -159,15 +159,50 @@ public class OrderCancellationService {
         int rows = transactionTemplate.execute(status -> orderStateMachine.transitionPayOrder(
                 payOrderId, OrderStatusEnum.WAIT_PAYMENT, OrderStateEvent.USER_CANCEL));
         if (rows != waitingOrders.size()) {
-            throw new BusinessException("支付单取消失败，子订单状态已变化");
+            // 诊断信息而不是中断条件：CAS 已经改了该改的行，剩余差异由收敛序列与后续对账处理
+            log.warn("支付单取消部分成功 payOrderId={} rows={} expected={}", payOrderId, rows, waitingOrders.size());
         }
 
-        // 事务外远程收敛（幂等/可补偿）：单点失败不影响关单事实，重试路径按已关单幂等跳过
-        markPayOrderClosedIfNeeded(payOrderId);
-        payRpcSupport.markClosed(payOrderId);
-        cancelOrder4Channel(waitingOrders.get(0));
-        releaseCouponIfNeeded(payOrderId);
-        restoreStockForOrders(payOrderId, waitingOrders);
+        // 事务外远程收敛：每步独立容错（见 convergeClosedPayOrder）
+        convergeClosedPayOrder(payOrderId, waitingOrders);
+    }
+
+    /**
+     * 关单后的远程收敛：每步**独立容错**，任一步失败都不影响后续步骤，也不改变"订单已关"的事实。
+     *
+     * <p>2026-10-16 审计：此前这条序列是裸调用——渠道关单抛错（例如支付已成功、
+     * pay 侧拒绝关闭意图）会直接跳过解券与库存回补，而重试路径又因状态已 CLOSED 短路，
+     * 结果是库存永久虚少、用户券永久卡在 CANT 且无台账。现在每步失败都会记日志 + 落补偿台账
+     * （券/库存），pay 侧意图关闭失败由 payOrderPoll 与退款对账继续兜。</p>
+     */
+    private void convergeClosedPayOrder(String payOrderId, List<OrderInfo> closedOrders) {
+        try {
+            markPayOrderClosedIfNeeded(payOrderId);
+        } catch (Exception e) {
+            log.error("关单：标记支付单已关闭失败（缓存标记，靠 TTL 收敛）payOrderId={}", payOrderId, e);
+        }
+        try {
+            payRpcSupport.markClosed(payOrderId);
+        } catch (Exception e) {
+            log.error("关单：通知支付侧关单失败（由支付轮询/退款对账兜底）payOrderId={}", payOrderId, e);
+        }
+        try {
+            if (closedOrders != null && !closedOrders.isEmpty()) {
+                cancelOrder4Channel(closedOrders.get(0));
+            }
+        } catch (Exception e) {
+            log.error("关单：渠道侧关单失败（本地已关，渠道侧由对账兜底）payOrderId={}", payOrderId, e);
+        }
+        try {
+            releaseCouponIfNeeded(payOrderId);
+        } catch (Exception e) {
+            log.error("关单：解券失败（已落补偿台账，定时重放）payOrderId={}", payOrderId, e);
+        }
+        try {
+            restoreStockForOrders(payOrderId, closedOrders);
+        } catch (Exception e) {
+            log.error("关单：库存回补失败（已落补偿台账，定时重放）payOrderId={}", payOrderId, e);
+        }
     }
 
     private void closeUnpaidPayOrderForTimeout(String payOrderId) {
@@ -189,18 +224,10 @@ public class OrderCancellationService {
             return;
         }
         if (rows != orderList.size()) {
-            throw new BusinessException("支付超时关单失败，子订单状态已变化");
+            log.warn("支付超时关单部分成功 payOrderId={} rows={} expected={}", payOrderId, rows, orderList.size());
         }
-        // 事务外远程收敛
-        markPayOrderClosedIfNeeded(payOrderId);
-        payRpcSupport.markClosed(payOrderId);
-        OrderInfo channelRef = orderList.stream()
-                .filter(o -> !StringTools.isEmpty(o.getChannelOrderId()))
-                .findFirst()
-                .orElse(orderList.get(0));
-        cancelOrder4Channel(channelRef);
-        releaseCouponIfNeeded(payOrderId);
-        restoreStockForOrders(payOrderId, orderList);
+        // 事务外远程收敛：每步独立容错（见 convergeClosedPayOrder）
+        convergeClosedPayOrder(payOrderId, orderList);
     }
 
     private void cancelCouponRushOrder(String orderId, String userId) {

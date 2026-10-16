@@ -58,7 +58,14 @@ public class RefundSagaService {
                 if (status == RefundSagaStatus.PENDING_PAYMENT) {
                     processPayment(request, false);
                 } else if (status == RefundSagaStatus.PAYMENT_CONFIRMED) {
-                    transactionService.queueStockRestore(request.getRefundRequestId(), false);
+                    // 收尾失败要计数并升级：此前该状态既不计次也不转人工，
+                    // 确定性失败（如还券事件键冲突）会无限循环且管理端看不到（2026-10-16 审计）
+                    try {
+                        transactionService.queueStockRestore(request.getRefundRequestId(), false);
+                    } catch (Exception e) {
+                        transactionService.recordStockQueueFailure(request.getRefundRequestId(), e);
+                        throw e;
+                    }
                 } else if (status == RefundSagaStatus.STOCK_PENDING) {
                     reconcileStock(request);
                 }

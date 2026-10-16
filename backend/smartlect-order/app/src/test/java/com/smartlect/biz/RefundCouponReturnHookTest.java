@@ -23,6 +23,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -77,9 +79,29 @@ class RefundCouponReturnHookTest {
                 eq(com.smartlect.mq.RocketMqTopics.TOPIC_REFUND),
                 eq(com.smartlect.mq.RocketMqTopics.TAG_REFUND_COUPON_RETURN),
                 any(RefundCouponReturnDTO.class),
-                eq("refund-return-coupon:pay-1"),
+                eq("refund-return-coupon:order-1"),
                 any(),
                 isNull());
+    }
+
+    @Test
+    void siblingOrdersUnderSamePayOrderUseDistinctCouponReturnKeys() {
+        // 一次结算拆多张订单、共用一张券：两单各自全额退款时，事件键必须不同，
+        // 否则第二单会命中 Outbox"同键不同载荷"断言并抛错 → 退款卡在 PAYMENT_CONFIRMED
+        //（2026-10-16 审计 H2）。这里断言键取自 orderId 而不是 payOrderId。
+        when(orderStateMachine.transition(anyString(), anySet(), any(), any())).thenReturn(1);
+        stubItemOrderAndRel(0);
+
+        ReflectionTestUtils.invokeMethod(service, "finalizeOrderRefund", refundRequest());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(transactionalMqSender).sendAfterCommit(
+                anyString(), anyString(), any(RefundCouponReturnDTO.class),
+                captor.capture(), any(), isNull());
+        assertTrue(captor.getValue().startsWith("refund-return-coupon:order-"),
+                "事件键必须按订单维度：" + captor.getValue());
+        assertFalse(captor.getValue().contains("pay-1"),
+                "键里不应再出现支付单号（它是聚合级、兄弟订单会撞）");
     }
 
     @Test

@@ -256,7 +256,10 @@ public class OrderCreationService {
                             unifiedPayOrderId, copyItemsWithSignedBuyCount(newList, false));
                 } catch (Exception compensateEx) {
                     log.error("下单失败后库存回补失败, payOrderId={}", unifiedPayOrderId, compensateEx);
-                    remoteCompensateRecorder.recordStockChangeBatch(
+                    // 记"按支付单回补"而不是裸批量变更：重放走 restoreOrderStock 的幂等键
+                    // （order-close:{payOrderId,sku} + 前置 order-deduct 校验），
+                    // 与直连回补同一条幂等链，重放不会双倍加库存（2026-10-16 审计 H3）
+                    remoteCompensateRecorder.recordOrderStockRestore(
                             unifiedPayOrderId, copyItemsWithSignedBuyCount(newList, false), compensateEx);
                 }
             }

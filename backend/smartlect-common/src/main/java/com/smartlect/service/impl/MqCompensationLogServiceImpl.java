@@ -186,7 +186,9 @@ public class MqCompensationLogServiceImpl implements MqCompensationLogService {
                 if (stockPort == null) {
                     throw new BusinessException("库存补偿能力不可用（缺少 stock-api）");
                 }
-                stockPort.changeStockBatch(items);
+                // 用补偿行自身的幂等键当业务键：同一行重复重放被库存侧幂等挡掉，
+                // 不会重复加库存（此前传 null 键 → 每次重放都真的 apply，2026-10-16 审计）
+                stockPort.changeStockBatch(items, "compensation:" + existing.getIdempotencyKey());
             } else if (InternalApiHeaders.REMOTE_STOCK_ORDER_RESTORE.equals(routingKey)) {
                 JsonNode payload = JsonUtils.parseTree(existing.getPayloadJson());
                 StockBatchCompensatePort stockPort = stockBatchCompensatePort.getIfAvailable();

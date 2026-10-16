@@ -49,6 +49,8 @@ public final class TrialAdminAccess {
      *
      * <p>订单域收件人隐私走脱敏（{@link TrialOrderPrivacy}）而不是拒绝，页面功能不受影响。</p>
      */
+    // 注：物流读取面（/admin/order/getLogistics 与 /admin/orderLogisticsInfo/**）不在此清单——
+    // 它们允许读取，但收发件人 PII 由 TrialOrderPrivacy 脱敏（订单页需要物流进度）。
     public static final List<String> DENIED_PATH_PATTERNS = List.of(
             // —— 隐私读取面（ README：不能查看用户隐私）——
             "/admin/user/**",
@@ -56,8 +58,6 @@ public final class TrialAdminAccess {
             "/admin/userAddress/**",
             "/admin/productCart/**",
             "/admin/imageModeration/**",
-            // 注：/admin/order/getLogistics 与 /admin/orderLogisticsInfo/** 不在此列——
-            // 它们改为"允许读取 + TrialOrderPrivacy 脱敏收发件人 PII"（订单页要看物流进度）
             // —— 运维面（第二道；本来也要求 ops:* 权限）——
             "/admin/mqCompensationLog/**",
             "/admin/tool/**",

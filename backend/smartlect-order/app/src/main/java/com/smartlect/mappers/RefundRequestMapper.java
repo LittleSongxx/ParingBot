@@ -85,6 +85,30 @@ public interface RefundRequestMapper {
                              @Param("maxRetries") int maxRetries,
                              @Param("error") String error);
 
+    /**
+     * PAYMENT_CONFIRMED 阶段的收尾失败登记：此前该状态既不计次、也不升级，
+     * 确定性失败会无限循环且管理端看不到（2026-10-16 审计 H2/M5）。
+     * 与 STOCK_PENDING 的 recordStockRetry 同构：累计到上限转 MANUAL_REVIEW。
+     */
+    @Update("""
+            UPDATE refund_request
+            SET retry_count = retry_count + 1,
+                next_retry_time = DATE_ADD(NOW(), INTERVAL #{retrySeconds} SECOND),
+                last_error = #{error},
+                status = CASE WHEN retry_count + 1 >= #{maxRetries}
+                              THEN 'MANUAL_REVIEW' ELSE status END,
+                review_origin_status = CASE WHEN retry_count + 1 >= #{maxRetries}
+                              THEN COALESCE(review_origin_status, 'PAYMENT_CONFIRMED')
+                              ELSE review_origin_status END,
+                updated_at = NOW()
+            WHERE refund_request_id = #{refundRequestId}
+              AND status = 'PAYMENT_CONFIRMED'
+            """)
+    int recordStockQueueFailure(@Param("refundRequestId") String refundRequestId,
+                                @Param("retrySeconds") int retrySeconds,
+                                @Param("maxRetries") int maxRetries,
+                                @Param("error") String error);
+
     @Update("""
             UPDATE refund_request
             SET status = 'STOCK_PENDING',
