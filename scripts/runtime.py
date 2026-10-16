@@ -437,7 +437,14 @@ def cluster_endpoint_check(env):
     print(f"Cluster endpoint checks passed: {len(endpoints)} middleware endpoints reachable, Nacos authenticated.")
 
 
-def process_identity(pid):
+def process_identity(pid, expect=None):
+    """读取 PID 的稳定身份（exe / cwd / argv / start_ticks）。
+
+    expect 给定时（刚 Popen 的服务命令）只在 argv 匹配后才返回：fork 与 exec 之间
+    有一个窗口，此刻 /proc 里还是父进程（python）的 argv——"稳定但错误"，会让
+    start_app 的精确校验误报。2026-10-16 本地 up 实测 admin 服务踩中（既有缺陷，
+    概率随机器负载变化；"稳定"判定必须包含"是我要等的那个身份"）。
+    """
     proc = Path("/proc") / str(pid)
     for _ in range(100):
         try:
@@ -450,8 +457,12 @@ def process_identity(pid):
             if after[0] == "Z":
                 return None
             if cmdline and fields[19] == after[19] and executable == os.readlink(proc / "exe"):
+                argv = cmdline.decode().split("\0")
+                if expect is not None and argv != expect:
+                    time.sleep(0.01)
+                    continue
                 return {"pid": pid, "start_ticks": fields[19], "exe": executable,
-                        "cwd": cwd, "cmdline": cmdline.decode().split("\0")}
+                        "cwd": cwd, "cmdline": argv}
         except (FileNotFoundError, ProcessLookupError):
             if not proc.exists():
                 return None
@@ -854,7 +865,21 @@ def start_app(service, env, records):
     if service in records and owned_process(records[service]):
         if (records[service].get("source_sha256") == source_sha and records[service].get("env_stamp") == env_stamp
                 and records[service]["cmdline"] == command):
+            # 复用/重启必须可区分：部署日志里只看到 "health passed" 分不清该服务
+            # 是否真的换了产物——2026-10-16 实部署核对时生产 user 服务行为与新代码
+            # 不一致，却无法从日志判定它是复用还是重启，排查全靠猜。
+            print(f"Smartlect {service} already runs the current build ({source_sha[:12]}, "
+                  f"PID {records[service].get('pid')}); reuse.", flush=True)
             return
+        previous = str(records[service].get("source_sha256") or "unknown")[:12]
+        causes = []
+        if records[service].get("source_sha256") != source_sha:
+            causes.append(f"build {previous} -> {source_sha[:12]}")
+        if records[service].get("env_stamp") != env_stamp:
+            causes.append("env changed")
+        if records[service].get("cmdline") != command:
+            causes.append("command changed")
+        print(f"Smartlect {service} restarting ({', '.join(causes) or 'identity check failed'}).", flush=True)
         stop_process(records[service])
     port = int(env[f"SMARTLECT_{service.upper().replace('-', '_')}_PORT"])
     if port is not None:
@@ -874,7 +899,7 @@ def start_app(service, env, records):
         output.flush()
         process = subprocess.Popen(command, cwd=ROOT, env=launch_env, stdin=subprocess.DEVNULL,
                                    stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
-    identity = process_identity(process.pid)
+    identity = process_identity(process.pid, expect=command)
     if identity is None:
         raise RuntimeError(f"{service} exited during launch; inspect run/logs/smartlect-{service}.log")
     if identity["cmdline"] != command or identity["exe"] != str(executable.resolve()) or identity["cwd"] != str(ROOT):
@@ -911,6 +936,27 @@ def install_catalog(env):
     module.apply_catalog(env)
 
 
+def assert_current_build(env):
+    """部署门禁：每个运行中的服务都必须是本次构建的产物。
+
+    2026-10-16 实部署事故：部署全绿（12 进程健康、9 个注册），但生产上 user 服务
+    的行为与新代码不一致——"部署是否真的换掉了每个服务的产物"当时没有任何断言，
+    只能靠事后逐接口探测。这里把它变成启动流程的最后一道门禁：台账记录的产物指纹
+    必须等于当前构建产物指纹，否则部署失败（而不是静默跑旧代码）。
+    """
+    records = load_processes()
+    stale = []
+    for service in app_services(env):
+        _, _, source_sha, _, _ = app_launch(service, env)
+        running = str((records.get(service) or {}).get("source_sha256") or "unregistered")
+        if running != source_sha:
+            stale.append(f"{service}(running {running[:12]} != built {source_sha[:12]})")
+    if stale:
+        raise RuntimeError("Deployment did not take effect for: " + ", ".join(stale)
+                           + "; inspect run/logs and re-run up")
+    print("Build consistency check passed: every app runs the current build.", flush=True)
+
+
 def apps_up(env):
     local = set(app_services(env))
     # 主节点（跑全部服务）沿用完整 infra 门禁；副本节点只验到集群中间件的连通性
@@ -938,6 +984,7 @@ def apps_up(env):
                 if service == "stock":
                     install_catalog(env)
         apps_check(env)
+        assert_current_build(env)
         java_count = len([name for name in local if name not in {"assistant", "web-user", "web-admin"}])
         print(f"Smartlect application startup smoke passed: {java_count} Java services, AI API and UI health.")
         prune_staged_artifacts()
@@ -974,13 +1021,31 @@ def apps_check(env):
           f"{java_local} Nacos registrations at {register_ip}.")
 
 
+def process_start_time(pid):
+    """进程启动时刻（本地时区字符串）：部署核对要看"进程是否启于本次部署"。"""
+    try:
+        uptime_seconds = float((Path("/proc") / "uptime").read_text().split()[0])
+        stat = (Path("/proc") / str(pid) / "stat").read_text()
+        ticks = int(stat.rsplit(")", 1)[1].split()[19])
+        hz = os.sysconf("SC_CLK_TCK")
+        started = time.time() - (uptime_seconds - ticks / hz)
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(started))
+    except (OSError, ValueError, IndexError):
+        return "?"
+
+
 def apps_status(services=None):
     records = load_processes()
     for service in services or APPS:
         record = records.get(service)
         state = "stopped" if record is None or not owned_process(record) else (
             "healthy" if app_health(service, record) else "starting/unhealthy")
-        print(f"smartlect-{service}: {state}" + (f" (PID {record['pid']}, port {record['port']})" if record else ""))
+        detail = ""
+        if record:
+            build = str(record.get("source_sha256") or "")[:12]
+            detail = (f" (PID {record['pid']}, port {record['port']}, "
+                      f"started {process_start_time(record['pid'])}, build {build})")
+        print(f"smartlect-{service}: {state}" + detail)
 
 
 def self_test():
@@ -1148,6 +1213,9 @@ def self_test():
     calls = []
     with patch.dict(globals(), infra_check=lambda env: None, compose=lambda *a, **kw: None,
                     load_processes=lambda: {}, apps_check=lambda env: None,
+                    # 启动顺序模拟：台账是空的，产物一致性断言语义上不适用（它验证的是
+                    # "真实 up 有没有换掉每个服务的产物"，与这里的调用顺序无关）
+                    assert_current_build=lambda env: None,
                     install_catalog=lambda env: calls.append(('catalog',)),
                     start_app=lambda name, env, records: calls.append(('start', name)),
                     wait_apps=lambda names, records: calls.append(('healthy', tuple(names)))):
