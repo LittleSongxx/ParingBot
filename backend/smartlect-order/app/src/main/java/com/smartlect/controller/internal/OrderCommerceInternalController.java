@@ -206,10 +206,12 @@ public class OrderCommerceInternalController extends ABaseController {
             OrderItemQuery itemQuery = new OrderItemQuery();
             itemQuery.setOrderId(orderId);
             List<OrderItem> items = orderItemService.findListByParam(itemQuery);
-            if (items != null) {
+            if (items != null && !items.isEmpty()) {
+                // 批量取退款单：此前逐明细查一次，多明细订单会放大成 N 次 SQL（N+1）
+                Map<String, RefundRequest> byItem = refundSagaTransactionService.mapByOrderItemIds(
+                        items.stream().map(OrderItem::getOrderItemId).toList());
                 for (OrderItem item : items) {
-                    RefundRequest request = refundSagaTransactionService.findByOrderItemId(
-                            item.getOrderItemId());
+                    RefundRequest request = byItem.get(item.getOrderItemId());
                     if (request != null && userId.equals(request.getUserId())) {
                         requests.add(request);
                     }

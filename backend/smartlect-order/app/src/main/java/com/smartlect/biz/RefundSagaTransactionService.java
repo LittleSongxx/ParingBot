@@ -126,6 +126,19 @@ public class RefundSagaTransactionService {
         return refundRequestMapper.selectById(refundRequestId);
     }
 
+    /**
+     * 批量取退款单（key = order_item_id）。订单状态接口用它把 N 次查询压成 1 次；
+     * 调用方仍需按 userId 过滤（跨主体不泄露）。
+     */
+    public java.util.Map<String, RefundRequest> mapByOrderItemIds(java.util.Collection<String> orderItemIds) {
+        if (orderItemIds == null || orderItemIds.isEmpty()) {
+            return java.util.Map.of();
+        }
+        return refundRequestMapper.selectByOrderItemIds(orderItemIds).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        RefundRequest::getOrderItemId, r -> r, (a, b) -> a));
+    }
+
     public RefundRequest findByOrderItemId(String orderItemId) {
         if (orderItemId == null || orderItemId.isBlank()) {
             return null;

@@ -10,6 +10,11 @@ spring:
       validation-timeout: ${SMARTLECT_DB_POOL_VALIDATION_TIMEOUT_MS:3000}
       idle-timeout: ${SMARTLECT_DB_POOL_IDLE_TIMEOUT_MS:300000}
       max-lifetime: ${SMARTLECT_DB_POOL_MAX_LIFETIME_MS:1800000}
+      # 隔离级别显式化：此前吃 MySQL 8 默认值，评审时说不清是"选择"还是"没想过"。
+      # 保持 REPEATABLE READ——热点写路径（库存、券、幂等账本）都是"条件 UPDATE + 唯一键"
+      # 而不是"先读后写"，不依赖 READ COMMITTED 的语义；代价是 RR 的间隙锁会扩大并发写
+      # 冲突面，这也是库存热点不用"先查后改"的原因之一（见 OrderCreationService 注释）。
+      transaction-isolation: TRANSACTION_REPEATABLE_READ
   flyway:
     enabled: ${SMARTLECT_FLYWAY_ENABLED:true}
     baseline-on-migrate: true

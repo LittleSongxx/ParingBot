@@ -28,6 +28,18 @@ public interface RefundRequestMapper {
     @Select("SELECT * FROM refund_request WHERE order_item_id = #{orderItemId}")
     RefundRequest selectByOrderItemId(@Param("orderItemId") String orderItemId);
 
+    /**
+     * 批量取退款单：替掉"逐明细查一次"的 N+1（订单状态接口在明细多时会被放大成 N 次 SQL）。
+     * 空集合由调用方短路，避免生成 `IN ()` 这种非法 SQL。
+     */
+    @Select("""
+            <script>
+            SELECT * FROM refund_request WHERE order_item_id IN
+            <foreach collection="orderItemIds" item="itemId" open="(" close=")" separator=",">#{itemId}</foreach>
+            </script>
+            """)
+    List<RefundRequest> selectByOrderItemIds(@Param("orderItemIds") java.util.Collection<String> orderItemIds);
+
     @Select("SELECT * FROM refund_request WHERE refund_request_id = #{refundRequestId} FOR UPDATE")
     RefundRequest selectByIdForUpdate(@Param("refundRequestId") String refundRequestId);
 

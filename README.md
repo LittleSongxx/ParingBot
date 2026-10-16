@@ -253,6 +253,7 @@ python3 scripts/xxljob_setup.py # 幂等登记 9 个调度任务（只加注解�
 | `smartlect_stock_insufficient_total` | Counter | 库存不足（条件更新 0 行，防超卖的正常拒绝） |
 | `smartlect_outbox_dispatch_total{result}` | Counter | Outbox 投递：`sent/failed/parked`（`parked` = 撞 broker 时间轮上限，驻留待重投） |
 | `smartlect_mq_compensation_replayed_total` | Counter | 补偿日志自动重放成功条数 |
+| `smartlect_sql_slow_total{mapper}` | Counter | 慢 SQL（默认阈值 200ms，`smartlect.sql.slow-threshold-ms`）；只记 mapperId 与 SQL 骨架，不记参数值 |
 | `smartlect_mq_outbox_exhausted` | Gauge | 重试耗尽、需人工重放的消息数（**长期 >0 要处置**） |
 | `executor_*{name=smartlect.mq.async / smartlect.coupon.cache.rebuild}` | Gauge/Counter | 自定义线程池：活跃线程、队列深度、完成数、拒绝数 |
 | `hikaricp_*` · `tomcat_threads_*` · `jvm_*` | Boot 默认 | 连接池、容器线程、JVM（GC / 内存） |

@@ -22,6 +22,7 @@ public class SmartlectMetrics {
     public static final String OUTBOX_DISPATCH = "smartlect_outbox_dispatch_total";
     public static final String COMPENSATION_REPLAYED = "smartlect_mq_compensation_replayed_total";
     public static final String PRODUCT_CACHE = "smartlect_product_cache_total";
+    public static final String SLOW_SQL = "smartlect_sql_slow_total";
 
     private final MeterRegistry registry;
 
@@ -60,6 +61,11 @@ public class SmartlectMetrics {
         if (count > 0) {
             Counter.builder(COMPENSATION_REPLAYED).register(registry).increment(count);
         }
+    }
+
+    /** 慢 SQL：按 mapperId 计数（阈值见 smartlect.sql.slow-threshold-ms，默认 200ms）。 */
+    public void slowSql(String mapperId) {
+        Counter.builder(SLOW_SQL).tag("mapper", mapperId).register(registry).increment();
     }
 
     /** 商品详情缓存：layer = l1 / l2 / db，result = hit / miss / error / load。 */

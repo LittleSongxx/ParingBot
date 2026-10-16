@@ -33,8 +33,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -416,5 +419,40 @@ class OrderCommerceInternalControllerTest {
             assertTrue(statement.getBoundSql(params).getSql().contains("AND 1 = 0"));
             params.put("productIds", List.of("p1' OR 1=1 --"));
         }
+    }
+
+    @Test
+    void orderLevelRefundStatusUsesOneBatchQueryInsteadOfPerItemLookups() {
+        delegateAs("u1");
+        com.smartlect.entity.po.OrderInfo order = new com.smartlect.entity.po.OrderInfo();
+        order.setOrderId("SM202608050099");
+        order.setUserId("u1");
+        when(orderInfoService.getOrderInfoByOrderId("SM202608050099")).thenReturn(order);
+        when(orderItemService.findListByParam(any())).thenReturn(List.of(
+                item("SMITEM-A"), item("SMITEM-B"), item("SMITEM-C")));
+        RefundRequest onlySecond = new RefundRequest();
+        onlySecond.setRefundRequestId("refund-2");
+        onlySecond.setOrderItemId("SMITEM-B");
+        onlySecond.setUserId("u1");
+        onlySecond.setStatus("PENDING_PAYMENT");
+        onlySecond.setRefundAmount(new BigDecimal("10.00"));
+        onlySecond.setCreatedAt(new Date());
+        when(refundService.mapByOrderItemIds(any()))
+                .thenReturn(Map.of("SMITEM-B", onlySecond));
+
+        ResponseVO<List<Map<String, Object>>> response = controller.refundStatus(Map.of(
+                "userId", "u1",
+                "orderId", "SM202608050099"
+        ));
+
+        assertEquals(1, response.getData().size(), "只有属于该用户的退款单会出现在结果里");
+        verify(refundService, times(1)).mapByOrderItemIds(any());
+        verify(refundService, never()).findByOrderItemId(anyString());
+    }
+
+    private com.smartlect.entity.po.OrderItem item(String orderItemId) {
+        com.smartlect.entity.po.OrderItem item = new com.smartlect.entity.po.OrderItem();
+        item.setOrderItemId(orderItemId);
+        return item;
     }
 }

@@ -127,7 +127,17 @@
 	 </where>
 	</sql>
 
-	<!-- 查询集合-->
+	<!-- 查询集合。深分页说明（2026-10-16 实测后不改写，理由在此）：
+	     本查询由 PageHelper 的 Interceptor 统一注入 LIMIT 与 count 查询，"在 SQL 里写
+	     join (SELECT ... LIMIT ?,?) 的延迟关联"会与它冲突——内层 LIMIT 的 offset 参数
+	     根本不会被填（分页由 PageHelper 接管），count 改写也会落到嵌套结构上。
+	     真正可行的两条路都要改契约：
+	       ① 两阶段分页：先用 PageHelper 只取 order_id 窗口，再按 id 集合回表 join；
+	       ② keyset/游标分页（WHERE order_id > lastId），彻底摆脱 offset；
+	     两者都要动前端分页协议，且当前数据量（本地实测 5 万行量级，见
+	     eval/verification/2026-10-16/page-depth-experiment.txt）下 offset 深分页的
+	     代价仍在可接受范围——所以本次只加"页码上限"护栏（PageUtils），把改写留给
+	     真有数据量压力的那一档。 -->
 	<select id="selectList" resultMap="base_result_map" >
 		 SELECT <include refid="base_column_list" />
 		     <if test="query.queryItems">
