@@ -255,6 +255,8 @@ python3 scripts/xxljob_setup.py # 幂等登记 10 个调度任务（只加注解
 | `smartlect_outbox_dispatch_total{result}` | Counter | Outbox 投递：`sent/failed/parked`（`parked` = 撞 broker 时间轮上限，驻留待重投） |
 | `smartlect_mq_compensation_replayed_total` | Counter | 补偿日志自动重放成功条数 |
 | `smartlect_sql_slow_total{mapper}` | Counter | 慢 SQL（默认阈值 200ms，`smartlect.sql.slow-threshold-ms`）；只记 mapperId 与 SQL 骨架，不记参数值 |
+| `smartlect_knowledge_mirror_failures_total` | Counter | 知识发布后向 ES/Qdrant 双写失败次数（发布不阻塞，但检索侧可能缺该文档；>0 要查索引后端） |
+| `smartlect_idempotent_stuck_total{status}` | Counter | 幂等账本"待核对/待人工/陈旧 PROCESSING"计数（旧 PROCESSING = 进程崩溃或收口失败的遗留行） |
 | `smartlect_mq_outbox_exhausted` | Gauge | 重试耗尽、需人工重放的消息数（**长期 >0 要处置**） |
 | `executor_*{name=smartlect.mq.async / smartlect.coupon.cache.rebuild}` | Gauge/Counter | 自定义线程池：活跃线程、队列深度、完成数、拒绝数 |
 | `hikaricp_*` · `tomcat_threads_*` · `jvm_*` | Boot 默认 | 连接池、容器线程、JVM（GC / 内存） |
@@ -270,6 +272,7 @@ Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预
 | 站点 | `http://127.0.0.1/` | nginx 反代网关，`/actuator` 与业务端口不对公网开放 |
 | 网关健康 | `:18080/actuator/health` | 依赖 Redis / Nacos 的存活探针 |
 | 调度中心 | `:18090/xxl-job-admin` | 10 个任务的执行记录、手动触发、失败重试；**判断"任务在跑"看 handle_code=200**，只看触发会漏掉"调度成功但执行器不可达" |
+| 展厅账号策略 | `TrialAdminAccess` + `TrialAdminGuardInterceptor` | 公开口令的 gallery 账号：**读默认允许（隐私清单除外）、写默认拒绝**（退款复核显式放行）；清单完整性由 `scripts/check_admin_authz.py` 门禁强制 |
 | 配置中心 | `:18848` Nacos 控制台 | `SMARTLECT_GROUP` 下的配置；改完用 `scripts/nacos_config_push.py` 推送 |
 | 指标 | 各服务 `/actuator/prometheus` | JVM / Hikari / 线程池 / 业务指标；只从内网抓 |
 | 应用日志 | `run/logs/<服务>.log` | 启动失败先看这里；`run/logs/<服务>/nacos/` 是注册与配置客户端日志 |
@@ -310,6 +313,11 @@ Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预
 - **`deploy/seata/` 残留**：历史容器卷挂载留下的 root 属主空目录，未纳入版本控制，本地删除需 sudo。
 - **`smartlect_growth`**：助手库与账号沿用历史命名（环境变量已统一为 `SMARTLECT_ASSISTANT_*`），改名需数据迁移，暂不动。
 - **集成档进 CI 前的老问题**：`OutboxLeaseSqlIT` 曾因 MySQL 秒级 DATETIME 的四舍五入而抖动（创建时刻落在"未来 1 秒"），已回拨 create_time 修复。
+- **`/internal/**` 是"共享令牌=上帝模式"**（接受风险）：内部面只校验一枚共享令牌 + 可选委托身份头，
+  改成 per-service 令牌或签名 actor 需要重做全部服务与助手的调用约定；当前无已知利用链
+  （模型可影响的助手侧只暴露字面量路径且以 `/internal/` 开头），故明确列为接受风险。
+- **资源 id 用非 CSPRNG**（`StringTools.getRandomNumber`，ThreadLocalRandom）：不可从外部预测，
+  文件/订单/地址 id 的不可猜性不受影响；仅安全码（邮件验证码）已切 SecureRandom。
 
 ## 这个仓库里没有的东西
 
