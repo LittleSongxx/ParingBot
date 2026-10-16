@@ -56,6 +56,10 @@ overrides = {
     'SMARTLECT_APP_BIND_ADDRESS': '0.0.0.0',
     'SMARTLECT_APP_REGISTER_IP': ip,
     'SMARTLECT_PROJECT_FOLDER': '/opt/smartlect/run/uploads/',
+    # 执行器地址必须是副本节点在内网的真实 IP：调度中心容器跑在 node1，
+    # 用 host.docker.internal 只能回到 node1 自己——不覆盖就会把 node1 的值
+    # 原样带过来，副本的任务回调全部指错机器（2026-10-16 副本首同步时补上）。
+    'SMARTLECT_XXLJOB_EXECUTOR_HOST': ip,
 }
 # 刻意不在这里写 JVM/连接池数值：这些参数跟着机器规格走，由 apply-sizing.sh 按
 # nproc 与本机角色推导。写死过一次（2 核时代的 1 处理器/320m），扩容后被本脚本
