@@ -99,7 +99,43 @@ def local_ip():
         return sock.getsockname()[0]
 
 
+LEGACY_ENV_ALIASES = {"SMARTLECT_GROWTH_": "SMARTLECT_ASSISTANT_"}
+
+
+def migrate_legacy_env():
+    """把历史键名迁移成现役键名（幂等、保值、原子写回）。
+
+    背景（2026-10-16 实部署事故）：assistant 相关环境变量由 SMARTLECT_GROWTH_* 改名为
+    SMARTLECT_ASSISTANT_*，但**服务器上的 run/runtime.env 还是旧键名**——而 compose 里
+    `SMARTLECT_ASSISTANT_MYSQL_PASSWORD:?run bootstrap` 是必需变量，compose 解析直接失败，
+    连锁导致 `up` 非零退出、systemd 单元 failed、站点 502。
+    修法：任何入口读 env 之前先跑一次本迁移——按旧键的**原值**补出新键（不重新生成，
+    否则数据库账号密码会对不上），并补上执行器地址键。旧键保留（无害，便于回滚旧代码）。
+    """
+    if not ENV_FILE.exists():
+        return
+    env = parse_env(ENV_FILE)
+    additions = {}
+    for legacy_prefix, new_prefix in LEGACY_ENV_ALIASES.items():
+        for key, value in env.items():
+            if key.startswith(legacy_prefix):
+                new_key = new_prefix + key[len(legacy_prefix):]
+                if new_key not in env:
+                    additions[new_key] = value
+    if "SMARTLECT_XXLJOB_EXECUTOR_HOST" not in env:
+        additions["SMARTLECT_XXLJOB_EXECUTOR_HOST"] = "host.docker.internal"
+    if not additions:
+        return
+    merged = {**env, **additions}
+    temp = ENV_FILE.with_suffix(".env.migrating")
+    temp.write_text("\n".join(f"{k}={v}" for k, v in merged.items()) + "\n")
+    os.chmod(temp, 0o600)
+    temp.replace(ENV_FILE)
+    print("migrated env keys: " + ", ".join(sorted(additions)), flush=True)
+
+
 def bootstrap():
+    migrate_legacy_env()
     if ENV_FILE.exists():
         env = parse_env(ENV_FILE)
         web_port = env.get('SMARTLECT_WEB_USER_PORT') or str(free_ports(PORTS['WEB_USER'], occupied={
@@ -1115,6 +1151,7 @@ def self_test():
 
 
 def main():
+    migrate_legacy_env()
     command = sys.argv[1] if len(sys.argv) > 1 else "status"
     if command == "bootstrap":
         bootstrap()
