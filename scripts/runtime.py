@@ -107,6 +107,9 @@ def bootstrap():
         admin_port = env.get('SMARTLECT_WEB_ADMIN_PORT') or str(free_ports(PORTS['WEB_ADMIN'], occupied={
             int(v) for k, v in env.items() if k.endswith('_PORT')} | {int(web_port)}))
         candidate = {
+            # 存量环境也要补上这个键：xxl-job 执行器必须报"容器能回拨的地址"，
+            # 缺键会静默回落到自动探测（局域网 IP → 容器不可达 → 兜底任务全部只触发不执行）。
+            "SMARTLECT_XXLJOB_EXECUTOR_HOST": "host.docker.internal",
             "SMARTLECT_DEMO_ENABLED": "true", "SMARTLECT_DEMO_PASSWORD": secrets.token_hex(24),
             "SMARTLECT_VISITOR_SECRET": secrets.token_hex(32),
             "SMARTLECT_ATTRIBUTION_SECRET": secrets.token_hex(32),
