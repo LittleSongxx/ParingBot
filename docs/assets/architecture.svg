@@ -1,102 +1,94 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 780" role="img" aria-label="Smartlect 架构">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 660" role="img" aria-label="Smartlect 架构：Vue 双端 → 网关 → Python 导购 Agent ｜ Java 交易权威 → 数据面">
   <defs>
-    <style>
-      text { font-family: "Noto Sans CJK SC","Microsoft YaHei","PingFang SC",sans-serif; }
-      .title { font-size: 20px; font-weight: 700; fill: #0f172a; }
-      .layer { font-size: 14px; font-weight: 700; fill: #1e293b; }
-      .body { font-size: 12.5px; fill: #334155; }
-      .chip { font-size: 11px; fill: #fff; font-weight: 600; }
-      .sub { font-size: 10.5px; fill: #94a3b8; }
-      .arrow { stroke: #94a3b8; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
-    </style>
-    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-      <path d="M0,0 L8,3 L0,6 Z" fill="#94a3b8"/>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0.8 L9.4 5 L0 9.2 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0.8 L9.4 5 L0 9.2 z" fill="#2563eb"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0.8 L9.4 5 L0 9.2 z" fill="#059669"/>
     </marker>
   </defs>
-  <rect width="1120" height="780" fill="#f8fafc"/>
-  <text x="560" y="32" text-anchor="middle" class="title">Smartlect — 交易权威 + 有界 ReAct 导购 Agent</text>
+  <rect width="1180" height="660" fill="#ffffff"/>
 
-  <!-- 浏览器层 -->
-  <rect x="30" y="52" width="1060" height="54" rx="10" fill="#e0f2fe" stroke="#7dd3fc"/>
-  <text x="50" y="76" class="layer">浏览器</text>
-  <text x="120" y="76" class="body">用户端 Vue 3 + TypeScript（18180）</text>
-  <text x="420" y="76" class="body">管理端 Vue 3（18181）</text>
-  <text x="640" y="76" class="body">SSE 流式 + 提案确认卡</text>
+  <rect x="24" y="20" width="1132" height="86" rx="12" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="44" y="44" fill="#94a3b8" font-size="12.5" font-weight="700" letter-spacing="1">浏览器端（Vue 3 · 只负责把状态画出来）</text>
+  <rect x="44" y="54" width="220" height="40" rx="9" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.4"/>
+  <text x="60" y="79" fill="#5b21b6" font-size="13.5" font-weight="700">用户端 :18180</text>
+  <rect x="284" y="54" width="220" height="40" rx="9" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.4"/>
+  <text x="300" y="79" fill="#5b21b6" font-size="13.5" font-weight="700">管理端 :18181</text>
+  <text x="532" y="79" fill="#64748b" font-size="12.5">静态资源 + /api 与 /admin-api 反代 · 权限由服务端拒绝</text>
 
-  <line x1="560" y1="106" x2="560" y2="130" class="arrow"/>
-  <text x="590" y="124" class="sub">HTTPS / SSE</text>
+  <path d="M144 106 V 140" stroke="#94a3b8" stroke-width="1.4" fill="none" marker-end="url(#a)"/>
+  <path d="M394 106 V 140" stroke="#94a3b8" stroke-width="1.4" fill="none" marker-end="url(#a)"/>
 
-  <!-- 网关层 -->
-  <rect x="230" y="132" width="660" height="50" rx="10" fill="#fef3c7" stroke="#fbbf24"/>
-  <text x="250" y="156" class="layer">Spring Cloud Gateway（18080）</text>
-  <text x="490" y="156" class="body">Sa-Token 统一校验 · Sentinel 限流 · 剥离伪造身份头</text>
-  <text x="250" y="173" class="sub">/api/** → 用户端服务     /admin-api/** → 管理端服务     /api/assistant/** → assistant</text>
+  <rect x="44" y="142" width="460" height="48" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="60" y="163" fill="#1e293b" font-size="13.5" font-weight="700">nginx（线上）</text>
+  <text x="60" y="181" fill="#64748b" font-size="12">TLS · 静态站 · /api 不缓冲（SSE 直通）· /actuator 不对外反代</text>
 
-  <!-- 双向箭头 -->
-  <line x1="330" y1="182" x2="330" y2="210" class="arrow"/>
-  <text x="260" y="202" class="sub">@SaCheckLogin ×29</text>
-  <line x1="660" y1="182" x2="660" y2="210" class="arrow"/>
-  <text x="690" y="202" class="sub">Cookie introspect</text>
+  <path d="M274 190 V 224" stroke="#94a3b8" stroke-width="1.4" fill="none" marker-end="url(#a)"/>
+  <rect x="44" y="226" width="460" height="62" rx="10" fill="#ecfdf5" stroke="#059669" stroke-width="1.8"/>
+  <text x="60" y="249" fill="#047857" font-size="14" font-weight="700">网关 :18080（Spring Cloud Gateway · Sa-Token 会话键）</text>
+  <text x="60" y="269" fill="#334155" font-size="12">16 条路由 · 鉴权限流 · 剥离伪造身份头后转发 · 自己做权限判定的是服务端注解</text>
 
-  <!-- Java 交易权威层 -->
-  <rect x="30" y="212" width="620" height="128" rx="10" fill="#dcfce7" stroke="#86efac"/>
-  <text x="50" y="238" class="layer">Java 交易权威 — Spring Cloud（9 服务）</text>
-  <rect x="50" y="250" width="90" height="26" rx="6" fill="#16a34a"/><text x="62" y="267" class="chip">gateway</text>
-  <rect x="148" y="250" width="68" height="26" rx="6" fill="#16a34a"/><text x="160" y="267" class="chip">user</text>
-  <rect x="224" y="250" width="82" height="26" rx="6" fill="#16a34a"/><text x="236" y="267" class="chip">product</text>
-  <rect x="314" y="250" width="70" height="26" rx="6" fill="#16a34a"/><text x="326" y="267" class="chip">stock</text>
-  <rect x="392" y="250" width="66" height="26" rx="6" fill="#16a34a"/><text x="404" y="267" class="chip">cart</text>
-  <rect x="466" y="250" width="76" height="26" rx="6" fill="#16a34a"/><text x="478" y="267" class="chip">order</text>
-  <rect x="550" y="250" width="60" height="26" rx="6" fill="#16a34a"/><text x="562" y="267" class="chip">pay</text>
-  <rect x="50" y="282" width="80" height="26" rx="6" fill="#16a34a"/><text x="62" y="299" class="chip">coupon</text>
-  <rect x="138" y="282" width="74" height="26" rx="6" fill="#16a34a"/><text x="150" y="299" class="chip">admin</text>
-  <text x="230" y="300" class="body">Nacos 注册 · OpenFeign · PageHelper · Redisson · Sa-Token 1.39</text>
-  <text x="50" y="330" class="body">Outbox 可靠消息 · 退款 Saga · 命令幂等账本 · 金额分摊 CHECK · 秒杀 Lua · 条件 UPDATE 不超卖</text>
+  <path d="M180 288 V 330" stroke="#2563eb" stroke-width="1.6" fill="none" marker-end="url(#ab)"/>
+  <text x="188" y="313" fill="#64748b" font-size="12">/api/** 与 /admin-api/**</text>
+  <path d="M400 288 V 330" stroke="#d97706" stroke-width="1.6" fill="none" marker-end="url(#a)"/>
+  <text x="408" y="313" fill="#64748b" font-size="12">/api/assistant/**</text>
 
-  <!-- assistant 层 -->
-  <rect x="690" y="212" width="400" height="128" rx="10" fill="#ede9fe" stroke="#c4b5fd"/>
-  <text x="710" y="238" class="layer">Shopping Agent — Python 3.11</text>
-  <text x="710" y="258" class="body">FastAPI 18000 · LangGraph 1.2 · 有界 ReAct（手写三节点）</text>
-  <text x="710" y="276" class="body">17 工具 · 预算墙（模型≤6 · 工具≤10 · 检索≤2 · 90s）</text>
-  <text x="710" y="294" class="body">task_dispatch → 1–3 子智能体（create_react_agent）并发</text>
-  <text x="710" y="312" class="body">openai SDK · 端点/模型白名单 · 持久化提案 HITL</text>
-  <text x="710" y="330" class="sub">trim_messages 上下文裁剪</text>
+  <rect x="44" y="332" width="560" height="200" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="1.6"/>
+  <text x="60" y="356" fill="#1d4ed8" font-size="13" font-weight="700">交易权威：9 个 Java 服务 · 每服务一个独立库（唯一写口）</text>
+  <rect x="60" y="366" width="126" height="46" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="70" y="386" fill="#1e293b" font-size="12.5" font-weight="600">user :18105</text>
+  <text x="70" y="402" fill="#64748b" font-size="11">账号 / 地址 / RBAC</text>
+  <rect x="196" y="366" width="126" height="46" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="206" y="386" fill="#1e293b" font-size="12.5" font-weight="600">product :18106</text>
+  <text x="206" y="402" fill="#64748b" font-size="11">目录 / SKU / 多级缓存</text>
+  <rect x="332" y="366" width="126" height="46" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="342" y="386" fill="#1e293b" font-size="12.5" font-weight="600">stock :18108</text>
+  <text x="342" y="402" fill="#64748b" font-size="11">条件扣减 + 台账</text>
+  <rect x="468" y="366" width="120" height="46" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="478" y="386" fill="#1e293b" font-size="12.5" font-weight="600">cart :18102</text>
+  <text x="478" y="402" fill="#64748b" font-size="11">购物车</text>
+  <rect x="60" y="420" width="126" height="46" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="70" y="440" fill="#1e293b" font-size="12.5" font-weight="600">order :18104</text>
+  <text x="70" y="456" fill="#64748b" font-size="11">幂等下单 / 状态机</text>
+  <rect x="196" y="420" width="126" height="46" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="206" y="440" fill="#1e293b" font-size="12.5" font-weight="600">pay :18103</text>
+  <text x="206" y="456" fill="#64748b" font-size="11">模拟渠道 / 退款</text>
+  <rect x="332" y="420" width="126" height="46" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="342" y="440" fill="#1e293b" font-size="12.5" font-weight="600">coupon :18107</text>
+  <text x="342" y="456" fill="#64748b" font-size="11">券 / 秒杀</text>
+  <rect x="468" y="420" width="120" height="46" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="478" y="440" fill="#1e293b" font-size="12.5" font-weight="600">admin :18101</text>
+  <text x="478" y="456" fill="#64748b" font-size="11">管理端 BFF</text>
+  <text x="60" y="490" fill="#475569" font-size="11.5">服务间只走 Dubbo（timeout 10s / retries 0）或 /internal/** + X-Internal-Token</text>
+  <text x="60" y="510" fill="#475569" font-size="11.5">一致性：本地事务 + 幂等账本 + 事务性 Outbox + 定时消息 + 补偿重放 + 对账任务</text>
 
-  <!-- Java ↔ assistant 箭头 -->
-  <line x1="652" y1="276" x2="688" y2="276" class="arrow" stroke-dasharray="4,3"/>
-  <text x="640" y="270" class="sub" text-anchor="end">报价/下单/查询</text>
+  <rect x="628" y="332" width="528" height="120" rx="12" fill="#fffbeb" stroke="#d97706" stroke-width="1.6"/>
+  <text x="644" y="356" fill="#b45309" font-size="13" font-weight="700">导购 Agent（Python，非确定性）</text>
+  <text x="644" y="378" fill="#334155" font-size="12">Assistant :18000 · FastAPI + LangGraph 三节点（model → tools → answer）</text>
+  <text x="644" y="398" fill="#334155" font-size="12">20 个工具：检索 / 订单只读 / 提案 / 记忆 / 派发子智能体</text>
+  <text x="644" y="418" fill="#334155" font-size="12">预算：模型 ≤8 · 工具 ≤10 · 检索 ≤2 · 90s 墙钟 · 超限确定性收口</text>
+  <text x="644" y="438" fill="#64748b" font-size="11.5">成交权不在这里：只能生成待确认提案，人点确认后由 Java 落单</text>
 
-  <!-- 存储层 -->
-  <rect x="30" y="368" width="1060" height="100" rx="10" fill="#fef2f2" stroke="#fca5a5"/>
-  <text x="50" y="394" class="layer">存储与中间件</text>
-  <rect x="50" y="406" width="130" height="28" rx="6" fill="#ef4444"/><text x="60" y="425" class="chip">MySQL 8.4（10 库）</text>
-  <rect x="190" y="406" width="80" height="28" rx="6" fill="#ef4444"/><text x="200" y="425" class="chip">Redis 7.4</text>
-  <rect x="280" y="406" width="110" height="28" rx="6" fill="#ef4444"/><text x="290" y="425" class="chip">RabbitMQ 4.2</text>
-  <rect x="400" y="406" width="80" height="28" rx="6" fill="#ef4444"/><text x="410" y="425" class="chip">Nacos 2.5</text>
-  <rect x="490" y="406" width="80" height="28" rx="6" fill="#ef4444"/><text x="500" y="425" class="chip">Sa-Token</text>
-  <text x="50" y="458" class="body">Sa-Token 会话（token:login: / adminToken:login:）· Redisson RLock + RRateLimiter · Outbox 租约重试</text>
+  <path d="M628 400 C 610 400, 612 392, 604 392" stroke="#059669" stroke-width="1.6" fill="none" marker-end="url(#ag)"/>
+  <path d="M604 396 C 640 470, 640 530, 560 548" stroke="#059669" stroke-width="1.2" fill="none" stroke-dasharray="4 3"/>
+  <path d="M560 548 H 470" stroke="#059669" stroke-width="1.2" fill="none" marker-end="url(#ag)"/>
+  <text x="352" y="545" fill="#047857" font-size="12">价格 / 库存 / 订单状态实时回问（不进向量）</text>
 
-  <!-- 检索层 -->
-  <rect x="30" y="490" width="1060" height="88" rx="10" fill="#fce7f3" stroke="#f9a8d4"/>
-  <text x="50" y="516" class="layer">RAG 检索（assistant 内）</text>
-  <rect x="50" y="528" width="200" height="32" rx="6" fill="#ec4899"/><text x="60" y="549" class="chip">Elasticsearch 8.19（smartcn BM25）</text>
-  <rect x="270" y="528" width="170" height="32" rx="6" fill="#ec4899"/><text x="280" y="549" class="chip">Qdrant 1.15（HNSW dense）</text>
-  <rect x="460" y="528" width="70" height="32" rx="6" fill="#ec4899"/><text x="478" y="549" class="chip">RRF</text>
-  <rect x="550" y="528" width="110" height="32" rx="6" fill="#ec4899"/><text x="560" y="549" class="chip">gte-rerank</text>
-  <text x="690" y="549" class="body">→ top8 → 引用 ≤4 · 拒答阈值 · 未配置回退内存 BM25</text>
-  <text x="50" y="572" class="body">知识发布流：DRAFT → 异步索引 → PUBLISHED → 才可检索 · 价格库存不进向量，每次实时查 Java</text>
+  <rect x="628" y="470" width="256" height="72" rx="10" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="644" y="492" fill="#1e293b" font-size="12.5" font-weight="700">混检（只查已发布知识）</text>
+  <text x="644" y="511" fill="#475569" font-size="11.5">ES BM25(IK) top50 ‖ Qdrant top50</text>
+  <text x="644" y="529" fill="#475569" font-size="11.5">→ RRF(k=60) → gte-rerank → top8 → 引用 ≤4</text>
+  <rect x="900" y="470" width="256" height="72" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="916" y="492" fill="#1e293b" font-size="12.5" font-weight="700">模型接入（可热切换）</text>
+  <text x="916" y="511" fill="#475569" font-size="11.5">OpenAI 兼容端点白名单 + 模型白名单</text>
+  <text x="916" y="529" fill="#475569" font-size="11.5">端点/密钥缺失时明确失败，不静默降级</text>
 
-  <!-- 鉴权条 -->
-  <rect x="30" y="600" width="1060" height="52" rx="10" fill="#e0e7ff" stroke="#a5b4fc"/>
-  <text x="50" y="624" class="layer">Sa-Token 1.39（ADR-0011）</text>
-  <text x="250" y="624" class="body">用户端 StpUtil（token）· 管理端 StpAdminLogic（adminToken，isConcurrent=false）</text>
-  <text x="50" y="643" class="body">网关 GlobalFilter 统一校验 · 服务端 @SaCheckLogin ×29 · @SaCheckPermission ×5 · SmartlectStpInterface</text>
-
-  <!-- 核心设计条 -->
-  <rect x="30" y="668" width="1060" height="52" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
-  <text x="50" y="692" class="layer">电商核心设计</text>
-  <text x="180" y="692" class="body">条件 UPDATE 不超卖 · 秒杀 Lua 预扣 · 命令幂等账本 · Outbox · 退款 Saga · 金额分摊 CHECK · mock 支付 intent 权威</text>
-  <text x="50" y="711" class="body">ADR-0006 删 Seata · ADR-0008 推荐/归因/worker 线退役 · PageHelper 分页 · Redisson 锁/限流</text>
-
-  <text x="560" y="762" text-anchor="middle" class="sub">Smartlect · 2026-10 收敛重构 · ADR 0006–0012</text>
+  <rect x="44" y="568" width="1132" height="72" rx="12" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="64" y="592" fill="#94a3b8" font-size="12.5" font-weight="700" letter-spacing="1">数据面：10 个中间件容器（docker compose）</text>
+  <text x="64" y="614" fill="#334155" font-size="12">MySQL 8.4（每服务独立库 · binlog ROW）· Redis 7.4 · RocketMQ 5.3（三件套 · 任意精度定时消息）· Nacos 2.5</text>
+  <text x="64" y="632" fill="#334155" font-size="12">ES 8.19 + IK · Qdrant 1.15 · Canal 1.1.8（binlog → MQ → 商品索引与缓存失效）· xxl-job 2.5（9 个任务）</text>
 </svg>

@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/Python-3.11+-3776ab?style=flat-square&amp;logo=python&amp;logoColor=white" />
   <img src="https://img.shields.io/badge/LangGraph-1.2-bounded-1a1a2e?style=flat-square" />
   <img src="https://img.shields.io/badge/Elasticsearch_+_Qdrant-混检-005571?style=flat-square&amp;logo=elasticsearch&amp;logoColor=white" />
-  <img src="https://img.shields.io/badge/MySQL_·_Redis_·_RocketMQ-11_容器-4479a1?style=flat-square&amp;logo=mysql&amp;logoColor=white" />
+  <img src="https://img.shields.io/badge/MySQL_·_Redis_·_RocketMQ-10_容器-4479a1?style=flat-square&amp;logo=mysql&amp;logoColor=white" />
   <a href="https://github.com/LittleSongxx/Smartlect/actions/workflows/ci.yml"><img src="https://github.com/LittleSongxx/Smartlect/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
@@ -128,7 +128,7 @@
 ## 架构
 
 <p align="center">
-  <img src="docs/assets/architecture.png" alt="Smartlect 架构：Vue 双端 → 网关(Sa-Token) → Python 导购 Agent ｜ Java 交易权威 → 数据面" width="100%" />
+  <img src="docs/assets/architecture.png" alt="Smartlect 架构：Vue 双端 → 网关(Sa-Token 会话键) → Python 导购 Agent ｜ Java 交易权威 → 数据面" width="100%" />
 </p>
 
 这条边界是刻意画的：浏览器只负责把状态画出来，Python 负责「问什么、检索什么、下一步计划什么」，真正改价格、扣库存、落订单的，只有 Java。
@@ -137,8 +137,8 @@
 
 ```mermaid
 flowchart LR
-  B["浏览器<br/>Vue 3 双端"] --> N["nginx<br/>TLS · 静态 · /api"]
-  N --> G["Gateway :18080<br/>Sa-Token · Sentinel"]
+  B["浏览器<br/>Vue 3 双端"] --> N["nginx<br/>TLS · 静态 · /api 不缓冲"]
+  N --> G["Gateway :18080<br/>Sa-Token 会话键 · Sentinel"]
   G -->|/api/assistant| A["Assistant :18000<br/>FastAPI + LangGraph"]
   G -->|/api/**| J["Java 交易域 · 9 服务"]
   A -->|混检| R["ES 8.19 + Qdrant 1.15"]
@@ -150,14 +150,14 @@ flowchart LR
   C -.-> A
 ```
 
-**两条主链路**
+**两条主链**
 
 | 链路 | 路径 |
 |---|---|
 | 浏览 | nginx → Gateway（限流/鉴权）→ product → Caffeine L1 → Redis L2 → MySQL；未命中回源，Canal 兜底失效 |
 | 导购 | 浏览器 → Assistant 选工具 → ES + Qdrant 混检（只查已发布知识）→ 价格库存回问 Java → 带引用作答或出提案，人点确认才下单 |
 
-**一致性没有用分布式事务框架。** 本地事务 + 事务性 Outbox 投递到 RocketMQ 做最终一致；订单幂等账本挡住重复提交，库存用条件更新，延迟队列取消超时未付款单，补偿日志自动重放失败的消费者。
+**一致性没有用分布式事务框架。** 本地事务 + 事务性 Outbox 投递到 RocketMQ 做最终一致；订单幂等账本挡住重复提交，库存用条件更新，延迟队列取消超时未付款单，补偿日志自动重放失败的消费者。五层防线与各自的收敛者（关单消息 / 补偿重放 / 对账任务 / 人工重放接口）写在 §关键决策。
 
 ---
 
@@ -167,7 +167,7 @@ flowchart LR
 |---|---|
 | **前端** | Vue 3 · Vite · Element Plus · TypeScript（用户端）· JavaScript（管理端） |
 | **交易** | Java 17 · Spring Boot 3.5 · Spring Cloud 2025 + Dubbo 3.3 · 9 个服务 · MyBatis + PageHelper |
-| **鉴权** | Sa-Token 1.39（网关统一校验 + 服务端 `@SaCheckLogin` / `@SaCheckPermission`） |
+| **鉴权** | Sa-Token 1.39（网关读会话键 + 服务端 `@SaCheckLogin` / `@SaCheckPermission`） |
 | **Agent** | Python 3.11 · FastAPI · LangGraph 1.2 · openai SDK（兼容模式端点白名单） |
 | **检索** | Elasticsearch 8.19（IK BM25 + 商品索引）· Qdrant 1.15（HNSW dense）→ RRF → gte-rerank |
 | **缓存** | Caffeine L1 + Redis L2 + pub/sub 失效 + Canal 兜底 |
@@ -175,18 +175,17 @@ flowchart LR
 | **变更捕获** | Canal 1.1.8（MySQL binlog → RocketMQ → ES 商品索引与缓存失效） |
 | **调度** | xxl-job 2.5（9 个定时任务：订单超时、支付轮询、Outbox 补偿、秒杀对账等） |
 | **服务治理** | Nacos 2.5（服务发现 + 配置中心）· 锁/限流 Redisson 4.0 |
-| **模型** | LiteLLM 网关（可选）；演示走 live，缺配置时明确失败 |
-| **基础设施** | 11 个容器（MySQL 8.4 · Redis 7.4 · RocketMQ 5.3 三件套 · Nacos 2.5 · ES 8.19(IK) · Qdrant 1.15 · Canal 1.1.8 · xxl-job 2.5 · LiteLLM） |
+| **模型** | OpenAI 兼容端点直连（端点 / 模型白名单 + MySQL 热切换）；缺配置时明确失败，不静默降级 |
+| **基础设施** | 10 个容器（MySQL 8.4 · Redis 7.4 · RocketMQ 5.3 三件套 · Nacos 2.5 · ES 8.19(IK) · Qdrant 1.15 · Canal 1.1.8 · xxl-job 2.5） |
 
 ```
 backend/   gateway · user · product · stock · cart · order · pay · coupon · admin
 assistant/ Shopping Agent · RAG（ES+Qdrant 混检）· 提案确认 · 子智能体派发
 web/       用户端与管理端（Vue 3）
 deploy/    容器编排（compose）· nginx · SQL 初始化 · 集群编排
-scripts/   dev.sh 入口 · runtime.py 进程编排 · 压测与验证工具
+scripts/   dev.sh 入口 · runtime.py 进程编排 · 压测与验证工具 · 故障演练
 evals/     quality-v2（导购 / 客服）
 eval/verification/  评测与发布的原始证据库（按日期归档）
-docs/      设计说明与 ADR，给想往下翻的人
 ```
 
 ---
@@ -196,7 +195,7 @@ docs/      设计说明与 ADR，给想往下翻的人
 ```bash
 ./scripts/dev.sh bootstrap     # 探测空闲端口、生成本机凭证（run/runtime.env，权限 600）
 ./scripts/dev.sh build         # 编译 Java + assistant venv + 双前端
-./scripts/dev.sh infra-up      # 起 9 个中间件容器并等待健康
+./scripts/dev.sh infra-up      # 起 10 个中间件容器并等待健康
 ./scripts/dev.sh up            # 按依赖顺序拉起 12 个应用进程
 ```
 
@@ -206,19 +205,24 @@ docs/      设计说明与 ADR，给想往下翻的人
 
 | 层 | 端口 |
 |---|---|
-| 中间件 | MySQL 13306 · Redis 16379 · RocketMQ gRPC 8081 · Nacos 18848 · ES 9200 · Qdrant 6333 · Canal 11111 · xxl-job 18090 · LiteLLM 14000 |
+| 中间件 | MySQL 13306 · Redis 16379 · RocketMQ gRPC 8081 · Nacos 18848 · ES 9200 · Qdrant 6333 · Canal 11111 · xxl-job 18090 |
 | 应用 | gateway 18080 · admin 18101 · cart 18102 · pay 18103 · order 18104 · user 18105 · product 18106 · coupon 18107 · stock 18108 · assistant 18000 |
 | 前端 | 用户端 18180 · 管理端 18181 |
 
 已经部署的副本：[用户端](https://smartlect.cn/) · [管理端](https://smartlect.cn/admin/)。试用账密见上文，超管密码不在此公开。
 
-边界、评测和运行细节在 [docs/](docs/)： [Agent 设计](docs/agent-design.md) · [quality-v2](docs/quality-eval-v2.md) · [本地运行](docs/runtime.md) · [ADR 索引](#决策记录)。
-
 ---
 
 ## 怎么验证它真的能跑
 
-仓库带 [CI](https://github.com/LittleSongxx/Smartlect/actions/workflows/ci.yml)。本地一条命令跑三栈自检（Java 单测 · Python 单测 · 双前端 vitest · 运行时自测与进程独立性检查）：
+仓库带 [CI](https://github.com/LittleSongxx/Smartlect/actions/workflows/ci.yml)，backend 一档跑的是**集成档而不是单测档**：`mvn -Pintegration verify`（单测 + 7 个 testcontainers 真库 IT + jacoco），再加一道覆盖率棘轮：
+
+```bash
+mvn -B -f backend/pom.xml -Pintegration verify   # 单测 + 真库 IT（Outbox 租约 SQL、金额分摊、下单一致性…）
+python3 scripts/coverage_gate.py                  # 行覆盖率对比 backend/jacoco-baseline.txt（±1pp 容差）
+```
+
+本地一条命令跑三栈自检（Java 单测 · Python 单测 · 双前端 vitest · 运行时自测与进程独立性检查）：
 
 ```bash
 ./scripts/dev.sh check
@@ -232,7 +236,28 @@ docs/      设计说明与 ADR，给想往下翻的人
 python3 scripts/xxljob_setup.py # 幂等登记 9 个调度任务（只加注解不会执行）
 ```
 
-公开评测是 [quality-v2](docs/quality-eval-v2.md) 两条线（导购 / 客服），每条自己的指标和分母，不合成总分。
+公开评测（导购 / 客服两条线，各自的分母与指标，不合成总分）的题库与判分器在 `evals/`，运行入口 `scripts/eval_quality_v2.py`、`scripts/eval_support_eval.py`；原始证据按日期归档在 `eval/verification/`。
+
+---
+
+## 指标与观测
+
+每个服务都暴露 `/actuator/prometheus`（health/info/prometheus 三件套，只从内网抓；nginx 不反代 `/actuator`）。业务指标走 `com.smartlect.metrics.SmartlectMetrics` 单一出口，命名约定 `smartlect_<域>_<事件>_total`，标签只放有限基数的维度：
+
+| 指标 | 类型 | 含义 |
+|---|---|---|
+| `smartlect_product_cache_total{layer,result}` | Counter | 商品详情缓存：`layer=l1/l2/db`，`result=hit/miss/error/load`（L1 另有 Caffeine 的 `cache_*` 系列：命中率、加载耗时） |
+| `smartlect_order_created_total` | Counter | 下单成功（按子单数累加，Phase 3 短事务提交即计） |
+| `smartlect_idempotent_replay_total{command}` | Counter | 幂等重放命中（同键重复请求返回既有结果） |
+| `smartlect_idempotent_conflict_total{command,reason}` | Counter | 幂等冲突，`reason=in_flight/stale_processing/inconclusive/manual_review/fingerprint_mismatch` |
+| `smartlect_stock_insufficient_total` | Counter | 库存不足（条件更新 0 行，防超卖的正常拒绝） |
+| `smartlect_outbox_dispatch_total{result}` | Counter | Outbox 投递：`sent/failed/parked`（`parked` = 撞 broker 时间轮上限，驻留待重投） |
+| `smartlect_mq_compensation_replayed_total` | Counter | 补偿日志自动重放成功条数 |
+| `smartlect_mq_outbox_exhausted` | Gauge | 重试耗尽、需人工重放的消息数（**长期 >0 要处置**） |
+| `executor_*{name=smartlect.mq.async / smartlect.coupon.cache.rebuild}` | Gauge/Counter | 自定义线程池：活跃线程、队列深度、完成数、拒绝数 |
+| `hikaricp_*` · `tomcat_threads_*` · `jvm_*` | Boot 默认 | 连接池、容器线程、JVM（GC / 内存） |
+
+Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预算耗尽原因等）；日志带 `traceId`（网关入口裁决 → MDC → 跨 MQ / 线程池传播），手机号/邮箱等字段在落盘前脱敏。
 
 ---
 
@@ -244,7 +269,7 @@ python3 scripts/xxljob_setup.py # 幂等登记 9 个调度任务（只加注解�
 | 网关健康 | `:18080/actuator/health` | 依赖 Redis / Nacos 的存活探针 |
 | 调度中心 | `:18090/xxl-job-admin` | 9 个任务的执行记录、手动触发、失败重试 |
 | 配置中心 | `:18848` Nacos 控制台 | `SMARTLECT_GROUP` 下的配置；改完用 `scripts/nacos_config_push.py` 推送 |
-| 指标 | 各服务 `/actuator/prometheus` | JVM / Hikari / 线程池；只从内网抓 |
+| 指标 | 各服务 `/actuator/prometheus` | JVM / Hikari / 线程池 / 业务指标；只从内网抓 |
 | 应用日志 | `run/logs/<服务>.log` | 启动失败先看这里；`run/logs/<服务>/nacos/` 是注册与配置客户端日志 |
 | MQ 补偿 | 各库 `mq_compensation_log` | 消费失败落库后由 `mqCompensationReplay` 自动重放 |
 | Outbox 水位 | 各库 `local_message_outbox` | 积压说明投递侧异常；`EXHAUSTED` 需人工介入 |
@@ -253,28 +278,38 @@ python3 scripts/xxljob_setup.py # 幂等登记 9 个调度任务（只加注解�
 
 ---
 
-## 决策记录
+## 关键决策
 
-架构决策按时间序落档在 [docs/adr/](docs/adr/)，重构期关键决策（2026-10）：
+这些都是"选择 A 不选 B"的判断，取舍与代价写在一起（历史 ADR 已随文档面清理下线，结论仍以代码与测试为准）：
 
-| ADR | 主题 |
-|---|---|
-| [0006](docs/adr/0006-remove-seata.md) | 移除 Seata，统一为本地事务 + Outbox 最终一致 |
-| [0007](docs/adr/0007-hybrid-retrieval-es-qdrant.md) | 检索栈选型 Elasticsearch + Qdrant + RRF |
-| [0008](docs/adr/0008-retire-recommendation-line.md) | 推荐 / 归因 / worker 线整体退役 |
-| [0009](docs/adr/0009-agent-runtime-choices.md) | Agent runtime 选型（openai SDK · 手写 ReAct 暂缓迁移） |
-| [0010](docs/adr/0010-subagent-dispatch.md) | 并行子智能体（SubAgent-as-Tool + create_react_agent） |
-| [0011](docs/adr/0011-sa-token-migration-plan.md) | Sa-Token 替换自研鉴权三件套 |
-| [0012](docs/adr/0012-echomind-patterns.md) | 借鉴 EchoMind 模式的 Agent 架构清晰化重构 |
-| [0013](docs/adr/0013-guard-chain-layering.md) | 守卫链分层治理：意图帧启发式与证据契约校验分离 |
+| 决策 | 选择 | 理由与代价 |
+|---|---|---|
+| 一致性 | **不用分布式事务框架**，统一本地事务 + Outbox | 双轨（框架 + 手工补偿）会让回滚边界不可推理；代价是要自建幂等、补偿与对账四件事，且接受短暂不一致 |
+| 服务调用 | **OpenFeign → Dubbo 3** | 内网高 QPS 下的长连接与治理能力；代价是契约模块与注册中心耦合更重，门面类统一为 `*RpcSupport` |
+| 消息 | **RabbitMQ → RocketMQ 5** | 需要任意精度定时消息（15min/1h/7d 四档延迟）；代价是本地运维组件变多，且长延迟要处理 broker 24h 时间轮上限（驻留机制） |
+| 限流鉴权 | 自研三件套 → **Sa-Token** | 少维护一套会话实现；网关只校验会话键存在性，权限判定留在服务端注解 |
+| Agent 形态 | **一个领域 Agent + 按需并行子智能体** | 检索/记账是确定性服务，不包装成 Agent；子智能体只做只读检索，且预算与主循环共享 |
+| 成交边界 | **模型可以建议，不能成交** | 提案落库 + 人点确认 + version 乐观锁 + 幂等执行；代价是交互多一步，换来"重复确认 / 重放 / 超时"三件事都有确定答案 |
+| 检索 | 混检 **ES BM25 + Qdrant → RRF(k=60) → gte-rerank** | 词法管专名型号、向量管近义表达；重排失败回退融合序，未配置时回退内存 BM25 |
+| 价格库存 | **不进向量**，每次回问交易服务 | 向量是近似的，事实必须实时；代价是每轮多一次 RPC |
 
 ---
+
+## 已知边界与遗留
+
+- **演示规模**：单机 MySQL、演示目录（47 个商品 / 20 SKU 场景 + 8.7 万条索引）、压测注入的并发（集群峰值 832 req/s @1600 并发，p95 400ms 档），不是生产流量。
+- **MQ 是单点**：DLedger 三副本编排已就绪但线上未启用，如实记录。
+- **从机 Outbox 兜底不全**：兜底投递目前只挂在 order 组，pay / product 等库依赖 afterCommit 即时投递，没有调度重扫。
+- **Sentinel 规则热更**（Nacos 数据源）已完成代码侧，线上演练未做。
+- **`deploy/seata/` 残留**：历史容器卷挂载留下的 root 属主空目录，未纳入版本控制，本地删除需 sudo。
+- **`smartlect_growth`**：助手库与账号沿用历史命名（环境变量已统一为 `SMARTLECT_ASSISTANT_*`），改名需数据迁移，暂不动。
+- **集成档进 CI 前的老问题**：`OutboxLeaseSqlIT` 曾因 MySQL 秒级 DATETIME 的四舍五入而抖动（创建时刻落在"未来 1 秒"），已回拨 create_time 修复。
 
 ## 这个仓库里没有的东西
 
 - **没有真实资金。** 支付是本地模拟：不接第三方、不跳转、不会扣款。
 - **没有公开超管密码。** 演示账号权限在服务端裁剪；仓库里的超管凭证只对本地环境有效。
-- **没有分布式事务框架。** 一致性靠本地事务 + Outbox + 幂等键，不是 Seata 那类两阶段提交。
+- **没有分布式事务框架。** 一致性靠本地事务 + Outbox + 幂等键 + 补偿 + 对账，不是两阶段提交。
 - **没有第二个 Agent。** 检索、记账、发货都是确定性服务，不包装成 Agent 增加不确定性。
 - **没有把模型当事实源。** 价格、库存、订单状态一律以交易服务为准，模型只负责组织语言与提案。
 - **经营助手 / 广告投放 / 评价分析 / 增长报告已退役**，管理端只留菜单占位说明，代码里没有。
