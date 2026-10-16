@@ -205,6 +205,8 @@ smartlect:
   gateway:
     auth:
       enabled: true
+      # 注意：白名单是**整前缀放行**（/api/product/** 等）。新增写接口必须放在别的前缀下，
+      # 否则会静默变成免鉴权接口（2026-10-16 审计 L-2）。
       web-exclude-paths:
         - /api/account/autoLogin
         - /api/account/checkCode

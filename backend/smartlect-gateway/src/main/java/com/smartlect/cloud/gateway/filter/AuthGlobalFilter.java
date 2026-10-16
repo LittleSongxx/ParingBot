@@ -39,7 +39,10 @@ public class AuthGlobalFilter implements GlobalFilter, Ordered {
             "X-Internal-Token", "X-Internal-Ops-Token", "X-Smartlect-User-Id",
             "X-Admin-Id", "X-Admin-Account", "X-Admin-Roles", "X-Admin-Permissions",
             "X-Admin-Timestamp", "X-Admin-Nonce", "X-Admin-Body-SHA256",
-            "X-Admin-Signature", "X-Admin-Key-Id");
+            "X-Admin-Signature", "X-Admin-Key-Id",
+            // 与 InternalApiHeaders 全量对齐：网关随后自行写入该头（TraceIdGlobalFilter），
+            // 客户端传入值先剥掉，防日志/链路伪造（2026-10-16 审计 L-3）
+            "X-Trace-Id");
     private static final int CODE_LOGIN_TIMEOUT = 901;
 
     private final GatewayAuthProperties authProperties;

@@ -320,12 +320,10 @@ public class AdminIdentityService {
     }
 
     private void rejectTrialRoleAssignment(Set<String> roles) {
+        // 展厅角色只能由种子创建；"展厅 + 超管并存"的检查原本写在下面，但上一个 if 已经
+        // 对任何含展厅角色的入参抛错，那段代码永远不可达（2026-10-16 审计 L-4），已删。
         if (roles.contains(AdminPermissions.TRIAL_OPERATOR_ROLE)) {
             throw new BusinessException("展厅角色只能由系统种子创建");
-        }
-        if (roles.contains(AdminPermissions.TRIAL_OPERATOR_ROLE)
-                && roles.contains(AdminPermissions.SUPER_ADMIN_ROLE)) {
-            throw new BusinessException("展厅角色不能与超级管理员同时存在");
         }
     }
 
