@@ -278,8 +278,20 @@ Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预
 | 应用日志 | `run/logs/<服务>.log` | 启动失败先看这里；`run/logs/<服务>/nacos/` 是注册与配置客户端日志 |
 | MQ 补偿 | 各库 `mq_compensation_log` | 消费失败落库后由 `mqCompensationReplay` 自动重放 |
 | Outbox 水位 | 各库 `local_message_outbox` | 积压说明投递侧异常；`EXHAUSTED` 需人工介入 |
+| 副本节点版本 | node2/node3（见 `deploy/cluster/nodes.env`） | 副本应用 JAR 用 `deploy/cluster/scripts/sync-app-node.sh` 从 node1 同步（含重启与健康门禁）；**`deploy` 动词只更新 node1** |
+| 部署后核对 | `scripts/probes/post_deploy_check.sh https://smartlect.cn` | 展厅矩阵 ×8 + 多节点交替检测：同一路径若在期望码与其它码之间交替，说明有副本节点未更新 |
 
 服务起不来时的顺序：`run/logs/<服务>.log` 找首个异常 → `infra-check` 确认中间件 → `apps-check` 确认注册数 → 调度类问题看 xxl-job 控制台。
+
+**部署覆盖面（三节点集群）**：CI 的 `deploy` 动词只做 node1（它所在的本机）——node1 单实例服务（admin/coupon/pay/stock）随部署更新；node2/node3 的副本服务（gateway/user/product/order/cart）要在 **node1** 上执行：
+
+```bash
+cd /opt/cluster/scripts   # 若缺脚本：cp -a /opt/smartlect/deploy/cluster/scripts/*.sh .
+bash sync-app-node.sh node2 "gateway,product,order,user,cart"
+bash sync-app-node.sh node3 "gateway,product,order,user,cart"
+```
+
+脚本从 node1 已构建产物取 JAR（副本节点不装 Maven）、渲染节点定制 env、重启 unit 并等健康。2026-10-16 实测教训：副本节点未更新时，同一接口会因负载均衡命中不同版本而"时拦时不拦"（403 与 200/600 交替）——上面核对脚本已把这个现象做成检测项。
 
 ---
 

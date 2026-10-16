@@ -76,4 +76,18 @@ log "applying spec-derived sizing (JVM/pool) ..."
 $SCP "$HERE/apply-sizing.sh" "root@$IP:/opt/cluster/apply-sizing.sh"
 $SSH "bash /opt/cluster/apply-sizing.sh"
 
-log "sync-app-node $TAG complete: $SERVICES"
+# 同步完必须重启并等健康——"只同步不重启"是陷阱：JAR 换了、进程还是旧的，行为在
+# 新旧版本之间摇摆。2026-10-16 部署核对实测：副本节点（自集群搭建起未跑过本脚本的
+# 版本更新）与 node1 行为不一致，展厅账号的越权请求约 2/3 概率落到旧节点被放行。
+# 重启走 unit（其 ExecStart 是 runtime.py up：按产物指纹重启变化了的服务）。
+log "restarting apps on $IP ..."
+$SSH "systemctl restart smartlect-apps"
+log "waiting for health on $IP ..."
+$SSH "for waited in \$(seq 1 60); do
+        systemctl is-active --quiet smartlect-apps && break
+        sleep 5
+      done
+      systemctl is-active smartlect-apps || { systemctl status smartlect-apps --no-pager -l | tail -20; exit 1; }
+      /usr/bin/python3 $ROOT/scripts/runtime.py apps-check"
+
+log "sync-app-node $TAG complete: $SERVICES（JAR 已更新并重启生效）"

@@ -1,0 +1,65 @@
+部署后现场核对——发现与恢复的原始输出（2026-10-16）
+====================================================
+
+时间：北京时间 2026-10-16 21:2x–21:4x（部署 run 38906048160 全绿、站点恢复 200 之后）
+方式：curl 直连 https://smartlect.cn（同一 gallery 会话；无 SSH，只能行为探测）
+说明：以下为按时间线誊写的原始命令与未改写输出（会话内实测记录）。
+
+[1] 展厅会话登录 + 越权面逐条
+--------------------------------
+$ curl -s -c prod-gallery.jar -X POST https://smartlect.cn/admin-api/account/login \
+    --data-urlencode account=gallery --data-urlencode password=Visit-Smartlect-2026
+登录 HTTP 200
+
+  order/delivery                 → 403（"作品集展厅账号只能查看看板、商品、订单和知识库…"）
+  sysCategory/saveCategory       → 403（同上文案）
+  user/changeStatus (userId=8800000002&status=0) → {"status":"success","code":200,...}   ← 异常
+  home/getTodayData              → 200 ✓
+  discountCoupon/loadDiscountCoupon → {"status":"error","code":500,...}                  ← 异常
+
+[2] 用户隐私读取面（只读探测，定位 changeStatus 放行范围）
+--------------------------------
+$ curl -s -b prod-gallery.jar -X POST https://smartlect.cn/admin-api/user/loadUser \
+    --data-urlencode pageNo=1 --data-urlencode pageSize=10 --data-urlencode status=0
+{"status":"success","code":200,"info":"请求成功","data":{"totalCount":1,"pageSize":10,"pageNo":1,
+"pageTotal":1,"list":[{"userId":"8800000002","nickName":"演示买家","avatar":null,
+"email":"shopper@smartlect.demo","sex":2,"joinTime":"2026-10-05 02:23:17",
+"lastLoginTime":"2026-10-14 06:33:03","lastLoginIp":"116.168.63.48","status":0,
+"tempBanUntilMs":null}]}}
+（user 服务对该路径放行并返回隐私；同时确认全站仅此一个 status=0 用户 = 本次调用所改）
+
+[3] 恢复动作（把越权改动恢复为原值）
+--------------------------------
+$ curl -s -b prod-gallery.jar -X POST https://smartlect.cn/admin-api/user/changeStatus \
+    --data-urlencode userId=8800000002 --data-urlencode status=1
+{"status":"success","code":200,"info":"请求成功","data":null}
+
+$ ... loadUser?status=0       → {"data":{"totalCount":0,...,"list":[]}}            （无被禁用户）
+$ ... loadUser?nickNameFuzzy=演示买家
+  → {"data":{"totalCount":1,...,"list":[{"userId":"8800000002",...,"status":1,...}]}}
+
+[4] 恢复后的登录验证
+--------------------------------
+$ curl -s -X POST https://smartlect.cn/api/account/login \
+    --data-urlencode email=shopper@smartlect.demo --data-urlencode password=Visit-Smartlect-2026
+{"status":"success","code":200,"data":{"userId":"8800000002","email":"shopper@smartlect.demo",
+"nickName":"演示买家","avatar":null,"token":null,"trial":false}}
+（visitor 登录同样 200）
+注：首次探测时误用参数名 account=（该接口要 email=）得到 600/500；改用 email= 后正常。
+
+[5] 更多服务样本（判定放行范围）
+--------------------------------
+  discountCoupon/saveDiscountCoupon          → 500（类级 coupon:manage 注解先抛）
+  productCart/loadProductCart                → 403（守卫文案；cart 服务生效）
+  tool/addAllOrderToDelayQueue               → 500（注解先抛）
+  order/loadOrder                            → 200（读默认允许，设计如此）
+  productInfo/loadProduct                    → 200（同上）
+
+[6] 局部结论与后续
+--------------------------------
+- 守卫在 order/product/cart 服务生效；user 服务对 /admin/user/** 全放行（200 + 隐私）。
+- coupon 的 500 为类级注解先抛（本地可复现，同 reason 与生产一致）。
+- user 服务异常的进程级证据缺失（无 SSH）；本轮部署（38914161066）重建该服务后，
+  用 scripts/probes/post_deploy_check.sh 复核（期望 → 403；逐服务版本指纹期望 401/901）。
+- 相关修复与回归：commit ee7d484 / 23836b6 / 5736bfc；
+  记录 docs/改动记录/2026-10-16/部署后核对与修复.md
