@@ -234,7 +234,7 @@ private CouponRushRedisComponent couponRushRedisComponent;
 		orderInfo.setPayChannel(payMethod);
 		BigDecimal payAmount = OrderPayAmountUtil.normalizeChannelPayAmount(orderInfo.getAmount());
 		PayInfoDTO payInfoDTO = payRpcSupport.getPayUrl(
-				payChannelEnum.getPayScene(), orderInfo.getPayOrderId(), orderInfo.getSubject(), payAmount);
+				payChannelEnum.getPayScene(), orderInfo.getPayOrderId(), orderInfo.getSubject(), payAmount, userId);
 		payInfoDTO.setOrderId(orderInfo.getOrderId());
 		payRpcSupport.createPending(userId, orderInfo.getPayOrderId(), orderInfo.getOrderId(),
 				payAmount, payMethod);

@@ -18,12 +18,14 @@ public class OrderLogisticsInfoRecordController extends com.smartlect.controller
 
 	@PostMapping("/loadDataList")
 	public ResponseVO loadDataList(OrderLogisticsInfoRecordQuery query){
-		return getSuccessResponseVO(orderLogisticsInfoRecordService.findListByPage(query));
+		return getSuccessResponseVO(com.smartlect.security.TrialOrderPrivacy.redact(
+				orderLogisticsInfoRecordService.findListByPage(query)));
 	}
 
 	@PostMapping("/getOrderLogisticsInfoRecordByRecordId")
 	public ResponseVO getOrderLogisticsInfoRecordByRecordId(Integer recordId) {
-		return getSuccessResponseVO(orderLogisticsInfoRecordService.getOrderLogisticsInfoRecordByRecordId(recordId));
+		return getSuccessResponseVO(com.smartlect.security.TrialOrderPrivacy.redact(
+				orderLogisticsInfoRecordService.getOrderLogisticsInfoRecordByRecordId(recordId)));
 	}
 
 }

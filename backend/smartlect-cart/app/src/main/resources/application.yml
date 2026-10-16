@@ -81,6 +81,13 @@ management:
       exposure:
         include: health,info,prometheus
 
+mq:
+  # local_message_outbox 是 cart 库本地表，与 app.common-scheduling 无关（那个开关管的是
+  # 补偿重放任务）：兜底投递随本开关注册，由 xxl-job 的 smartlect-cart 执行器组触发
+  # （2026-10-17 审计 M-5：此前只有 order 域注册了兜底任务）。
+  outbox:
+    dispatch-enabled: true
+
 app:
   # 本服务没有定时任务，库里也没有 mq_compensation_log，打开只会让重放任务空转报错。
   common-scheduling:

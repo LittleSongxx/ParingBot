@@ -75,6 +75,13 @@ mybatis:
   configuration:
     map-underscore-to-camel-case: true
 
+mq:
+  # local_message_outbox 是 user 库本地表：兜底投递任务（outboxDispatch）随本开关注册，
+  # 由 xxl-job 的 smartlect-user 执行器组触发（scripts/xxljob_setup.py 登记）。
+  # 2026-10-17 审计 M-5：此前只有 order 域注册了兜底任务，其余库的失败行没有周期重投。
+  outbox:
+    dispatch-enabled: true
+
 app:
   # UserTempBanReconcileTask（临时封禁到期解封）挂在这个开关上；写成 false
   # 会让它连 Bean 都不注册——任务从此永不执行，且没有任何报错提示。

@@ -254,7 +254,7 @@ public class OrderCreationService {
             payRpcSupport.createPending(userId, unifiedPayOrderId, orderInfoList.get(0).getOrderId(),
                     totalAmount, postOrderDTO.getPayMethod());
             return requestInitialPayInfoBestEffort(
-                    payChannelEnum.getPayScene(), unifiedPayOrderId, subject, totalAmount);
+                    payChannelEnum.getPayScene(), unifiedPayOrderId, subject, totalAmount, userId);
         } catch (RuntimeException ex) {
             // Phase 5: 补偿（事务外，可独立重试）
             if (stockDeducted) {
@@ -490,13 +490,15 @@ public class OrderCreationService {
     }
 
     // 支付表单获取是 best-effort：失败不阻塞下单（订单保持待支付，支付页可重试）。
+    // userId 随契约传给 pay：Dubbo 线程没有 HTTP 上下文，取表单前的归属校验依赖
+    // provider 显式注入的委托身份（2026-10-17 审计 H-1）。
     PayInfoDTO requestInitialPayInfoBestEffort(
-            String payScene, String payOrderId, String subject, BigDecimal amount) {
+            String payScene, String payOrderId, String subject, BigDecimal amount, String userId) {
         if (OrderPayAmountUtil.isFreeOrder(amount)) {
             return new PayInfoDTO("FREE", payOrderId, BigDecimal.ZERO.setScale(2));
         }
         try {
-            return payRpcSupport.getPayUrl(payScene, payOrderId, subject, amount);
+            return payRpcSupport.getPayUrl(payScene, payOrderId, subject, amount, userId);
         } catch (RuntimeException ex) {
             log.warn("支付表单暂不可用，订单保持待支付并允许支付页重试, payOrderId={}, error={}",
                     payOrderId, ex.getMessage());

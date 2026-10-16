@@ -1,5 +1,5 @@
 # Smartlect 工程入口。旧 eval-harness 线（app/frontend/eval harness）已于 2026-10-04 退役，
-# 原 4 个 harness 目标随之移除；完整本地流程见 scripts/dev.sh 与 docs/runtime.md。
+# 原 4 个 harness 目标随之移除；完整本地流程见 scripts/dev.sh 与 README「快速开始」。
 
 .PHONY: help build check test-backend test-assistant test-web \
         infra-up up down status demo seed-store reset-demo

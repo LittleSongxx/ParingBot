@@ -12,8 +12,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 普通用户登录失败锁定（ADR-0022）：此前仅管理端有锁定，普通登录可被枚举爆破。
- * 与 AdminLoginLockService 同模式（5 次 / 15 分钟），键按 邮箱+IP 双维度——
- * 单 IP 撞多账号与单账号多 IP 都会被各自维度收敛。
+ * 与 AdminLoginLockService 同模式（5 次 / 15 分钟），键为**邮箱+IP 组合**——
+ * 同一账号换 IP 或同一 IP 撞多个账号都各计各的键，互不串扰（2026-10-17 审计 M3：
+ * 原 javadoc 声称"单 IP / 单账号各一维独立的计数"，实现从来只有组合键一档，已按实现改写）。
  */
 @Service
 @Slf4j
@@ -27,7 +28,6 @@ public class UserLoginLockService {
 
     public void ensureNotLocked(String email, String ip) {
         check(failKey(email, ip));
-        check(lockKey(email, ip));
     }
 
     private void check(String key) {
@@ -89,9 +89,5 @@ public class UserLoginLockService {
         }
         return Constants.REDIS_KEY_USER_LOGIN_FAIL + email.trim().toLowerCase()
                 + ":" + (ip == null ? "unknown" : ip);
-    }
-
-    private static String lockKey(String email, String ip) {
-        return failKey(email, ip);
     }
 }

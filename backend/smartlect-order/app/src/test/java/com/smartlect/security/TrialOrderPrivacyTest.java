@@ -4,6 +4,7 @@ import com.smartlect.entity.dto.AdminPrincipalDTO;
 import com.smartlect.entity.po.OrderInfo;
 import com.smartlect.entity.po.OrderItem;
 import com.smartlect.entity.po.OrderLogisticsInfo;
+import com.smartlect.entity.po.OrderLogisticsInfoRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -100,5 +101,25 @@ class TrialOrderPrivacyTest {
         TrialOrderPrivacy.redact(info);
 
         assertEquals("李收货", info.getReceiverName(), "没有 principal 时不得误伤（非管理端路径）");
+    }
+
+    @Test
+    void trialAdminSeesMaskedRecordAddressesAndItemRemarks() {
+        AdminSecurityContext.set(principal(Set.of("TRIAL_OPERATOR"), Set.of("admin:trial")));
+
+        OrderLogisticsInfoRecord record = new OrderLogisticsInfoRecord();
+        record.setRecordAddress("北京市海淀区某路 2 号");
+        OrderLogisticsInfo logistics = logistics();
+        logistics.setRecordList(List.of(record));
+
+        TrialOrderPrivacy.redact(logistics);
+
+        assertEquals("***", record.getRecordAddress(), "轨迹末站即收件地址，必须脱敏");
+        assertEquals("***", logistics.getReceiverName(), "主体字段继续脱敏");
+
+        OrderItem line = new OrderItem();
+        line.setRemark("送到前台");
+        TrialOrderPrivacy.redact(line);
+        assertNull(line.getRemark(), "买家备注属买家原文，展厅视角抹掉");
     }
 }

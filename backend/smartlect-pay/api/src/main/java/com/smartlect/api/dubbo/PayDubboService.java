@@ -29,7 +29,7 @@ public interface PayDubboService {
 
     ResponseVO<Void> markRefunded(PayTradeStatusDTO dto);
 
-    ResponseVO<PayInfoDTO> getPayUrl(PayUrlRequestDTO dto);
+    ResponseVO<PayInfoDTO> getPayUrl(PayUrlRequestDTO dto, String userId);
 
     ResponseVO<Void> refund(PayRefundDTO dto);
 

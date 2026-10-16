@@ -1,5 +1,8 @@
 name: ops
 
+permissions:
+  contents: read
+
 # 只读/应急运维通道：复用部署网关已放行的动词，不重建、不传物、不跑测试。
 #
 # 为什么单独一条：部署核查（"进程是否启于本次部署、跑的是哪个 build"）此前
@@ -18,7 +21,8 @@ on:
         required: true
 
 concurrency:
-  group: ops-${{ github.ref }}
+  # 与 ci 的 deploy job 共享同一组：部署与运维动词（含 rollback）串行、互不取消
+  group: smartlect-deploy
   cancel-in-progress: false
 
 jobs:
@@ -26,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      SSH_CMD: ssh -i ~/deploy_key -o BatchMode=yes -o ConnectTimeout=15
+      SSH_CMD: ssh -i ~/deploy_key -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=10
     steps:
       - name: 配置 deploy key（服务器网关仅放行 upload/upload-dist/deploy/status/rollback）
         run: |

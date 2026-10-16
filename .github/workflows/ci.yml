@@ -1,5 +1,8 @@
 name: ci
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -11,9 +14,13 @@ on:
         type: boolean
         default: false
 
+# 并发语义：push 只取消 push 的旧跑；dispatch（部署/回滚演练）不与任何人在同组互抢——
+# 此前 push 与 dispatch 同组 + cancel-in-progress，一次 push 会把进行中的 deploy job
+# 掐在半途（2026-10-16 实测：38914161066 被取消后重跑）。部署与运维动词之间的互斥
+# 改由 deploy job 与 ops workflow 共享 `smartlect-deploy` 组承担（cancel-in-progress: false）。
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   backend:
@@ -33,6 +40,10 @@ jobs:
         run: mvn -B -f backend/pom.xml -Pintegration verify
       - name: 覆盖率棘轮（对比 backend/jacoco-baseline.txt，±1pp）
         run: python3 scripts/coverage_gate.py
+      # 管理端授权门禁：新增写接口若既无权限注解/二次确认、又不在 TrialAdminAccess
+      # 拒绝清单内，这里直接红（2026-10-17 审计 M2：此前只挂在本机 dev.sh check）
+      - name: 管理端授权门禁（写接口必须注解/确认/在拒绝清单内）
+        run: python3 scripts/check_admin_authz.py
       - name: 上传测试与覆盖率报告
         if: always()
         uses: actions/upload-artifact@v4
@@ -103,9 +114,15 @@ jobs:
           if-no-files-found: error
 
   deploy:
-    if: github.event_name == 'workflow_dispatch'
+    # 只允许从 main 派发部署；提交未推送时 gh workflow run --ref main 取远程 main——
+    # 两者都防"部署了不受控的代码"（2026-10-16 实测过一次误派发旧代码的 run）。
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.rollback
     needs: [backend, assistant, web]
     runs-on: ubuntu-latest
+    # 部署动作与 ops workflow（status/rollback）共享同组：串行、互不取消
+    concurrency:
+      group: smartlect-deploy
+      cancel-in-progress: false
     # 40 分钟：打包+冒烟+重启典型 ~15 分钟；2026-10-15 冒烟因磁盘满挂起时 30 分钟被撞满，
     # job 在重启前被取消——冒烟已修（截止强制），此余量防同类尾部风险。
     timeout-minutes: 40

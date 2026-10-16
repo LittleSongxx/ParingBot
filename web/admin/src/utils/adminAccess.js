@@ -28,8 +28,18 @@ export function hasAnyAdminPermission(principal, permissions) {
 }
 
 export function isTrialAdmin(principal) {
+  // 与后端 TrialIdentities.isTrialAdmin 同一口径：超管持有全部权限点（含 admin:trial），
+  // 只看权限点会把超管误判成展厅（2026-10-17 审计 H2——后端已修，这里是 JS 孪生）。
   const current = normalizeAdminPrincipal(principal)
-  return current.roles.includes('TRIAL_OPERATOR') || current.permissions.includes(ADMIN_PERMISSION.ADMIN_TRIAL)
+  if (String(current.account || '').toLowerCase() === 'gallery') {
+    return true
+  }
+  if (current.roles.includes('TRIAL_OPERATOR')) {
+    return true
+  }
+  return current.permissions.includes(ADMIN_PERMISSION.ADMIN_TRIAL)
+    && !current.permissions.includes('admin:legacy')
+    && !current.roles.includes('SUPER_ADMIN')
 }
 
 export function filterTrialMenu(items) {

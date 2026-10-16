@@ -41,14 +41,17 @@ for svc in ${SERVICES//,/ }; do
   rsync -a --delete -e "ssh $CLUSTER_SSH_OPTS" --include='smartlect-*.jar' --exclude='*' "$dir/" "root@$IP:$dir/"
 done
 
-log "syncing runtime.env ..."
-$SCP "$ROOT/run/runtime.env" "root@$IP:$ROOT/run/runtime.env"
-$SSH "chmod 600 $ROOT/run/runtime.env"
+log "syncing runtime.env (render-then-mv + 单文件备份) ..."
+# 落到 .sync-new、渲染后原子 mv：scp 直写目标会使"传输/渲染失败"留下
+# "JAR 已换新 + env 变成 node1 形态（APP_REGISTER_IP 错、缺 APP_SERVICES）"的半状态，
+# 副本重启会直接掉出 LB（2026-10-17 审计 #2）。备份 .bak-sync 每次同步覆盖。
+$SCP "$ROOT/run/runtime.env" "root@$IP:$ROOT/run/runtime.env.sync-new"
+$SSH "chmod 600 $ROOT/run/runtime.env.sync-new && if [ -f $ROOT/run/runtime.env ]; then cp -a $ROOT/run/runtime.env $ROOT/run/runtime.env.bak-sync; fi"
 
-log "rendering node-specific overrides into runtime.env ..."
+log "rendering node-specific overrides into runtime.env.sync-new ..."
 # 副本节点的差异只有三处：本机跑哪些服务、绑哪个地址、注册哪个 IP。
 # 其余（集群中间件地址、密钥）与 node1 完全一致。
-$SSH "python3 - \"$ROOT/run/runtime.env\" '$IP' '$SERVICES' <<'PY'
+$SSH "python3 - \"$ROOT/run/runtime.env.sync-new\" '$IP' '$SERVICES' <<'PY'
 import sys
 path, ip, services = sys.argv[1], sys.argv[2], sys.argv[3]
 overrides = {
@@ -70,7 +73,7 @@ lines += [f'{k}={v}' for k, v in overrides.items()]
 open(path, 'w').write('\n'.join(lines) + '\n')
 print('overrides applied:', ', '.join(sorted(overrides)))
 PY
-chmod 600 $ROOT/run/runtime.env"
+chmod 600 $ROOT/run/runtime.env.sync-new && mv $ROOT/run/runtime.env.sync-new $ROOT/run/runtime.env"
 
 log "installing systemd unit ..."
 $SCP "$HERE/../app-node/smartlect-apps.service" "root@$IP:/etc/systemd/system/smartlect-apps.service"
@@ -88,6 +91,7 @@ log "restarting apps on $IP ..."
 $SSH "systemctl restart smartlect-apps"
 log "waiting for health on $IP ..."
 $SSH "for waited in \$(seq 1 60); do
+        systemctl is-failed --quiet smartlect-apps && { systemctl status smartlect-apps --no-pager -l | tail -30; exit 1; }
         systemctl is-active --quiet smartlect-apps && break
         sleep 5
       done

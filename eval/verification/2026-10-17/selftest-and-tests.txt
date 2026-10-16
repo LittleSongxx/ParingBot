@@ -1,0 +1,39 @@
+2026-10-17 收尾整理与全面复查——测试与自检证据（原始运行摘要）
+====================================================================
+时间：北京时间 2026-10-17 01:40–02:15。均为本地实际运行输出（按会话记录誊写）。
+
+[清理与根因修复的行为验证]
+- JVM 字体缓存：本地全量重启后 `run/cache/<服务>/tmp/+~JF*.tmp` 出现（落点生效）、
+  系统 `/tmp/+~JF*.tmp` 为 0；三节点服务器清理后各 0（清理前 node1 24 个 295MB /
+  node2 12 个 148MB / node3 12 个 148MB），站点不受影响。
+- prune 输出：`pruned staged artifacts: 77 MB（历史版本快照 / JVM 临时缓存，不影响运行中进程）`。
+
+[全量自检]
+$ ./scripts/dev.sh check
+  - 独立性检查：Scanned 1431/1432 runtime files; 0 violations
+  - 管理端授权门禁：84 端点 / 32 写 / TrialAdminAccess 33 拒 3 放行 → 通过
+  - runtime self-test（含启动顺序模拟）→ 通过
+  - 后端 mvn test 全量 → BUILD SUCCESS；python unittest、双前端 vitest → 通过
+
+[集成档与覆盖率]
+$ mvn -B -f backend/pom.xml -Pintegration verify → BUILD SUCCESS
+  真库 IT：TransactionPersistenceIT 4 / CoPurchasePersistenceIT 10 / OrderMoneyPersistenceIT 4 /
+  OrderConsistencyFixIT 3 / PayChannel4MockIT 5 —— 全绿
+$ python3 scripts/coverage_gate.py → 37.2% 通过（基线 37.2%，容差 1pp）
+
+[修复批的最终状态回归]
+$ mvn -o -f backend/pom.xml test → BUILD SUCCESS（含新增 PayDubboDelegatedIdentityTest 1 项、
+  TrialOrderPrivacyTest 新增"轨迹地址与明细备注"用例、OrderInfoInitialPaymentTest 已随
+  getPayUrl 五参契约更新、TrialAdminAccessTest 增角色优先断言）
+$ npm --prefix web/admin run test → Test Files 8 passed / Tests 38 passed
+  （新增 tests/trial-access.test.js：展厅身份 6 例 + 菜单过滤 2 例）
+$ python3 scripts/runtime.py self-test → 通过（新增迁移幂等/保值/0600 三条断言；
+  输出含 `migrated env keys: SMARTLECT_ASSISTANT_MODEL_ID, SMARTLECT_XXLJOB_EXECUTOR_HOST`）
+$ python3 scripts/check_admin_authz.py → 通过
+$ bash -n scripts/probes/post_deploy_check.sh && bash -n deploy/cluster/scripts/sync-app-node.sh → 通过
+$ python3 scripts/xxljob_setup.py --dry-run → outboxDispatch 条目 6（order + 按库 5）
+
+[数据核对（只读）]
+- 各库 local_message_outbox 非 SENT 行数：user/pay/cart 均为 0；order 为 FAILED 1 + EXHAUSTED 2
+  （后者为 10-16 演练的两条 15 分钟关单消息，属已记录的"EXHAUSTED 仅人工出口"待排期项）
+- outbox 表分布：admin/cart/order/pay/product/user（6 库）；dispatch-enabled 修复后：6 库全开

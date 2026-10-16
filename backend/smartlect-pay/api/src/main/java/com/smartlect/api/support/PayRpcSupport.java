@@ -58,9 +58,9 @@ public class PayRpcSupport {
                 "更新退款状态失败");
     }
 
-    public PayInfoDTO getPayUrl(String payChannel, String payOrderId, String subject, BigDecimal amount) {
+    public PayInfoDTO getPayUrl(String payChannel, String payOrderId, String subject, BigDecimal amount, String userId) {
         return rpcResponseSupport.call(
-                () -> payDubboService.getPayUrl(new PayUrlRequestDTO(payChannel, payOrderId, subject, amount)),
+                () -> payDubboService.getPayUrl(new PayUrlRequestDTO(payChannel, payOrderId, subject, amount), userId),
                 "获取支付链接失败");
     }
 

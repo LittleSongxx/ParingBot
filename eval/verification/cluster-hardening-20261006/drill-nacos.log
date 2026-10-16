@@ -1,0 +1,9 @@
+[03:05:49] raft hints: 
+[03:05:49] KILLING nacos-c2 (follower)...
+[03:06:02] after kill c2: c1 readiness 10/10 — discovery still served
+[03:06:18] c2 restarted
+[03:06:18] KILLING nacos-c1 (first in client addr list)...
+[03:06:30] after kill c1: c2 readiness 0/10
+gateway via nginx: HTTP 200 in 0.040145s
+[03:06:46] all members back: 2/3 ready
+[03:06:46] DRILL-NACOS DONE

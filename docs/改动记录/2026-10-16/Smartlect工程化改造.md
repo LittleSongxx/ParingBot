@@ -14,7 +14,7 @@
 
 | 提交 | 内容 |
 | --- | --- |
-| `36f6d98` | **产物下线**：删 `架构图/`（13 张 Archify 图 + 生成器）、`教程/Java电商后端图解/`、`教程/Smartlect全链路图解.html`、`docs/java-backend-architecture.{html,json,png}`、`figures/` 全部；未跟踪产物先备份到 `~/smartlect-archive-20261016/` |
+| `36f6d98` | **产物下线**：删 `架构图/`（13 张 Archify 图 + 生成器）、`教程/Java电商后端图解/`、`教程/Smartlect全链路图解.html`、`docs/java-backend-architecture.{html,json,png}`、`figures/` 全部；未跟踪产物先备份到 `~/smartlect-archive-20261016/`（该备份已于 2026-10-17 收尾整理时清理，见当日记录） |
 | `75274a9` | **P0-1 死物清理**：`smartlect.feign.*`（9 个 yml）、`alipay.*` 与 alipay-sdk 依赖、3 处空 `security:` 键、8 个 `@EnableScheduling`（全仓 `@Scheduled` 为 0）、按错误文案吞异常的死分支、空包 `api/feign/`、两个 RabbitMQ 时代死脚本、**无消费者的 LiteLLM 容器**（compose 由 12 → 11 service，默认起 10） |
 | `9f62a93` | **P0-2 命名统一**：`*FeignSupport → *RpcSupport`（7 个 api 模块 + 字段 + 内部接口，43 文件 / 348 引用）、`RabbitMQ*ListenerComponent → RocketMq*Listener`、`SMARTLECT_GROWTH_* → SMARTLECT_ASSISTANT_*`（20 文件，库名保留历史命名并注释）；`runtime.py` 删掉 GROWTH 端口特判 |
 | `af6efa0` | **P0-3 真 bug**：商品详情缓存库存隔离（详见下"关键缺陷一"）；新增 `ProductCacheStockIsolationTest`（5 例） |
@@ -130,4 +130,4 @@ admin 容器 `connect timed out` → 同网络实测 `host.docker.internal` 可�
 - 本次改造前基线：`36f6d98` 之前的工作区状态（用户已删除 docs 的 127 个文件，HEAD 完好、未恢复）。
 - 本次共 13 个提交（`36f6d98` … `963cf1d`），全部在 `main` 上；未推送、未重新部署线上。
 - 回滚：按提交粒度 `git revert`；产物下线那笔如需恢复，除未跟踪的 `教程/Smartlect全链路图解.html`
-  与 11 张截图外，其余都在 HEAD 中（备份另存 `~/smartlect-archive-20261016/`）。
+  与 11 张截图外，其余都在 HEAD 中（该备份已于 2026-10-17 收尾整理时清理，未跟踪部分至此不可恢复）。

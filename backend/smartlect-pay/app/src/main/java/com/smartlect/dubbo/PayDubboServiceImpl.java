@@ -54,8 +54,16 @@ public class PayDubboServiceImpl implements PayDubboService {
     }
 
     @Override
-    public ResponseVO<PayInfoDTO> getPayUrl(PayUrlRequestDTO dto) {
-        return payInternalController.getPayUrl(dto);
+    public ResponseVO<PayInfoDTO> getPayUrl(PayUrlRequestDTO dto, String userId) {
+        // 与 tradeStatus 同一模式：Dubbo 线程没有 HTTP 上下文，取表单前的归属校验
+        // （PayInternalService.getPayUrl）依赖委托身份，必须由 provider 显式注入
+        // ——2026-10-17 审计 H-1：此前不注入会让 every live getPayUrl 在记录存在时 401。
+        com.smartlect.security.DelegatedUserIdentity.setDubboDelegated(userId);
+        try {
+            return payInternalController.getPayUrl(dto);
+        } finally {
+            com.smartlect.security.DelegatedUserIdentity.clearDubboDelegated();
+        }
     }
 
     @Override

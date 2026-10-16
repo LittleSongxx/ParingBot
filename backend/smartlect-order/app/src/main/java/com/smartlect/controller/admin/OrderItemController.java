@@ -18,12 +18,14 @@ public class OrderItemController extends com.smartlect.controller.admin.ABaseCon
 
 	@PostMapping("/loadDataList")
 	public ResponseVO loadDataList(OrderItemQuery query){
-		return getSuccessResponseVO(orderItemService.findListByPage(query));
+		return getSuccessResponseVO(com.smartlect.security.TrialOrderPrivacy.redact(
+				orderItemService.findListByPage(query)));
 	}
 
 	@PostMapping("/getOrderItemByOrderItemId")
 	public ResponseVO getOrderItemByOrderItemId(String orderItemId) {
-		return getSuccessResponseVO(orderItemService.getOrderItemByOrderItemId(orderItemId));
+		return getSuccessResponseVO(com.smartlect.security.TrialOrderPrivacy.redact(
+				orderItemService.getOrderItemByOrderItemId(orderItemId)));
 	}
 
 }

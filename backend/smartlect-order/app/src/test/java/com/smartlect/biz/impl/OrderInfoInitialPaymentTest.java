@@ -37,11 +37,11 @@ class OrderInfoInitialPaymentTest {
     void successfulPaymentFormIsReturnedUnchanged() {
         BigDecimal amount = new BigDecimal("19.90");
         PayInfoDTO expected = new PayInfoDTO("<form>pay</form>", "pay-1", amount);
-        when(payRpcSupport.getPayUrl("mock", "pay-1", "subject", amount))
+        when(payRpcSupport.getPayUrl("mock", "pay-1", "subject", amount, "u1"))
                 .thenReturn(expected);
 
         PayInfoDTO actual = service.requestInitialPayInfoBestEffort(
-                "mock", "pay-1", "subject", amount);
+                "mock", "pay-1", "subject", amount, "u1");
 
         assertSame(expected, actual);
     }
@@ -49,11 +49,11 @@ class OrderInfoInitialPaymentTest {
     @Test
     void unavailablePaymentFormKeepsPayableOrderIdentity() {
         BigDecimal amount = new BigDecimal("19.90");
-        when(payRpcSupport.getPayUrl("mock", "pay-2", "subject", amount))
+        when(payRpcSupport.getPayUrl("mock", "pay-2", "subject", amount, "u1"))
                 .thenThrow(new BusinessException("provider unavailable"));
 
         PayInfoDTO actual = service.requestInitialPayInfoBestEffort(
-                "mock", "pay-2", "subject", amount);
+                "mock", "pay-2", "subject", amount, "u1");
 
         assertNull(actual.getPayInfo());
         assertEquals("pay-2", actual.getPayOrderId());
@@ -63,7 +63,7 @@ class OrderInfoInitialPaymentTest {
     @Test
     void zeroAmountSkipsChannelAndStaysFree() {
         PayInfoDTO actual = service.requestInitialPayInfoBestEffort(
-                "mock", "pay-free", "subject", BigDecimal.ZERO);
+                "mock", "pay-free", "subject", BigDecimal.ZERO, "u1");
 
         assertEquals("FREE", actual.getPayInfo());
         assertEquals("pay-free", actual.getPayOrderId());

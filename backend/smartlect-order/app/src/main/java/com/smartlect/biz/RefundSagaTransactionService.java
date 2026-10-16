@@ -172,14 +172,18 @@ public class RefundSagaTransactionService {
         return refundRequestMapper.resetRejected(refundRequestId) == 1;
     }
 
-    @Transactional(rollbackFor = Exception.class)
     /** 登记 PAYMENT_CONFIRMED 阶段的收尾失败（累计到上限转人工复核）。 */
+    @Transactional(rollbackFor = Exception.class)
     public void recordStockQueueFailure(String refundRequestId, Throwable error) {
         refundRequestMapper.recordStockQueueFailure(
                 refundRequestId, retrySeconds, maxRetries,
                 error == null || error.getMessage() == null ? "stock queue failed" : truncate(error.getMessage()));
     }
 
+    // 事务边界恢复（2026-10-17 审计 H-2）：插入 recordStockQueueFailure 时注解被顶掉，
+    // finalizeOrderRefund 的"明细转 REFUND → 聚合 CAS → 还券 Outbox 落库 → markStockPending"
+    // 曾变成逐条自动提交且 FOR UPDATE 锁立即释放；这里按原设计恢复。
+    @Transactional(rollbackFor = Exception.class)
     public boolean queueStockRestore(String refundRequestId, boolean retry) {
         RefundRequest request = refundRequestMapper.selectByIdForUpdate(refundRequestId);
         if (request == null) {

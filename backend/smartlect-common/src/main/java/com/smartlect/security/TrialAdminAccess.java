@@ -16,8 +16,9 @@ import java.util.List;
  * <p><b>策略（与助手侧 admin API 的口径一致：读 require_any(admin:trial)、写 require(admin:legacy)）</b></p>
  * <ul>
  *   <li>读（GET 或读语义的 POST）：默认允许，命中 {@link #DENIED_PATH_PATTERNS} 的隐私面除外；</li>
- *   <li>写（POST/PUT/PATCH/DELETE）：默认拒绝，只有 {@link #ALLOWED_WRITE_PATTERNS} 显式放行
- *       （退款复核是产品上明确给展厅保留的能力，见 README 允许清单）；</li>
+ *   <li>写：管理端读接口也是 POST，无法按 HTTP 方法判定读写——实现上是"把全部写接口
+ *       逐条列进 {@link #DENIED_PATH_PATTERNS}"，其完整性由 {@code scripts/check_admin_authz.py}
+ *       在 CI 强制（新增写接口若不在清单且无权限注解/二次确认，门禁直接红）；</li>
  *   <li>{@link TrialReadable} 注解可在方法级显式放宽（也是该注解第一次有了消费者）。</li>
  * </ul>
  *
@@ -97,15 +98,17 @@ public final class TrialAdminAccess {
 
     public static boolean isTrial(java.util.Collection<String> roles,
                                   java.util.Collection<String> permissions) {
-        // 身份判定必须带超管豁免：超管拥有全部权限点（含 admin:trial），只看
-        // "有 admin:trial"会把超管误判成展厅——2026-10-16 本地实测超管写券被
-        // 403"展厅账号"文案拦截。口径与 TrialIdentities.isTrialAdmin 一致
-        // （admin:trial 且无 admin:legacy、非 SUPER_ADMIN）。
-        boolean trial = (roles != null && roles.contains(TRIAL_ROLE))
-                || (permissions != null && permissions.contains(TRIAL_PERMISSION));
+        // 身份判定与 TrialIdentities.isTrialAdmin 同口径，且与它同序：账号/角色是排他标识
+        // （roles 含 TRIAL_OPERATOR 直接成立——展厅角色只能由系统种子创建，见
+        // AdminIdentityService.rejectTrialRoleAssignment）；权限点路径必须带超管豁免，
+        // 否则超管（持有全部权限点，含 admin:trial）会被误判为展厅（2026-10-16 实测）。
+        if (roles != null && roles.contains(TRIAL_ROLE)) {
+            return true;
+        }
+        boolean trialByPermission = permissions != null && permissions.contains(TRIAL_PERMISSION);
         boolean superAdmin = (roles != null && roles.contains(AdminPermissions.SUPER_ADMIN_ROLE))
                 || (permissions != null && permissions.contains(AdminPermissions.ADMIN_LEGACY));
-        return trial && !superAdmin;
+        return trialByPermission && !superAdmin;
     }
 
     /** 写方法判定：GET 视为读；其余方法一律先按写处理（真正的读语义由 ALLOWED_WRITE 之外的白名单兜底）。 */

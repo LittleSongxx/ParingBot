@@ -218,7 +218,7 @@ public class OrderInfoServiceImpl implements OrderInfoService {
 		amount = OrderPayAmountUtil.normalizeChannelPayAmount(amount);
 		String payOrderId = orderInfo.getPayOrderId();
 
-		PayInfoDTO payInfoDTO = payRpcSupport.getPayUrl(payChannelEnum.getPayScene(), payOrderId, subject, amount);
+		PayInfoDTO payInfoDTO = payRpcSupport.getPayUrl(payChannelEnum.getPayScene(), payOrderId, subject, amount, userId);
 		if (payChannelEnum != PayChannelEnum.MOCK) {
 			orderCancellationService.cancelOrder4Channel(orderInfo);
 		}

@@ -145,7 +145,7 @@ flowchart LR
   A -->|价格/库存回问| J
   J --> D["MySQL · Redis · RocketMQ"]
   M[("MySQL binlog")] -->|Canal| Q["RocketMQ"] -->|ProductIndexConsumer| E["ES 商品索引"]
-  X["xxl-job 2.5<br/>10 个定时任务"] -.->|调度| J
+  X["xxl-job 2.5<br/>15 个定时任务"] -.->|调度| J
   C["Nacos 2.5<br/>发现 + 配置中心"] -.->|注册 / 下发| J
   C -.-> A
 ```
@@ -173,7 +173,7 @@ flowchart LR
 | **缓存** | Caffeine L1 + Redis L2 + pub/sub 失效 + Canal 兜底 |
 | **消息** | RocketMQ 5.3（任意精度定时消息 · Outbox 可靠投递 · 定时回投重试） |
 | **变更捕获** | Canal 1.1.8（MySQL binlog → RocketMQ → ES 商品索引与缓存失效） |
-| **调度** | xxl-job 2.5（10 个定时任务：订单超时、支付轮询、Outbox 补偿、秒杀对账、幂等账本待核对上报等） |
+| **调度** | xxl-job 2.5（15 个定时任务：Outbox 兜底投递按库 ×6、订单超时、支付轮询、秒杀与退款对账、幂等账本上报等） |
 | **服务治理** | Nacos 2.5（服务发现 + 配置中心）· 锁/限流 Redisson 4.0 |
 | **模型** | OpenAI 兼容端点直连（端点 / 模型白名单 + MySQL 热切换）；缺配置时明确失败，不静默降级 |
 | **基础设施** | 10 个容器（MySQL 8.4 · Redis 7.4 · RocketMQ 5.3 三件套 · Nacos 2.5 · ES 8.19(IK) · Qdrant 1.15 · Canal 1.1.8 · xxl-job 2.5） |
@@ -186,6 +186,7 @@ deploy/    容器编排（compose）· nginx · SQL 初始化 · 集群编排
 scripts/   dev.sh 入口 · runtime.py 进程编排 · 压测与验证工具 · 故障演练
 evals/     quality-v2（导购 / 客服）
 eval/verification/  评测与发布的原始证据库（按日期归档）
+docs/      改动记录（按日归档的功能点）· 资产（架构图/截图）
 ```
 
 ---
@@ -233,7 +234,7 @@ python3 scripts/coverage_gate.py                  # 行覆盖率对比 backend/j
 ```bash
 ./scripts/dev.sh infra-check    # 中间件健康 + 权限隔离（app/flyway 只能碰自己的库）
 ./scripts/dev.sh apps-check     # 12 个进程健康 + Nacos 注册数
-python3 scripts/xxljob_setup.py # 幂等登记 10 个调度任务（只加注解不会执行）
+python3 scripts/xxljob_setup.py # 幂等登记 15 个调度任务（只加注解不会执行）
 ```
 
 公开评测（导购 / 客服两条线，各自的分母与指标，不合成总分）的题库与判分器在 `evals/`，运行入口 `scripts/eval_quality_v2.py`、`scripts/eval_support_eval.py`；原始证据按日期归档在 `eval/verification/`。
@@ -271,7 +272,7 @@ Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预
 |---|---|---|
 | 站点 | `http://127.0.0.1/` | nginx 反代网关，`/actuator` 与业务端口不对公网开放 |
 | 网关健康 | `:18080/actuator/health` | 依赖 Redis / Nacos 的存活探针 |
-| 调度中心 | `:18090/xxl-job-admin` | 10 个任务的执行记录、手动触发、失败重试；**判断"任务在跑"看 handle_code=200**，只看触发会漏掉"调度成功但执行器不可达" |
+| 调度中心 | `:18090/xxl-job-admin` | 15 个任务的执行记录、手动触发、失败重试；**判断"任务在跑"看 handle_code=200**，只看触发会漏掉"调度成功但执行器不可达" |
 | 展厅账号策略 | `TrialAdminAccess` + `TrialAdminGuardInterceptor` | 公开口令的 gallery 账号：**读默认允许（隐私清单除外）、写默认拒绝**（退款复核显式放行）；清单完整性由 `scripts/check_admin_authz.py` 门禁强制 |
 | 配置中心 | `:18848` Nacos 控制台 | `SMARTLECT_GROUP` 下的配置；改完用 `scripts/nacos_config_push.py` 推送 |
 | 指标 | 各服务 `/actuator/prometheus` | JVM / Hikari / 线程池 / 业务指标；只从内网抓 |

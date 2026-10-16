@@ -128,8 +128,10 @@ def migrate_legacy_env():
         return
     merged = {**env, **additions}
     temp = ENV_FILE.with_suffix(".env.migrating")
-    temp.write_text("\n".join(f"{k}={v}" for k, v in merged.items()) + "\n")
-    os.chmod(temp, 0o600)
+    # 以 0600 创建再写：write_text 会按 umask 先生成 0644 的窗口（2026-10-17 审计 #13）
+    descriptor = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w") as handle:
+        handle.write("\n".join(f"{k}={v}" for k, v in merged.items()) + "\n")
     temp.replace(ENV_FILE)
     print("migrated env keys: " + ", ".join(sorted(additions)), flush=True)
 
@@ -589,7 +591,8 @@ def package_fingerprint(directory):
 
 def immutable_jar(source, directory):
     # 历史版本快照由 prune_staged_artifacts（apps_up/smoke 收尾调用）回收——2026-10-15
-    # 因从未回收累积 14G 撑满根分区，见 docs/改动记录/2026-10-15/七批次线上部署验证.md。
+    # 因从未回收累积 14G 撑满根分区（现场记录见 commit bf0fb14；更早的 2026-10-15
+    # 文档已随文档面清理，Git 历史可查）。
     before = source.stat()
     directory.mkdir(parents=True, exist_ok=True)
     descriptor, name = tempfile.mkstemp(dir=directory, suffix=".tmp")
@@ -620,7 +623,8 @@ def immutable_jar(source, directory):
 
 
 def prune_staged_artifacts(grace_seconds=600):
-    """回收 run/apps 下不再被台账引用的历史版本 JAR（immutable_jar 每次启动按新哈希暂存副本）。
+    """回收两类过程文件：run/apps 下不再被台账引用的历史版本 JAR（immutable_jar 每次启动
+    按新哈希暂存副本），以及 run/cache/<服务>/tmp 下的 JVM 临时缓存（JDK 字体缓存等）。
 
     2026-10-15 事故：多日部署累积约 14G 暂存 JAR 撑满 40G 根分区——MySQL 临时表分配失败
     （错误 1114）、冒烟语句永久等待、部署撞 job 超时被取消。保留台账（processes.json）
@@ -642,8 +646,18 @@ def prune_staged_artifacts(grace_seconds=600):
             continue
         freed += jar.stat().st_size
         jar.unlink()
+    # JVM 临时文件（java.io.tmpdir 已指到 run/cache/<服务>/tmp）：只回收 JDK 字体缓存
+    # +~JF*.tmp（单个约 12MB）；该目录此后即 java.io.tmpdir，其它临时文件（上传缓冲等）
+    # 生命周期由使用方管理，不在此盲扫（2026-10-17 审计建议收紧范围）。
+    cache_dir = ROOT / "run" / "cache"
+    if cache_dir.exists():
+        for stale in cache_dir.glob("*/tmp/+~JF*.tmp"):
+            if not stale.is_file() or now - stale.stat().st_mtime < grace_seconds:
+                continue
+            freed += stale.stat().st_size
+            stale.unlink()
     if freed:
-        print(f"pruned staged artifacts: {freed / 1e6:.0f} MB（历史版本快照，不影响运行中进程）")
+        print(f"pruned staged artifacts: {freed / 1e6:.0f} MB（历史版本快照 / JVM 临时缓存，不影响运行中进程）")
 
 
 def java_launch_args(service, env):
@@ -656,6 +670,8 @@ def java_launch_args(service, env):
     artifact = artifacts[0]
     runtime_jar, source_sha, stamp = immutable_jar(artifact, ROOT / "run/apps" / service)
     executable = Path(shutil.which("java") or "/missing-java")
+    # -Djava.io.tmpdir 的目标目录必须先存在（见下方参数注释）
+    (ROOT / "run" / "cache" / service / "tmp").mkdir(parents=True, exist_ok=True)
     # JVM 规格 env 化：默认值即 4c16g 共享机的保守配置；升配后按新规格调大。
     # 服务级键（SMARTLECT_JAVA_PROCESSORS_GATEWAY 等）优先于全局键，用于给
     # 网关/热点服务单独提预算；默认行为与纯全局键时代完全一致。
@@ -673,6 +689,11 @@ def java_launch_args(service, env):
                f"-Dcsp.sentinel.log.dir={ROOT}/run/logs/sentinel/{service}",
                f"-DJM.LOG.PATH={ROOT}/run/logs/{service}",
                f"-DJM.SNAPSHOT.PATH={ROOT}/run/cache/{service}",
+               # JDK 加载字体时会在 java.io.tmpdir 写 +~JF*.tmp 字体缓存（单个约 12MB）：
+               # 此前落在系统 /tmp，本地全量重启一轮实测 24 个 ≈ 300MB，服务器上随每次
+               # 部署累积、与根分区抢空间（历史上已有过一次撑满事故）。改指到
+               # run/cache/<服务>/tmp，由 prune_staged_artifacts 按代回收。
+               f"-Djava.io.tmpdir={ROOT}/run/cache/{service}/tmp",
                "-jar", str(runtime_jar),
                f"--server.address={app_bind_address(env)}",
                f"--spring.cloud.nacos.discovery.ip={app_register_ip(env)}"]
@@ -763,7 +784,7 @@ def smoke_apps(env, timeout=180):
         try:
             # 读线程 + 轮询：原直接 readline 是阻塞读，deadline 只在两行之间被检查——
             # 某语句被锁/资源卡住（如 2026-10-15 磁盘满致 MySQL 临时表分配失败）而不再
-            # 输出新行时，冒烟会永久挂起并把部署拖到 job 超时（见 docs/改动记录/2026-10-15）。
+            # 输出新行时，冒烟会永久挂起并把部署拖到 job 超时（现场记录见 commit bf0fb14）。
             deadline = started + timeout
             scanned = 0
             while time.monotonic() < deadline:
@@ -787,7 +808,7 @@ def smoke_apps(env, timeout=180):
         finally:
             # 先杀进程再关流（顺序不能互换）：读线程阻塞在空管道 read() 时持有缓冲锁，
             # close() 会等这把锁——close-before-terminate 实测永久挂起（2026-10-15
-            # gateway 冒烟 29 分钟不动，见 docs/改动记录/2026-10-15）。进程终止后
+            # gateway 冒烟 29 分钟不动，现场记录见 commit 8234d2f）。进程终止后
             # 写端关闭、读线程收到 EOF 释放锁，close() 立即返回。
             process.terminate()
             killed = False
@@ -899,11 +920,26 @@ def start_app(service, env, records):
         output.flush()
         process = subprocess.Popen(command, cwd=ROOT, env=launch_env, stdin=subprocess.DEVNULL,
                                    stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
-    identity = process_identity(process.pid, expect=command)
+    try:
+        identity = process_identity(process.pid, expect=command)
+    except RuntimeError as error:
+        # 期望 argv 的循环预算耗尽：先杀刚起的子进程再抛——否则它活着却不在台账里，
+        # 端口预检会让之后每次 up 都 EADDRINUSE，只能人工 kill（2026-10-17 审计 #1）
+        with contextlib.suppress(ProcessLookupError):
+            process.kill()
+        with contextlib.suppress(Exception):
+            process.wait(timeout=10)
+        raise RuntimeError(
+            f"{service} did not reach the expected argv within the identity window "
+            f"(PID {process.pid}); child killed, inspect run/logs/smartlect-{service}.log") from error
     if identity is None:
         raise RuntimeError(f"{service} exited during launch; inspect run/logs/smartlect-{service}.log")
     if identity["cmdline"] != command or identity["exe"] != str(executable.resolve()) or identity["cwd"] != str(ROOT):
-        raise RuntimeError(f"{service} PID {process.pid} does not match the exact launched command")
+        with contextlib.suppress(ProcessLookupError):
+            process.kill()
+        with contextlib.suppress(Exception):
+            process.wait(timeout=10)
+        raise RuntimeError(f"{service} PID {process.pid} does not match the exact launched command (child killed)")
     records[service] = {**identity, "port": port, "health_host": health_host(env),
                         "artifact_stamp": stamp, "source_sha256": source_sha,
                         "source_artifact": str(artifact), "env_stamp": env_stamp}
@@ -911,10 +947,14 @@ def start_app(service, env, records):
     print(f"Started Smartlect {service}: PID {process.pid}, port {port}.", flush=True)
 
 
-def wait_apps(services, records):
+def wait_apps(services, records, env=None):
     pending = set(services)
-    # 副本节点跨网连中间件 + 布隆全量预热（8.7 万商品）首启更慢，允许环境变量放宽
-    deadline = time.monotonic() + int(os.environ.get("SMARTLECT_APP_HEALTH_TIMEOUT_SECONDS", "240"))
+    # 副本节点跨网连中间件 + 布隆全量预热（8.7 万商品）首启更慢，允许放宽超时。
+    # 优先读 runtime.env（systemd 单元不注入环境变量，只读 os.environ 时部署里没有
+    # 设置入口——2026-10-17 审计 #9），再退回进程环境，最后默认 240s。
+    timeout = (env or {}).get("SMARTLECT_APP_HEALTH_TIMEOUT_SECONDS") \
+        or os.environ.get("SMARTLECT_APP_HEALTH_TIMEOUT_SECONDS", "240")
+    deadline = time.monotonic() + int(timeout)
     while pending and time.monotonic() < deadline:
         for service in tuple(pending):
             if not owned_process(records[service]):
@@ -980,7 +1020,7 @@ def apps_up(env):
                     continue
                 start_app(service, env, records)
                 # Warm one JVM at a time on the shared WSL host.
-                wait_apps((service,), records)
+                wait_apps((service,), records, env)
                 if service == "stock":
                     install_catalog(env)
         apps_check(env)
@@ -995,7 +1035,7 @@ def apps_check(env):
     local = app_services(env)
     if any(service not in records for service in local):
         raise RuntimeError("Some application processes are not registered; run up first")
-    wait_apps(local, records)
+    wait_apps(local, records, env)
     token = nacos_request(env, "/nacos/v1/auth/login", {
         "username": env["SMARTLECT_NACOS_USERNAME"], "password": env["SMARTLECT_NACOS_PASSWORD"]})["accessToken"]
     # 只有 Java 服务进 Nacos 注册表；注册 IP 是分机部署的关键断言（回环 IP 别的节点打不通）
@@ -1038,13 +1078,18 @@ def apps_status(services=None):
     records = load_processes()
     for service in services or APPS:
         record = records.get(service)
-        state = "stopped" if record is None or not owned_process(record) else (
-            "healthy" if app_health(service, record) else "starting/unhealthy")
+        owned = record is not None and owned_process(record)
+        state = "stopped" if not owned else ("healthy" if app_health(service, record) else "starting/unhealthy")
         detail = ""
-        if record:
-            build = str(record.get("source_sha256") or "")[:12]
-            detail = (f" (PID {record['pid']}, port {record['port']}, "
-                      f"started {process_start_time(record['pid'])}, build {build})")
+        if record and not owned:
+            # 停止态只报陈旧记录，不报 started：死 PID 的启动时刻是误导（PID 可能已被
+            # 系统复用），而 ops status 把它当"是否启于本次部署"的判据（2026-10-17 审计 #8）
+            detail = (f" (stale record: PID {record.get('pid')}, "
+                      f"build {str(record.get('source_sha256') or '')[:12]})")
+        elif owned:
+            detail = (f" (PID {record.get('pid')}, port {record.get('port')}, "
+                      f"started {process_start_time(record.get('pid'))}, "
+                      f"build {str(record.get('source_sha256') or '')[:12]})")
         print(f"smartlect-{service}: {state}" + detail)
 
 
@@ -1082,6 +1127,28 @@ def self_test():
         path = Path(temp) / "runtime.env"
         path.write_text("# local\nSMARTLECT_TOKEN=abc==\nSMARTLECT_EMPTY=\n")
         assert parse_env(path) == {"SMARTLECT_TOKEN": "abc==", "SMARTLECT_EMPTY": ""}
+
+        # 键名迁移的幂等与保值（2026-10-16 部署事故的回归网，审计 #13）：旧键原值补到
+        # 新键、已有新键不被覆盖、缺的执行器键补默认值、重复执行不再改写
+        from unittest.mock import patch as mock_patch
+        legacy = Path(temp) / "legacy.env"
+        legacy.write_text("SMARTLECT_GROWTH_MYSQL_PASSWORD=old-secret\n"
+                          "SMARTLECT_ASSISTANT_MYSQL_PASSWORD=explicit\n")
+        legacy.chmod(0o600)
+        with mock_patch.dict(globals(), ENV_FILE=legacy):
+            migrate_legacy_env()
+            once = legacy.read_text()
+            migrate_legacy_env()
+        assert legacy.read_text() == once, "migrate_legacy_env 必须幂等"
+        migrated = parse_env(legacy)
+        assert migrated["SMARTLECT_ASSISTANT_MYSQL_PASSWORD"] == "explicit", "已有新键不得被旧值覆盖"
+        assert migrated["SMARTLECT_XXLJOB_EXECUTOR_HOST"] == "host.docker.internal"
+        legacy.write_text("SMARTLECT_GROWTH_MODEL_ID=qwen\n")
+        legacy.chmod(0o600)
+        with mock_patch.dict(globals(), ENV_FILE=legacy):
+            migrate_legacy_env()
+        assert parse_env(legacy)["SMARTLECT_ASSISTANT_MODEL_ID"] == "qwen", "旧键值必须保值迁移"
+        assert legacy.stat().st_mode & 0o777 == 0o600, "迁移写回必须保持 0600"
         provider = Path(temp) / "model.env"
         provider.write_text("SMARTLECT_MODEL_API_KEY=literal-$(false)\nSMARTLECT_MODEL_ID=qwen3.7-plus\n")
         provider.chmod(0o600)
@@ -1218,7 +1285,7 @@ def self_test():
                     assert_current_build=lambda env: None,
                     install_catalog=lambda env: calls.append(('catalog',)),
                     start_app=lambda name, env, records: calls.append(('start', name)),
-                    wait_apps=lambda names, records: calls.append(('healthy', tuple(names)))):
+                    wait_apps=lambda names, records, env=None: calls.append(('healthy', tuple(names)))):
         apps_up({})
     assert calls[:2] == [('start', 'user'), ('healthy', ('user',))]
     assert ('start', 'assistant') in calls and calls.index(('start', 'assistant')) > calls.index(('healthy', ('stock',)))

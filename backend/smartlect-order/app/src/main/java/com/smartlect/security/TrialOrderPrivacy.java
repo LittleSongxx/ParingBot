@@ -4,6 +4,7 @@ import com.smartlect.constants.TrialIdentities;
 import com.smartlect.entity.po.OrderInfo;
 import com.smartlect.entity.po.OrderItem;
 import com.smartlect.entity.po.OrderLogisticsInfo;
+import com.smartlect.entity.po.OrderLogisticsInfoRecord;
 import com.smartlect.entity.vo.PaginationResultVO;
 
 import java.util.Collection;
@@ -56,6 +57,18 @@ public final class TrialOrderPrivacy {
             logistics.setSenderPhone(MASKED);
             logistics.setSenderAddress(MASKED);
             logistics.setUserId(null);
+            // 轨迹记录逐条脱敏：getLogistics 的响应会内嵌 recordList，只打码主体字段
+            // 会把 record_address（末站即收件人地址）整条漏出去（2026-10-17 审计 H1）
+            if (logistics.getRecordList() != null) {
+                for (OrderLogisticsInfoRecord record : logistics.getRecordList()) {
+                    redactOne(record);
+                }
+            }
+            return;
+        }
+        if (item instanceof OrderLogisticsInfoRecord record) {
+            // record_address：中间站是城市，末站由 LogisticsStepListener 写入完整收件地址
+            record.setRecordAddress(MASKED);
             return;
         }
         if (item instanceof OrderInfo order) {
@@ -68,6 +81,11 @@ public final class TrialOrderPrivacy {
                 }
             }
             return;
+        }
+        if (item instanceof OrderItem line) {
+            // 独立走 /admin/orderItem/** 的明细：买家备注属买家原文，展厅视角一律抹掉
+            // （2026-10-17 审计 H1）
+            line.setRemark(null);
         }
     }
 }

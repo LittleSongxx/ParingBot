@@ -61,5 +61,9 @@ class TrialAdminAccessTest {
         assertFalse(TrialAdminAccess.isTrial(Set.of(), Set.of("admin:trial", "admin:legacy")));
         // 展厅本尊：TRIAL_OPERATOR 角色 + admin:trial 权限点，两条路径都要命中
         assertTrue(TrialAdminAccess.isTrial(Set.of("TRIAL_OPERATOR"), Set.of("admin:trial", "order:manage")));
+        // 角色是排他标识且优先于权限点超管豁免：同时挂超管角色也判为展厅——与
+        // TrialIdentities.isTrialAdmin 同序（该组合被种子约束挡住，这里钉住两处口径一致）
+        assertTrue(TrialAdminAccess.isTrial(Set.of("SUPER_ADMIN", "TRIAL_OPERATOR"),
+                Set.of("admin:trial", "admin:legacy")));
     }
 }

@@ -1,7 +1,9 @@
 # Smartlect 三节点集群编排
 
-把中间件从 node1 单机提升为跨三台 ECS 的集群。应用层多副本见
-`docs/prod-hardening/ha-cluster.md` 的「全栈 HA（应用多副本）」一节。
+把中间件从 node1 单机提升为跨三台 ECS 的集群。应用副本的部署与同步流程见仓库根
+README 的「部署覆盖面（三节点集群）」与 `deploy/cluster/scripts/sync-app-node.sh`
+（历史设计稿 `docs/prod-hardening/` 已随文档面清理下线，Git 历史可查；其原始证据在
+`eval/verification/cluster-hardening-20261006/`）。
 
 ## 拓扑
 

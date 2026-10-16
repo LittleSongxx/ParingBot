@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """注册 xxl-job 执行器组与任务定义（幂等，可反复执行）。
 
-批次三把九个 @Scheduled 任务迁成 @XxlJob handler（现役共十个，含后续新增的幂等对账上报），但 handler 只是"可被调用的
+批次三把九个 @Scheduled 任务迁成 @XxlJob handler（现役共十五个：含幂等对账上报与按库注册的
+Outbox 兜底投递），但 handler 只是"可被调用的
 入口"——任务本身（执行器组、cron、启用状态）存在 xxl-job 的库里，必须在调度
 中心登记才会被触发。只加注解不登记的结果是任务静默停摆：没有报错、没有日志，
 出问题时只表现为"业务该自动发生的事一直没发生"。
@@ -30,13 +31,22 @@ EXECUTORS = ['smartlect-admin', 'smartlect-cart', 'smartlect-coupon', 'smartlect
              'smartlect-user']
 
 # (执行器组, handler, cron, 说明)；cron 为 Quartz 六段式，按原 @Scheduled 周期折算。
-# 绑定的服务必须是该 handler Bean 真正注册的那个：
-#   - common 模块的 handler（outboxDispatch / mqCompensationReplay）在多个服务里都
-#     有 Bean，绑到 order（MQ 主链）即可，FIRST 路由保证只有一个实例执行；
+# 绑定的服务必须是该 handler Bean 真正注册的那个（bean 开关注解见各服务 application.yml）：
+#   - outboxDispatch 是 common 的 handler，但 local_message_outbox 是各库本地表——
+#     必须按"有表且 mq.outbox.dispatch-enabled=true"的服务分别注册（各库各扫各的）；
+#   - mqCompensationReplay 同理绑在补偿日志量最大的 order 域，其余域按需再加；
 #   - userTempBanReconcile 只在 user 注册，且受 app.common-scheduling.enabled 控制。
 JOBS = [
     ('smartlect-order', 'payOrderPoll', '*/5 * * * * ?', '支付单轮询（原 fixedDelay 5s）'),
-    ('smartlect-order', 'outboxDispatch', '*/5 * * * * ?', 'Outbox 兜底投递（原 fixedDelay 5s）'),
+    ('smartlect-order', 'outboxDispatch', '*/5 * * * * ?', 'Outbox 兜底投递（order 库本地表，原 fixedDelay 5s）'),
+    # local_message_outbox 是**各库本地表**（OutboxMessageServiceImpl 只读本服务数据源）：
+    # 兜底投递必须按"有表且 mq.outbox.dispatch-enabled"的服务分别注册，绑一个执行器组
+    # 只覆盖它自己（2026-10-17 审计 M-5：pay/user/cart 的失败行因无兜底任务长期滞留）
+    ('smartlect-user', 'outboxDispatch', '*/5 * * * * ?', 'Outbox 兜底投递（user 库本地表）'),
+    ('smartlect-product', 'outboxDispatch', '*/5 * * * * ?', 'Outbox 兜底投递（product 库本地表）'),
+    ('smartlect-cart', 'outboxDispatch', '*/5 * * * * ?', 'Outbox 兜底投递（cart 库本地表）'),
+    ('smartlect-pay', 'outboxDispatch', '*/5 * * * * ?', 'Outbox 兜底投递（pay 库本地表）'),
+    ('smartlect-admin', 'outboxDispatch', '*/5 * * * * ?', 'Outbox 兜底投递（admin 库本地表）'),
     ('smartlect-order', 'refundSagaReconcile', '*/30 * * * * ?', '退款 Saga 对账（原 fixedDelay 30s）'),
     ('smartlect-order', 'mqCompensationReplay', '0 * * * * ?', 'MQ 补偿重放（原 fixedDelay 60s）'),
     ('smartlect-order', 'orderAutoReceiptReconcile', '0 */10 * * * ?', '订单自动确认收货对账（原 fixedDelay 600s）'),

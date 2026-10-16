@@ -66,6 +66,7 @@ instance.interceptors.response.use(
             loading.close();
         }
         const { errorCallback, showError = true } = error.config || {}
+        const status = error.response?.status
         let responseData = error.response?.data
         if (responseData instanceof Blob) {
             try {
@@ -74,16 +75,27 @@ instance.interceptors.response.use(
                 responseData = null
             }
         }
+        // 未登录/登录失效：服务端异常映射为 HTTP 401 + code 901（网关侧同样是 401），
+        // 两条路径都必须清会话并跳登录页——此前 error 分支只弹提示，页面停在原地
+        // （2026-10-17 审计 M5）。
+        if (status === 401 || (responseData && typeof responseData === 'object' && responseData.code === 901)) {
+            try {
+                await instance.post('/account/logout', new FormData())
+            } catch {
+
+            }
+            router.push('/login')
+            return Promise.reject({ showError: false })
+        }
         if (responseData && typeof responseData === 'object') {
             if (errorCallback) errorCallback(responseData)
             return Promise.reject({
                 showError,
-                msg: responseData.info || `请求失败（HTTP ${error.response?.status || '—'}）`,
+                msg: responseData.info || `请求失败（HTTP ${status || '—'}）`,
                 responseData,
-                status: error.response?.status,
+                status,
             })
         }
-        const status = error.response?.status
         if (status === 404) {
             return Promise.reject({ showError, msg: '资源不存在', status })
         }
