@@ -51,6 +51,8 @@ class ProductDetailGalleryTest {
         com.smartlect.component.ProductCacheService cacheService =
                 mock(com.smartlect.component.ProductCacheService.class);
         ReflectionTestUtils.setField(service, "productCacheService", cacheService);
+        ReflectionTestUtils.setField(service, "metrics", new com.smartlect.metrics.SmartlectMetrics(
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
         when(bloomFilter.mightExist(any())).thenReturn(true);
         when(productSkuMapper.selectList(any())).thenReturn(List.of());
         when(stockRpcSupport.getAvailableBatch(anyList())).thenReturn(java.util.Map.of());

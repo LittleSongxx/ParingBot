@@ -12,6 +12,7 @@ import com.smartlect.constants.Constants;
 import com.smartlect.entity.dto.ProductSaveDTO;
 import com.smartlect.entity.enums.PageSize;
 import com.smartlect.entity.enums.ResponseCodeEnum;
+import com.smartlect.metrics.SmartlectMetrics;
 import com.smartlect.entity.po.Product4Load;
 import com.smartlect.entity.po.ProductInfo;
 import com.smartlect.entity.po.ProductPropertyValue;
@@ -63,6 +64,8 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 	private ProductBloomFilterComponent productBloomFilterComponent;
 	@Resource
 	private com.smartlect.component.ProductCacheService productCacheService;
+	@Resource
+	private SmartlectMetrics metrics;
 	@Resource
 	private StockRpcSupport stockRpcSupport;
 
@@ -374,6 +377,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 		product4VO.setSkuList(productSkuList);
 		// 回填多级缓存（库存清零后存静态快照，下次命中再实时补）
 		productCacheService.put(productId, product4VO);
+		metrics.productCache("db", "load");
 		return product4VO;
 	}
 

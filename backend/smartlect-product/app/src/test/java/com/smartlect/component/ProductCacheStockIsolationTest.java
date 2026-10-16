@@ -2,6 +2,8 @@ package com.smartlect.component;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartlect.entity.po.ProductSku;
+import com.smartlect.metrics.SmartlectMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.smartlect.entity.vo.Product4VO;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -37,7 +39,8 @@ class ProductCacheStockIsolationTest {
     }
 
     private ProductCacheService service() {
-        return new ProductCacheService(redis, objectMapper, 128, 60);
+        return new ProductCacheService(redis, objectMapper,
+                new SmartlectMetrics(new SimpleMeterRegistry()), new SimpleMeterRegistry(), 128, 60);
     }
 
     private Product4VO detailWithStock(int stock) {

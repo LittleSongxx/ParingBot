@@ -40,6 +40,8 @@ class OrderRequestIdempotencyServiceTest {
 
     @Mock
     private OrderRequestIdempotencyMapper mapper;
+    @Mock
+    private com.smartlect.metrics.SmartlectMetrics metrics;
 
     // 构造器注入的 PlatformTransactionManager mock：TransactionTemplate.execute 在
     // mock 事务管理器上执行（getTransaction 返回 null、commit/rollback 空操作），

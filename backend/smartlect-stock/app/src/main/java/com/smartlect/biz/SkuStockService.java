@@ -11,6 +11,7 @@ import com.smartlect.domain.SkuStock;
 import com.smartlect.exception.BusinessException;
 import com.smartlect.mappers.SkuStockMapper;
 import com.smartlect.mappers.StockChangeRecordMapper;
+import com.smartlect.metrics.SmartlectMetrics;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,8 @@ import java.util.TreeMap;
 @Service
 public class SkuStockService {
 
+    @Resource
+    private SmartlectMetrics metrics;
     @Resource
     private SkuStockMapper skuStockMapper;
     @Resource
@@ -80,6 +83,7 @@ public class SkuStockService {
     public int changeStock(SkuStockChangeDTO dto) {
         int affected = skuStockMapper.changeStock(dto.getProductId(), dto.getPropertyValueIdHash(), dto.getChangeAmount());
         if (affected <= 0) {
+            metrics.stockInsufficient();
             throw new BusinessException("库存不足");
         }
         return affected;
@@ -158,6 +162,7 @@ public class SkuStockService {
             String[] parts = entry.getKey().split("\0", 2);
             int affected = skuStockMapper.changeStock(parts[0], parts[1], entry.getValue());
             if (affected <= 0) {
+                metrics.stockInsufficient();
                 throw new BusinessException("库存不足");
             }
             total += affected;

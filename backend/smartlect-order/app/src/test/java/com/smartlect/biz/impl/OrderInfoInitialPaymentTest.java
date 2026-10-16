@@ -30,7 +30,7 @@ class OrderInfoInitialPaymentTest {
         // requestInitialPayInfoBestEffort 已随批次二拆分移入 OrderCreationService；
         // 该方法只依赖 payRpcSupport，其余依赖传 null 即可。
         service = new OrderCreationService(null, null, null, null, null,
-                null, null, null, null, null, payRpcSupport, null, null, null, null, null);
+                null, null, null, null, null, payRpcSupport, null, null, null, null, null, null);
     }
 
     @Test

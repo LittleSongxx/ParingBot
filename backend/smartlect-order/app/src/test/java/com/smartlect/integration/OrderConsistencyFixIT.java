@@ -84,7 +84,8 @@ class OrderConsistencyFixIT {
         txManager = new DataSourceTransactionManager(dataSource);
         quotes = new OrderQuoteService(jdbc, txManager);
         ledger = new OrderRequestIdempotencyService(
-                txManager, sqlSessionTemplate.getMapper(OrderRequestIdempotencyMapper.class));
+                txManager, sqlSessionTemplate.getMapper(OrderRequestIdempotencyMapper.class),
+                new com.smartlect.metrics.SmartlectMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
     }
 
     @Test

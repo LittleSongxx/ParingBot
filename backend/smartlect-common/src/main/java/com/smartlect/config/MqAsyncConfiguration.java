@@ -1,5 +1,7 @@
 package com.smartlect.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +20,7 @@ public class MqAsyncConfiguration {
 
     @Bean(name = "mqAsyncExecutor")
     public Executor mqAsyncExecutor(
+            MeterRegistry meterRegistry,
             @Value("${smartlect.mq.async.core-pool-size:4}") int corePoolSize,
             @Value("${smartlect.mq.async.max-pool-size:16}") int maxPoolSize,
             @Value("${smartlect.mq.async.queue-capacity:200}") int queueCapacity) {
@@ -31,6 +34,8 @@ public class MqAsyncConfiguration {
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
         executor.initialize();
+        // 队列深度 / 活跃线程 / 拒绝次数必须可观测：参数调优与"池是否被打满"都靠它
+        ExecutorServiceMetrics.monitor(meterRegistry, executor.getThreadPoolExecutor(), "smartlect.mq.async");
         return executor;
     }
 }

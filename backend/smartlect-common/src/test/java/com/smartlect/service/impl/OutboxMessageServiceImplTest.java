@@ -5,6 +5,7 @@ import com.smartlect.entity.enums.MessageReliabilityLevelEnum;
 import com.smartlect.entity.enums.OutboxMessageStatusEnum;
 import com.smartlect.entity.po.LocalMessageOutbox;
 import com.smartlect.mappers.LocalMessageOutboxMapper;
+import com.smartlect.metrics.SmartlectMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,6 +36,8 @@ class OutboxMessageServiceImplTest {
     private LocalMessageOutboxMapper mapper;
     @Mock
     private ReliableMessageSender sender;
+    @Mock
+    private SmartlectMetrics metrics;
     @InjectMocks
     private OutboxMessageServiceImpl service;
 

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.smartlect.entity.po.OrderRequestIdempotency;
 import com.smartlect.exception.HttpBusinessException;
 import com.smartlect.mappers.OrderRequestIdempotencyMapper;
+import com.smartlect.metrics.SmartlectMetrics;
 import com.smartlect.utils.JsonUtils;
 import com.smartlect.utils.RequestFingerprint;
 import org.springframework.stereotype.Service;
@@ -33,13 +34,16 @@ public class OrderRequestIdempotencyService {
     //   响应才可重放，避免"台账已 COMPLETED 而业务回滚"的假成功。
     private final TransactionTemplate ledgerTx;
     private final OrderRequestIdempotencyMapper mapper;
+    private final SmartlectMetrics metrics;
 
     public OrderRequestIdempotencyService(
             PlatformTransactionManager transactionManager,
-            OrderRequestIdempotencyMapper mapper) {
+            OrderRequestIdempotencyMapper mapper,
+            SmartlectMetrics metrics) {
         this.ledgerTx = new TransactionTemplate(transactionManager);
         this.ledgerTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.mapper = mapper;
+        this.metrics = metrics;
     }
 
     public static final String COMMAND_POST_ORDER = "POST_ORDER";
@@ -97,6 +101,7 @@ public class OrderRequestIdempotencyService {
                 throw new HttpBusinessException(409, "请求正在处理中，请稍后重试");
             }
             if (!requestHash.equals(existing.getRequestHash())) {
+                metrics.idempotentConflict(commandType, "fingerprint_mismatch");
                 throw new HttpBusinessException(409, "同一幂等键不能用于不同请求");
             }
             if ("PROCESSING".equals(existing.getStatus())) {
@@ -108,14 +113,18 @@ public class OrderRequestIdempotencyService {
                             3,
                             Date.from(Instant.now().plusSeconds(3600)),
                             "processing_stale");
+                    metrics.idempotentConflict(commandType, "stale_processing");
                     throw new HttpBusinessException(409, "原请求结果正在核对，不能重复执行");
                 }
+                metrics.idempotentConflict(commandType, "in_flight");
                 throw new HttpBusinessException(409, "请求正在处理中，请稍后重试");
             }
             if ("INCONCLUSIVE".equals(existing.getStatus())) {
+                metrics.idempotentConflict(commandType, "inconclusive");
                 throw new HttpBusinessException(409, "原请求结果正在核对，不能重复执行");
             }
             if ("MANUAL_REVIEW".equals(existing.getStatus())) {
+                metrics.idempotentConflict(commandType, "manual_review");
                 throw new HttpBusinessException(409, "原请求正在人工复核，不能重复执行");
             }
             if ("FAILED".equals(existing.getStatus())) {
@@ -131,6 +140,7 @@ public class OrderRequestIdempotencyService {
             }
             T replay = JsonUtils.parseObject(existing.getResponseJson(), responseType);
             markReplay(replay, true);
+            metrics.idempotentReplay(commandType);
             return replay;
         }
 

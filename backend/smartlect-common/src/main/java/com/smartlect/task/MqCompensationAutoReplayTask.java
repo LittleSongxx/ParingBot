@@ -1,6 +1,7 @@
 package com.smartlect.task;
 
 import com.smartlect.component.RedisComponent;
+import com.smartlect.metrics.SmartlectMetrics;
 import com.smartlect.constants.Constants;
 import com.smartlect.service.MqCompensationLogService;
 import jakarta.annotation.Resource;
@@ -19,6 +20,8 @@ public class MqCompensationAutoReplayTask {
 
     @Resource
     private MqCompensationLogService mqCompensationLogService;
+    @Resource
+    private SmartlectMetrics metrics;
     @Resource
     private RedisComponent redisComponent;
 
@@ -45,6 +48,7 @@ public class MqCompensationAutoReplayTask {
         try {
             int count = mqCompensationLogService.autoReplayPendingSendFailures(batchSize, maxRetries);
             if (count > 0) {
+                metrics.compensationReplayed(count);
                 log.info("MQ 发送补偿自动重放完成，成功 {} 条", count);
             }
         } catch (Exception e) {

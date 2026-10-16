@@ -4,9 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.smartlect.entity.po.ProductSku;
+import com.smartlect.metrics.SmartlectMetrics;
 import com.smartlect.entity.vo.Product4VO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -41,6 +44,7 @@ public class ProductCacheService {
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final SmartlectMetrics metrics;
     private final Cache<String, Product4VO> l1;
 
     @Value("${smartlect.cache.l2-ttl-seconds:300}")
@@ -48,30 +52,41 @@ public class ProductCacheService {
 
     public ProductCacheService(StringRedisTemplate redisTemplate,
                                ObjectMapper objectMapper,
+                               SmartlectMetrics metrics,
+                               MeterRegistry meterRegistry,
                                @Value("${smartlect.cache.l1-maximum-size:10000}") int l1MaximumSize,
                                @Value("${smartlect.cache.l1-expire-after-write-seconds:60}") long l1ExpireSeconds) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.metrics = metrics;
         this.l1 = Caffeine.newBuilder()
                 .maximumSize(l1MaximumSize)
                 .expireAfterWrite(l1ExpireSeconds, TimeUnit.SECONDS)
+                // L1 命中率要可观测：没有命中率就没法判断缓存是否值得存在、TTL 是否合理
+                .recordStats()
                 .build();
+        CaffeineCacheMetrics.monitor(meterRegistry, l1, "smartlect.product.detail.l1");
     }
 
     /** 读：L1 → L2 → miss（调用方查 DB 后调 put 回填）。返回副本，调用方可安全地补实时库存。 */
     public Product4VO get(String productId) {
         Product4VO cached = l1.getIfPresent(productId);
         if (cached != null) {
+            metrics.productCache("l1", "hit");
             return copyOf(cached);
         }
+        metrics.productCache("l1", "miss");
         try {
             String json = redisTemplate.opsForValue().get(KEY_PREFIX + productId);
             if (json != null) {
                 Product4VO value = objectMapper.readValue(json, Product4VO.class);
                 l1.put(productId, value);
+                metrics.productCache("l2", "hit");
                 return copyOf(value);
             }
+            metrics.productCache("l2", "miss");
         } catch (Exception e) {
+            metrics.productCache("l2", "error");
             log.debug("L2 读失败 productId={}：{}（L1 仍可用，继续 miss）", productId, e.getMessage());
         }
         return null;

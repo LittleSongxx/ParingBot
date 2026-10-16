@@ -6,6 +6,7 @@ import com.smartlect.entity.enums.MessageReliabilityLevelEnum;
 import com.smartlect.entity.enums.OutboxMessageStatusEnum;
 import com.smartlect.entity.po.LocalMessageOutbox;
 import com.smartlect.mappers.LocalMessageOutboxMapper;
+import com.smartlect.metrics.SmartlectMetrics;
 import com.smartlect.service.OutboxMessageService;
 import com.smartlect.utils.StringTools;
 import jakarta.annotation.Resource;
@@ -27,6 +28,8 @@ import java.util.concurrent.ThreadLocalRandom;
 @Slf4j
 public class OutboxMessageServiceImpl implements OutboxMessageService {
 
+    @Resource
+    private SmartlectMetrics metrics;
     @Resource
     private LocalMessageOutboxMapper localMessageOutboxMapper;
     @Lazy
@@ -114,6 +117,7 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
                     timerHorizonMs,
                     TIMER_WAKE_BEFORE_MS);
             if (parked != null && parked == 1) {
+                metrics.outboxDispatch("parked");
                 return;
             }
         }
@@ -152,7 +156,9 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
             if (marked == null || marked != 1) {
                 throw new IllegalStateException("Outbox 发送成功但租约已丢失, id=" + id);
             }
+            metrics.outboxDispatch("sent");
         } catch (Exception e) {
+            metrics.outboxDispatch("failed");
             log.error("Outbox 投递失败 id={}, key={}", id, row.getIdempotencyKey(), e);
             localMessageOutboxMapper.markFailed(
                     id,

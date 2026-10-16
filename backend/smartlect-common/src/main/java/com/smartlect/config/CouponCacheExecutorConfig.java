@@ -1,5 +1,7 @@
 package com.smartlect.config;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -16,7 +18,7 @@ public class CouponCacheExecutorConfig {
     // ADR-0021：改用 ThreadPoolTaskExecutor 以获得 MDC 传播装饰器；语义保持——
     // 固定 10 线程 + 队列 500 + CallerRuns 回压 + daemon 命名线程。
     @Bean(name = CACHE_REBUILD_EXECUTOR)
-    public Executor couponCacheRebuildExecutor() {
+    public Executor couponCacheRebuildExecutor(MeterRegistry meterRegistry) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(10);
         executor.setMaxPoolSize(10);
@@ -26,6 +28,7 @@ public class CouponCacheExecutorConfig {
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.setTaskDecorator(new MdcTaskDecorator());
         executor.initialize();
+        ExecutorServiceMetrics.monitor(meterRegistry, executor.getThreadPoolExecutor(), "smartlect.coupon.cache.rebuild");
         return executor;
     }
 }

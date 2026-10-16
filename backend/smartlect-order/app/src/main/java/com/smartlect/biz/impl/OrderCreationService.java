@@ -8,6 +8,7 @@ import com.smartlect.biz.OrderQuoteService;
 import com.smartlect.biz.OrderRequestIdempotencyService;
 import com.smartlect.component.RedisComponent;
 import com.smartlect.component.RemoteCompensateRecorder;
+import com.smartlect.metrics.SmartlectMetrics;
 import com.smartlect.constants.Constants;
 import com.smartlect.constants.TransactionalMqSender;
 import com.smartlect.entity.dto.LogisticsSendDTO;
@@ -57,6 +58,7 @@ public class OrderCreationService {
     private final RemoteCompensateRecorder remoteCompensateRecorder;
     private final OrderRequestIdempotencyService orderRequestIdempotencyService;
     private final OrderQuoteService orderQuoteService;
+    private final SmartlectMetrics metrics;
 
     public OrderCreationService(
             OrderInfoMapper<OrderInfo, OrderInfoQuery> orderInfoMapper,
@@ -74,7 +76,8 @@ public class OrderCreationService {
             TransactionalMqSender transactionalMqSender,
             RemoteCompensateRecorder remoteCompensateRecorder,
             OrderRequestIdempotencyService orderRequestIdempotencyService,
-            OrderQuoteService orderQuoteService) {
+            OrderQuoteService orderQuoteService,
+            SmartlectMetrics metrics) {
         this.orderInfoMapper = orderInfoMapper;
         this.orderItemMapper = orderItemMapper;
         this.orderLogisticsInfoMapper = orderLogisticsInfoMapper;
@@ -91,6 +94,7 @@ public class OrderCreationService {
         this.remoteCompensateRecorder = remoteCompensateRecorder;
         this.orderRequestIdempotencyService = orderRequestIdempotencyService;
         this.orderQuoteService = orderQuoteService;
+        this.metrics = metrics;
     }
 
     // 不标 @Transactional：createOrder 拆为三阶段（读准备 → 远程锁资源 → 短本地事务写入），
@@ -224,6 +228,8 @@ public class OrderCreationService {
                             System.currentTimeMillis() + com.smartlect.mq.RocketMqTopics.PAY_TIMEOUT.toMillis());
                 }
             });
+            // 下单成功口径：Phase 3 短事务提交即计入（Phase 4 失败走补偿，订单仍真实存在）
+            metrics.orderCreated(orderInfoList.size());
 
             // Phase 4: 事务外远程写（幂等，失败不回滚订单——订单已随 Phase 3 携带超时关单消息：
             // 库存/券由 Phase 5 补偿回滚，遗留的待付款单由延时消息关闭，且库存服务对
