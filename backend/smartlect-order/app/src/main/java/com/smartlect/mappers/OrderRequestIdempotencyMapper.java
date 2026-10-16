@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.Date;
+import java.util.List;
 
 public interface OrderRequestIdempotencyMapper {
 
@@ -121,4 +122,17 @@ public interface OrderRequestIdempotencyMapper {
             @Param("maxAttempts") int maxAttempts,
             @Param("reconcileDeadline") Date reconcileDeadline,
             @Param("reviewReason") String reviewReason);
+
+    /**
+     * 待核对行扫描：INCONCLUSIVE / MANUAL_REVIEW 且核对期限已到（或从未设过）。
+     * 只读；用于对账哨兵任务（不自动改判，理由见 OrderIdempotencyReconcileTask 注释）。
+     */
+    @Select("""
+            SELECT * FROM order_request_idempotency
+            WHERE status IN ('INCONCLUSIVE', 'MANUAL_REVIEW')
+              AND (reconcile_deadline IS NULL OR reconcile_deadline <= NOW())
+            ORDER BY update_time ASC
+            LIMIT #{limit}
+            """)
+    List<OrderRequestIdempotency> selectStuckForReview(@Param("limit") int limit);
 }

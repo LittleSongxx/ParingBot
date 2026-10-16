@@ -145,7 +145,7 @@ flowchart LR
   A -->|价格/库存回问| J
   J --> D["MySQL · Redis · RocketMQ"]
   M[("MySQL binlog")] -->|Canal| Q["RocketMQ"] -->|ProductIndexConsumer| E["ES 商品索引"]
-  X["xxl-job 2.5<br/>9 个定时任务"] -.->|调度| J
+  X["xxl-job 2.5<br/>10 个定时任务"] -.->|调度| J
   C["Nacos 2.5<br/>发现 + 配置中心"] -.->|注册 / 下发| J
   C -.-> A
 ```
@@ -173,7 +173,7 @@ flowchart LR
 | **缓存** | Caffeine L1 + Redis L2 + pub/sub 失效 + Canal 兜底 |
 | **消息** | RocketMQ 5.3（任意精度定时消息 · Outbox 可靠投递 · 定时回投重试） |
 | **变更捕获** | Canal 1.1.8（MySQL binlog → RocketMQ → ES 商品索引与缓存失效） |
-| **调度** | xxl-job 2.5（9 个定时任务：订单超时、支付轮询、Outbox 补偿、秒杀对账等） |
+| **调度** | xxl-job 2.5（10 个定时任务：订单超时、支付轮询、Outbox 补偿、秒杀对账、幂等账本待核对上报等） |
 | **服务治理** | Nacos 2.5（服务发现 + 配置中心）· 锁/限流 Redisson 4.0 |
 | **模型** | OpenAI 兼容端点直连（端点 / 模型白名单 + MySQL 热切换）；缺配置时明确失败，不静默降级 |
 | **基础设施** | 10 个容器（MySQL 8.4 · Redis 7.4 · RocketMQ 5.3 三件套 · Nacos 2.5 · ES 8.19(IK) · Qdrant 1.15 · Canal 1.1.8 · xxl-job 2.5） |
@@ -233,7 +233,7 @@ python3 scripts/coverage_gate.py                  # 行覆盖率对比 backend/j
 ```bash
 ./scripts/dev.sh infra-check    # 中间件健康 + 权限隔离（app/flyway 只能碰自己的库）
 ./scripts/dev.sh apps-check     # 12 个进程健康 + Nacos 注册数
-python3 scripts/xxljob_setup.py # 幂等登记 9 个调度任务（只加注解不会执行）
+python3 scripts/xxljob_setup.py # 幂等登记 10 个调度任务（只加注解不会执行）
 ```
 
 公开评测（导购 / 客服两条线，各自的分母与指标，不合成总分）的题库与判分器在 `evals/`，运行入口 `scripts/eval_quality_v2.py`、`scripts/eval_support_eval.py`；原始证据按日期归档在 `eval/verification/`。
@@ -250,6 +250,7 @@ python3 scripts/xxljob_setup.py # 幂等登记 9 个调度任务（只加注解�
 | `smartlect_order_created_total` | Counter | 下单成功（按子单数累加，Phase 3 短事务提交即计） |
 | `smartlect_idempotent_replay_total{command}` | Counter | 幂等重放命中（同键重复请求返回既有结果） |
 | `smartlect_idempotent_conflict_total{command,reason}` | Counter | 幂等冲突，`reason=in_flight/stale_processing/inconclusive/manual_review/fingerprint_mismatch` |
+| `smartlect_idempotent_stuck_total{status}` | Counter | 幂等账本"待核对/待人工"积压（>0 用 `scripts/reconcile_idempotency.py` 带业务参数驱动出口） |
 | `smartlect_stock_insufficient_total` | Counter | 库存不足（条件更新 0 行，防超卖的正常拒绝） |
 | `smartlect_outbox_dispatch_total{result}` | Counter | Outbox 投递：`sent/failed/parked`（`parked` = 撞 broker 时间轮上限，驻留待重投） |
 | `smartlect_mq_compensation_replayed_total` | Counter | 补偿日志自动重放成功条数 |
@@ -268,7 +269,7 @@ Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预
 |---|---|---|
 | 站点 | `http://127.0.0.1/` | nginx 反代网关，`/actuator` 与业务端口不对公网开放 |
 | 网关健康 | `:18080/actuator/health` | 依赖 Redis / Nacos 的存活探针 |
-| 调度中心 | `:18090/xxl-job-admin` | 9 个任务的执行记录、手动触发、失败重试 |
+| 调度中心 | `:18090/xxl-job-admin` | 10 个任务的执行记录、手动触发、失败重试 |
 | 配置中心 | `:18848` Nacos 控制台 | `SMARTLECT_GROUP` 下的配置；改完用 `scripts/nacos_config_push.py` 推送 |
 | 指标 | 各服务 `/actuator/prometheus` | JVM / Hikari / 线程池 / 业务指标；只从内网抓 |
 | 应用日志 | `run/logs/<服务>.log` | 启动失败先看这里；`run/logs/<服务>/nacos/` 是注册与配置客户端日志 |
@@ -301,6 +302,7 @@ Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预
 - **演示规模**：单机 MySQL、演示目录（47 个商品 / 20 SKU 场景 + 8.7 万条索引）、压测注入的并发（集群峰值 832 req/s @1600 并发，p95 400ms 档），不是生产流量。
 - **MQ 是单点**：DLedger 三副本编排已就绪但线上未启用，如实记录。
 - **从机 Outbox 兜底不全**：兜底投递目前只挂在 order 组，pay / product 等库依赖 afterCommit 即时投递，没有调度重扫。
+- **幂等账本无业务参数**：账本不存下游业务 id，因此 `INCONCLUSIVE / MANUAL_REVIEW` 不能自动改判，只能由运维带业务参数驱动核对（`scripts/reconcile_idempotency.py` + `orderIdempotencyReconcile` 上报）；要让它自动闭环，需要在业务行上冗余幂等键（列变更 + 回填，未做）。
 - **Sentinel 规则热更**（Nacos 数据源）已完成代码侧，线上演练未做。
 - **`deploy/seata/` 残留**：历史容器卷挂载留下的 root 属主空目录，未纳入版本控制，本地删除需 sudo。
 - **`smartlect_growth`**：助手库与账号沿用历史命名（环境变量已统一为 `SMARTLECT_ASSISTANT_*`），改名需数据迁移，暂不动。

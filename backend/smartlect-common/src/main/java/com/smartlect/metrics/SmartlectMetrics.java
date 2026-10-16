@@ -23,6 +23,7 @@ public class SmartlectMetrics {
     public static final String COMPENSATION_REPLAYED = "smartlect_mq_compensation_replayed_total";
     public static final String PRODUCT_CACHE = "smartlect_product_cache_total";
     public static final String SLOW_SQL = "smartlect_sql_slow_total";
+    public static final String IDEMPOTENT_STUCK = "smartlect_idempotent_stuck_total";
 
     private final MeterRegistry registry;
 
@@ -61,6 +62,11 @@ public class SmartlectMetrics {
         if (count > 0) {
             Counter.builder(COMPENSATION_REPLAYED).register(registry).increment(count);
         }
+    }
+
+    /** 幂等账本待核对：按 status 计数（INCONCLUSIVE / MANUAL_REVIEW，需运维驱动出口）。 */
+    public void idempotentStuck(String status) {
+        Counter.builder(IDEMPOTENT_STUCK).tag("status", status).register(registry).increment();
     }
 
     /** 慢 SQL：按 mapperId 计数（阈值见 smartlect.sql.slow-threshold-ms，默认 200ms）。 */

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """注册 xxl-job 执行器组与任务定义（幂等，可反复执行）。
 
-批次三把九个 @Scheduled 任务迁成 @XxlJob handler，但 handler 只是"可被调用的
+批次三把九个 @Scheduled 任务迁成 @XxlJob handler（现役共十个，含后续新增的幂等对账上报），但 handler 只是"可被调用的
 入口"——任务本身（执行器组、cron、启用状态）存在 xxl-job 的库里，必须在调度
 中心登记才会被触发。只加注解不登记的结果是任务静默停摆：没有报错、没有日志，
 出问题时只表现为"业务该自动发生的事一直没发生"。
@@ -40,6 +40,7 @@ JOBS = [
     ('smartlect-order', 'refundSagaReconcile', '*/30 * * * * ?', '退款 Saga 对账（原 fixedDelay 30s）'),
     ('smartlect-order', 'mqCompensationReplay', '0 * * * * ?', 'MQ 补偿重放（原 fixedDelay 60s）'),
     ('smartlect-order', 'orderAutoReceiptReconcile', '0 */10 * * * ?', '订单自动确认收货对账（原 fixedDelay 600s）'),
+    ('smartlect-order', 'orderIdempotencyReconcile', '0 */5 * * * ?', '幂等账本待核对上报（每 5 分钟）'),
     ('smartlect-admin', 'autoDataTask', '0 0 1 * * ?', '管理端统计快照（原 cron 0 0 1）'),
     ('smartlect-user', 'userTempBanReconcile', '0 * * * * ?', '临时封禁到期解封（原 fixedDelay 60s）'),
     ('smartlect-user', 'imageModerationCleanup', '0 15 * * * ?', '图片审核残留清理（原 cron 0 15 *）'),
