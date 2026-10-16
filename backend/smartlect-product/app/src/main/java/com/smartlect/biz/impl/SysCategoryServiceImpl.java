@@ -25,6 +25,7 @@ import com.smartlect.mappers.SysCategoryMapper;
 import com.smartlect.biz.SysCategoryService;
 import com.smartlect.utils.StringTools;
 import com.smartlect.utils.PageUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service("sysCategoryService")
 @Slf4j
@@ -163,6 +164,10 @@ public class SysCategoryServiceImpl implements SysCategoryService {
 	}
 
 	@Override
+	// 新增路径要"取同层最大 sort → 插入 → 改名"多步写，且末尾还要刷新 Redis 快照；
+	// 不加事务时中途失败会留下半棵树并与缓存不一致。单条 SQL 的失败率虽低，
+	// 但这段代码本来就是"写多张/多步"的语义，事务边界应该显式。
+	@Transactional(rollbackFor = Exception.class)
 	public void saveCategory(SysCategory bean) {
 		// 如果是修改，直接修改分类名
 		// 如果是添加， 则pCategoryId为父类id， categoryId为随机生成的五位纯数字，并且sort的值为当前同层级下的最大值+1

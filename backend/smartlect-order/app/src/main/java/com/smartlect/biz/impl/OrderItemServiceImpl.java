@@ -83,4 +83,16 @@ public class OrderItemServiceImpl implements OrderItemService {
 	public Integer deleteOrderItemByOrderItemId(String orderItemId) {
 		return this.orderItemMapper.deleteByOrderItemId(orderItemId);
 	}
+
+	@Override
+	public List<String> selectCoPurchaseProductIds(String productId, List<String> productIds,
+			List<String> excluded, int limit) {
+		return this.orderItemMapper.selectCoPurchaseProductIds(productId, productIds, excluded, limit);
+	}
+
+	@Override
+	public List<java.util.Map<String, Object>> selectPopularProducts(List<String> productIds,
+			List<String> excluded, int limit) {
+		return this.orderItemMapper.selectPopularProducts(productIds, excluded, limit);
+	}
 }

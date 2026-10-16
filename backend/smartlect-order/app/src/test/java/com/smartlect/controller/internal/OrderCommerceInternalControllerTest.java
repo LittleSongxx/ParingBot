@@ -10,7 +10,6 @@ import com.smartlect.entity.po.RefundRequest;
 import com.smartlect.entity.query.OrderItemQuery;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.exception.BusinessException;
-import com.smartlect.mappers.OrderItemMapper;
 import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -357,9 +356,7 @@ class OrderCommerceInternalControllerTest {
     @Test
     @SuppressWarnings("unchecked")
     void popularProductsExposeConfirmedUnitsAndExplicitBasisOnly() {
-        OrderItemMapper<OrderItem, OrderItemQuery> mapper = mock(OrderItemMapper.class);
-        ReflectionTestUtils.setField(controller, "orderItemMapper", mapper);
-        when(mapper.selectPopularProducts(List.of("p2"), List.of("p1"), 2))
+        when(orderItemService.selectPopularProducts(List.of("p2"), List.of("p1"), 2))
                 .thenReturn(List.of(Map.of("productId", "p2", "paidUnits", new BigDecimal("3"))));
         var result = controller.popularProducts(Map.of(
                 "productIds", List.of("p2"), "excludeProductIds", List.of("p1"), "limit", 2)).getData();
@@ -369,14 +366,13 @@ class OrderCommerceInternalControllerTest {
         assertEquals("confirmed_payment_units_excluding_refunds", result.get(0).get("basis"));
         Instant.parse((String) result.get(0).get("observedAt"));
         assertEquals(java.util.Set.of("productId", "paidUnits", "basis", "observedAt"), result.get(0).keySet());
-        verify(mapper).selectPopularProducts(List.of("p2"), List.of("p1"), 2);
+        verify(orderItemService).selectPopularProducts(List.of("p2"), List.of("p1"), 2);
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void popularScopeIsStrictAndAnEmptyIncludeNeverQueriesAllProducts() {
-        OrderItemMapper<OrderItem, OrderItemQuery> mapper = mock(OrderItemMapper.class);
-        ReflectionTestUtils.setField(controller, "orderItemMapper", mapper);
+        // 空 include 必须短路在参数校验层：连服务层都不该被调用（更不会退化成全量查询）
         assertEquals(List.of(), controller.popularProducts(Map.of("productIds", List.of())).getData());
         assertEquals(List.of(), controller.coPurchaseProductIds(Map.of("productId", "p1", "productIds", List.of())).getData());
         for (Object invalid : List.of("p1", List.of(12), List.of(" "), List.of("x".repeat(65)),
@@ -392,23 +388,24 @@ class OrderCommerceInternalControllerTest {
         for (Object invalid : List.of(0, 21, "1", true, 1.5)) {
             assertThrows(BusinessException.class, () -> controller.popularProducts(Map.of("limit", invalid)));
         }
-        verifyNoInteractions(mapper);
-        when(mapper.selectPopularProducts(null, null, 20)).thenReturn(List.of());
+        verifyNoInteractions(orderItemService);
+        when(orderItemService.selectPopularProducts(null, null, 20)).thenReturn(List.of());
         assertEquals(List.of(), controller.popularProducts(Map.of()).getData());
-        verify(mapper).selectPopularProducts(null, null, 20);
+        verify(orderItemService).selectPopularProducts(null, null, 20);
     }
 
     @Test
     void recallSqlBindsScopeBeforeGroupingAndLimitWithoutInterpolatingProductIds() {
         Configuration configuration = new Configuration();
-        configuration.addMapper(OrderItemMapper.class);
+        configuration.addMapper(com.smartlect.mappers.OrderItemMapper.class);
         Map<String, Object> params = new HashMap<>();
         params.put("productId", "seed");
         params.put("productIds", List.of("p1' OR 1=1 --"));
         params.put("excludeProductIds", List.of("p2"));
         params.put("limit", 1);
         for (String method : List.of("selectPopularProducts", "selectCoPurchaseProductIds")) {
-            var statement = configuration.getMappedStatement(OrderItemMapper.class.getName() + "." + method);
+            var statement = configuration.getMappedStatement(
+                    com.smartlect.mappers.OrderItemMapper.class.getName() + "." + method);
             var bound = statement.getBoundSql(params);
             String sql = bound.getSql().replaceAll("\\s+", " ");
             assertFalse(sql.contains("p1' OR"));

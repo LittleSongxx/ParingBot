@@ -16,7 +16,6 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import cn.dev33.satoken.annotation.SaCheckLogin;
@@ -28,10 +27,10 @@ public class ProductCartController extends ABaseController{
     @Resource
     private ProductCartService productCartService;
 
-    // 加入购物车
+    // 加入购物车。事务边界留在 service（controller 只做鉴权与参数装配）——
+    // controller 上开事务会让"事务范围 = HTTP 请求"成为隐式约定，后续加远程调用就会踩长事务。
     @PostMapping("/add2Cart")
     @SaCheckLogin
-    @Transactional(rollbackFor = Exception.class)
     public ResponseVO add2Cart(ProductCart productCart){
         TokenUserInfoDTO tokenUserInfo = getTokenUserInfo();
         if (tokenUserInfo == null || StringTools.isEmpty(tokenUserInfo.getUserId())) {

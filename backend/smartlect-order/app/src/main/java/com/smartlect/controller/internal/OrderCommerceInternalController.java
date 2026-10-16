@@ -20,7 +20,6 @@ import com.smartlect.exception.BusinessException;
 import com.smartlect.utils.PageUtils;
 import com.smartlect.utils.StringTools;
 import com.smartlect.utils.RequestFingerprint;
-import com.smartlect.mappers.OrderItemMapper;
 import jakarta.annotation.Resource;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -41,6 +40,10 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
+// 边界说明（2026-10-16 复核）：本类是订单域的**内部 RPC 表面**——Dubbo provider 直接委托它
+// （ADR-0017 的既定形态），因此它承担参数装配与响应裁剪，而不是"薄薄一层转发"。
+// 规则是：**不直连 mapper**（需要聚合查询就收回 OrderItemService 这类服务），
+// 也不在这里写事务；改动时请守住这两条，否则内部面会退化成第二个业务实现。
 @RequestMapping("/internal/order/commerce")
 public class OrderCommerceInternalController extends ABaseController {
 
@@ -51,8 +54,6 @@ public class OrderCommerceInternalController extends ABaseController {
     private OrderInfoService orderInfoService;
     @Resource
     private OrderItemService orderItemService;
-    @Resource
-    private OrderItemMapper<OrderItem, OrderItemQuery> orderItemMapper;
     @Resource
     private OrderLogisticsInfoService orderLogisticsInfoService;
     @Resource
@@ -281,7 +282,7 @@ public class OrderCommerceInternalController extends ABaseController {
         }
         int limit = Math.min(Math.max(intVal(body.get("limit"), 5), 1), 20);
 
-        return getSuccessResponseVO(orderItemMapper.selectCoPurchaseProductIds(productId, productIds, excluded, limit));
+        return getSuccessResponseVO(orderItemService.selectCoPurchaseProductIds(productId, productIds, excluded, limit));
     }
 
     @PostMapping("/popularProducts")
@@ -295,7 +296,7 @@ public class OrderCommerceInternalController extends ABaseController {
         if (productIds != null && productIds.isEmpty()) return getSuccessResponseVO(List.of());
         List<Map<String, Object>> result = new ArrayList<>();
         String observedAt = Instant.now().toString();
-        for (Map<String, Object> row : orderItemMapper.selectPopularProducts(productIds, excluded, limit)) {
+        for (Map<String, Object> row : orderItemService.selectPopularProducts(productIds, excluded, limit)) {
             result.add(Map.of("productId", row.get("productId"),
                     "paidUnits", new BigDecimal(row.get("paidUnits").toString()).longValueExact(),
                     "basis", "confirmed_payment_units_excluding_refunds", "observedAt", observedAt));
