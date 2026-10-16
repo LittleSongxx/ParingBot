@@ -16,6 +16,8 @@ import time
 import unicodedata
 import uuid
 
+from prometheus_client import Counter as PromCounter
+
 import jieba
 
 from smartlect.algo_version import content_hash
@@ -59,6 +61,12 @@ RERANK_VERSION = content_hash({
 })
 INSTRUCTION_PATTERN = re.compile(r"忽略.{0,12}(?:指令|规则|提示)|(?:系统|开发者)提示词|泄露.{0,10}(?:密钥|token)|"
                                  r"ignore.{0,25}(?:instruction|previous)|system\s*prompt|api[_ -]?key", re.I)
+# 索引双写失败计数：静默失败曾让"已发布却检索不到"完全不可观测（2026-10-16 审计）
+INDEX_MIRROR_FAILURES = PromCounter(
+    "smartlect_knowledge_mirror_failures_total",
+    "知识发布后向 ES/Qdrant 双写失败的次数（发布不阻塞，但检索侧可能缺该文档）",
+)
+
 VISIBLE_DOCUMENT = """d.execution_scope_id=%s AND d.status='PUBLISHED'
     AND d.valid_from<=UTC_TIMESTAMP(6) AND d.valid_until>UTC_TIMESTAMP(6)
     AND (d.acl='PUBLIC' OR (d.acl='USER' AND %s='user') OR (d.acl='MERCHANT' AND %s='merchant')
@@ -438,9 +446,21 @@ def _mirror_index(scope, doc_id, version, model, index_version, mapped, chunks_m
                     scope, doc_id, version, chunk_id, (meta or {}).get("heading"),
                     (meta or {}).get("content"), index_version=index_version))
             return results
-        asyncio.run(write_all())
-    except Exception:
-        return
+        hybrid_search.run_sync(write_all())
+    except Exception as error:
+        # 静默吞掉的代价：任务报 DONE、台账全绿，但 ES/Qdrant 没有这份文档 →
+        # "已发布却检索不到"，且无任何失败痕迹（2026-10-16 审计）。
+        # 发布语义仍是"不阻塞"，但失败必须留痕：日志 + 指标 + 返回 False 由调用方记入元数据。
+        INDEX_MIRROR_FAILURES.inc()
+        log.warning("知识索引双写失败 scope=%s doc=%s v=%s：%s（发布继续，但检索侧可能缺该文档）",
+                    scope, doc_id, version, error)
+        return False
+    return True
+
+
+def mirror_failure_counter():
+    """供索引任务读取（Prometheus Counter 的计数快照）。"""
+    return INDEX_MIRROR_FAILURES._value.get()
 
 
 class BackendHealth:
@@ -571,7 +591,8 @@ def _recall_backends(scope, query_vector, embedding_model, index_version, query,
         # get_event_loop 绑定循环而失败。
         return await asyncio.gather(ann(), es_lexical())
 
-    dense_pair, es_pair = asyncio.run(_both())
+    # 走检索专用循环：客户端绑定在那条循环上，跨循环复用会 "Event loop is closed"
+    dense_pair, es_pair = hybrid_search.run_sync(_both())
     return dense_pair, es_pair, _BACKEND_HEALTH.snapshot(('es_bm25', 'qdrant_ann'))
 
 
@@ -755,7 +776,15 @@ class KnowledgeStore(SessionStore):
                            "WHERE execution_scope_id=%s AND doc_id=%s AND version=%s AND status<>'WITHDRAWN'", (scope, doc_id, version))
             if cursor.rowcount:
                 cursor.execute("UPDATE knowledge_catalog SET revision=revision+1 WHERE execution_scope_id=%s", (scope,))
-            return _public(self._document(cursor, scope, doc_id, version))
+            withdrawn = _public(self._document(cursor, scope, doc_id, version))
+        # 撤回是权威事实（MySQL 状态机 + 检索谓词双保险），索引清理属"尽力而为的卫生工作"：
+        # 失败只记日志，不影响撤回结论（delete_doc 此前无调用方，残留旧版本长期占索引）
+        try:
+            from smartlect import hybrid_search
+            hybrid_search.run_sync(hybrid_search.delete_doc(scope, doc_id, version))
+        except Exception as error:  # noqa: BLE001
+            log.warning("撤回后清理检索索引失败 scope=%s doc=%s v=%s：%s", scope, doc_id, version, error)
+        return withdrawn
 
     def latest_product_auto(self, actor, doc_id):
         _merchant(actor, "admin:read")

@@ -177,7 +177,11 @@ async def dispatch(tasks: list[str], *, model: ProviderChatModel, invoke) -> dic
 
 # sku_key 的权威形态是 "商品名:规格"（如 kb-lite:black）。只核验这一种 token：
 # 数字形 productId/订单号不匹配该形态，宁可少核验也不误杀正常的订单类结论。
-SKU_TOKEN = re.compile(r'[A-Za-z0-9_-]+:[A-Za-z0-9_-]+')
+# 收窄（2026-10-16 审计）：原式 [A-Za-z0-9_-]+:[A-Za-z0-9_-]+ 会把 "9:00-18:00"、"1:2"
+# 这类时间/比值当成商品标识，正常结论被整条替换成"请复核"。要求**冒号两侧各含至少一个
+# 非数字字符**（sku 形态是 名:规格，两侧都有字母或汉字/下划线），并排除纯数字时间样式。
+SKU_TOKEN = re.compile(r'(?=[^\s:]*[A-Za-z_\u4e00-\u9fff])[A-Za-z0-9_\u4e00-\u9fff-]+:'
+                       r'(?=[^\s:]*[A-Za-z_\u4e00-\u9fff])[A-Za-z0-9_\u4e00-\u9fff-]+')
 
 
 def verify_against_observed(payload: dict, observed_keys) -> dict:

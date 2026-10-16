@@ -8,8 +8,10 @@
   SMARTLECT_ES_URL / SMARTLECT_ES_API_KEY（可选）
   SMARTLECT_QDRANT_URL / SMARTLECT_QDRANT_API_KEY（可选，缺省本地 127.0.0.1:6333）
 """
+import asyncio
 import logging
 import os
+import threading
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +21,36 @@ FIRST_STAGE = 50
 
 _es = None
 _qdrant = None
+
+# 检索专用事件循环。
+#
+# 为什么需要它（2026-10-16 审计实测）：ES/Qdrant 的异步客户端在**创建时**绑定当时的
+# 事件循环；而检索路径跑在 `asyncio.to_thread` 工作线程里（每次都新建循环）。此前
+# 客户端在 lifespan 的主循环里创建、在工作线程的循环里复用，实测直接抛
+# `RuntimeError: Event loop is closed` → 每个后端都被记成失败 → 健康度连续失败后
+# 进入跳过窗口，60s 半开探测同样失败 → **检索平面永久退化为内存 BM25**，而日志/指标不体现。
+#
+# 现在把两个客户端固定在一条常驻循环上，所有检索协程经 run_sync 提交过去执行：
+# 客户端永远只在一个循环里被使用，且连接可复用。
+_retrieval_loop = None
+_retrieval_loop_lock = threading.Lock()
+
+
+def _retrieval_loop_or_create():
+    global _retrieval_loop
+    with _retrieval_loop_lock:
+        if _retrieval_loop is None or _retrieval_loop.is_closed():
+            loop = asyncio.new_event_loop()
+            thread = threading.Thread(target=loop.run_forever, name="smartlect-retrieval", daemon=True)
+            thread.start()
+            _retrieval_loop = loop
+        return _retrieval_loop
+
+
+def run_sync(coro):
+    """在检索专用循环上执行协程并等待结果（检索路径的唯一入口）。"""
+    loop = _retrieval_loop_or_create()
+    return asyncio.run_coroutine_threadsafe(coro, loop).result()
 
 
 def _env(name, default=None):
@@ -78,7 +110,16 @@ async def _default_analyzer(es):
 
 
 async def ensure_schema():
-    """幂等建索引/集合；任一后端缺失时跳过对应部分。"""
+    """幂等建索引/集合；任一后端缺失时跳过对应部分。
+
+    在检索专用循环上执行（见模块头注释）：客户端一旦创建就固定在那条循环上，
+    避免"主循环创建、工作线程使用"的跨循环错误。
+    """
+    return await asyncio.wrap_future(
+        asyncio.run_coroutine_threadsafe(_ensure_schema_impl(), _retrieval_loop_or_create()))
+
+
+async def _ensure_schema_impl():
     es = es_client()
     if es is not None:
         if not await es.indices.exists(index=ES_INDEX):
@@ -218,11 +259,22 @@ async def ann_search(query_vector, scope, embedding_model, index_version, limit=
     return hits, "qdrant_hnsw"
 
 
-async def close():
-    global _es, _qdrant
-    if _es is not None:
-        await _es.close()
-        _es = None
-    if _qdrant is not None:
-        await _qdrant.close()
-        _qdrant = None
+def shutdown():
+    """应用停机时回收：关闭客户端并停掉检索专用循环（此前 close() 定义了但没有调用方）。"""
+    global _es, _qdrant, _retrieval_loop
+    loop = _retrieval_loop
+    if loop is not None and not loop.is_closed():
+        async def _close_clients():
+            global _es, _qdrant
+            if _es is not None:
+                await _es.close()
+                _es = None
+            if _qdrant is not None:
+                await _qdrant.close()
+                _qdrant = None
+        try:
+            asyncio.run_coroutine_threadsafe(_close_clients(), loop).result(timeout=10)
+        except Exception as error:  # noqa: BLE001 - 停机路径尽力而为
+            log.warning("检索客户端关闭失败（忽略）：%s", error)
+        loop.call_soon_threadsafe(loop.stop)
+        _retrieval_loop = None

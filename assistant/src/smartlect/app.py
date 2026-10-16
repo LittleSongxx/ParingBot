@@ -273,6 +273,13 @@ def create_app(settings=None, *, config=None, store=None, identity=None, commerc
         await asyncio.gather(*tasks.values(), return_exceptions=True)
         if indexing is not None:
             indexing.shutdown()
+        # 检索客户端与专用事件循环一起回收（此前 hybrid_search.close 定义了但无人调用，
+        # 进程反复 reload 时 fd 缓慢累积）
+        try:
+            from smartlect import hybrid_search
+            hybrid_search.shutdown()
+        except Exception as error:  # noqa: BLE001 - 停机路径尽力而为
+            log.warning("检索后端回收失败（忽略）：%s", error)
 
     app = FastAPI(title="Smartlect AI API", version=__version__, lifespan=lifespan)
 
