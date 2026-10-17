@@ -55,6 +55,6 @@
 
 - node1 正常恢复，站点 200；node2/node3 应用 unit 因安装的是旧副本 unit（缺少 `ExecStartPre wait-cluster`、`TimeoutStopSec=180`）在 Sentinel 未就绪时失败。
 - 已将新 replica unit 写入 `/opt/cluster/app-node` 并安装到 node2/node3，顺序重启后两节点各 5 进程健康；`post_deploy_check.sh` 全部通过。
-- Sentinel 在整机重启后将 node2 Redis 提升为 master、node1 成为 slave；这是正常故障转移，应用通过 Sentinel 正常访问。node2 容器旧健康检查固定要求 `role:slave`，因此显示 unhealthy；仓库已改为 PING 检查，运行中容器待下次重建应用，本轮未在 master 节点重建 Redis。
+- Sentinel 在整机重启后发生多次故障转移；最终 node3 为 Redis master，node1/node2 为 replica，三者 Redis/Sentinel 健康，node2 健康检查已恢复。仓库 healthcheck 改为 PING，角色交给 Sentinel。主库最终在 node3 而非原 node1，未再强制 failback，后续维护窗口应恢复 node1 主库。
 - 重启后核对：限流 200、JVM 4、HMAC 密钥、MySQL 300、proxy/namesrv 768MB、systemd 停止宽限 600s 均保留；未发现新的 OOM。
 - 证据：`eval/verification/2026-10-18/ecs-loadtest/reboot-recovery.txt`。

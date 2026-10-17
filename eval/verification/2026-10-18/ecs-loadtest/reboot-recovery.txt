@@ -25,9 +25,10 @@
 - rocketmq-proxy mem=805306368、restarts=2；namesrv mem=805306368、restarts=0
 - smartlect-apps TimeoutStopUSec=10min
 
-## Redis 拓扑
-Sentinel 在整机重启后把 node2 Redis 提升为 master，node1 Redis 成为 node2 的 slave；node3 为 replica。
-这是 Sentinel 的正常故障转移结果，应用通过 Sentinel 正常访问。
-- node2 redis-replica 容器当前 health=unhealthy：旧健康检查固定要求 role:slave，而它现在是 master。
-- 仓库 healthcheck 已改为只验证 PING（角色由 Sentinel 决定）；运行中的 node2 容器需要下次重建才会应用，
-  本轮没有在主库节点上重建 Redis，避免制造新的切换。节点1 Redis 仍为 node2 的 slave，未强制 failback。
+## Redis 拓扑（最终）
+整机重启后 Sentinel 先提升 node2，随后受控操作把 node2 停掉并重新加入，Sentinel 最终把 node3 提升为 master；
+node1/node2 都是 node3 的 replica，Sentinel master 为 172.19.34.203:6379，三者 Redis/Sentinel 健康。
+- 应用通过 Sentinel 访问正常；node2 的 redis-replica 现为 slave，健康检查恢复 healthy。
+- 仓库 healthcheck 已改为只验证 PING（角色由 Sentinel 决定）；node2 容器已用新 compose 重建。
+- Redis 主库最终在 node3 而非原 node1；这是本次重启后的实际故障转移结果。没有再次强制 failback，
+  避免连续切换；node3 的 Redis CPU 很低，应用链路正常，但后续维护/迁移时应恢复 node1 主库。
