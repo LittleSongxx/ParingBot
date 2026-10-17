@@ -1,0 +1,18 @@
+2026-10-17 16:44:58
+1	xxl-job-executor-sample	demoJobHandler	NULL	NULL	NULL
+2	smartlect-order	payOrderPoll	200	200	2026-10-17 16:44:55
+3	smartlect-order	outboxDispatch	200	200	2026-10-17 16:44:55
+4	smartlect-order	refundSagaReconcile	200	200	2026-10-17 16:44:30
+5	smartlect-order	mqCompensationReplay	200	200	2026-10-17 16:44:00
+6	smartlect-order	orderAutoReceiptReconcile	200	500	2026-10-17 16:40:00
+7	smartlect-admin	autoDataTask	500	0	2026-10-17 01:00:00
+8	smartlect-user	userTempBanReconcile	200	200	2026-10-17 16:44:00
+9	smartlect-user	imageModerationCleanup	200	200	2026-10-17 16:15:00
+10	smartlect-coupon	couponRushReconcile	200	200	2026-10-17 16:40:00
+11	smartlect-user	outboxDispatch	200	200	2026-10-17 16:44:55
+12	smartlect-product	outboxDispatch	200	200	2026-10-17 16:44:55
+13	smartlect-cart	outboxDispatch	200	200	2026-10-17 16:44:55
+14	smartlect-pay	outboxDispatch	200	200	2026-10-17 16:44:55
+15	smartlect-admin	outboxDispatch	200	200	2026-10-17 16:44:55
+16	smartlect-order	orderIdempotencyReconcile	200	500	2026-10-17 16:40:00
+17	smartlect-coupon	mqCompensationReplay	200	200	2026-10-17 16:44:00

@@ -113,3 +113,39 @@ python3 eval/verification/2026-10-17/backend-tour-doc/nav_sync_check.py 架构�
 ## 关联代码版本
 
 - 起始提交 `e5bfdd3`；本轮全部为未提交工作区改动（代码 31 个文件 + 3 个新测试/迁移文件 + 文档）。
+
+## 部署与线上核对（2026-10-17 16:02–16:50）
+
+- 提交：`34421ef`（本修复批）+ `4f49070`（部署绑定修复），已推送 `origin/main`。
+- CI：run **39015642407**（workflow_dispatch）——assistant / web(user,admin) / backend 全绿，
+  deploy job 成功；node1 12 进程健康、9 个 Nacos 注册、构建一致性检查通过。
+- 副本：node2、node3 各同步 `gateway,product,order,user,cart` 并重启，5 进程健康、5 个 Nacos 注册。
+- 迁移：生产库确认 coupon `mq_compensation_log` 与 user 三个新权限点已存在。
+- 配置：coupon 的 Nacos 配置里仍是 `auto-replay-enabled=false`（覆盖仓库 yml）——
+  已用 `SMARTLECT_NACOS_PORT=8848 python3 scripts/nacos_config_push.py smartlect-coupon` 推送并重启 coupon；
+  日志确认注册了 `couponRushReconcile` 与 `mqCompensationReplay` 两个 handler。
+- 调度：`xxljob_setup.py` 登记后共 16 个任务，coupon 组 2 个；故障窗口外全部 `trigger=200 / handle=200`
+  （证据 `eval/verification/2026-10-17/audit-fix/xxl-job-summary.txt`）。
+- 探针：`bash scripts/probes/post_deploy_check.sh https://smartlect.cn` 全部通过，
+  展厅矩阵 11 条路径 8/8 一致（无副本漂移）；证据 `.../audit-fix/post-deploy-check-final.txt`。
+
+### 部署中暴露并修复的两处 compose 漂移（事故记录）
+
+`docker compose up -d --force-recreate xxl-job-admin` 会让 compose **连依赖容器一起按声明对齐**，
+于是把 2026-10-16 已改、但从未应用到运行态的端口绑定带进了生产：
+
+1. **MySQL**：运行态从 `0.0.0.0:13306` 变成 `127.0.0.1:13306`，而三节点应用都连
+   `172.21.131.151:13306` → 新建连接全部失败（Hikari `total=0` + Communications link failure）。
+2. **xxl-job-admin**：同样从 `0.0.0.0:18090` 变成 `127.0.0.1:18090` → 三节点执行器心跳/回调不可达，
+   任务报"执行器地址为空"（这也是 01:00 `autoDataTask` 历史 500 的同一根因）。
+
+**修复**（提交 `4f49070`）：两处端口改为 `${SMARTLECT_MYSQL_BIND}` / `${SMARTLECT_XXLJOB_BIND}`
+（单机默认 `127.0.0.1`），`cutover.sh` 写入 node1 内网 IP；线上按此重建两个容器后，
+探针全过、调度任务恢复 200/200。
+**教训**：`--force-recreate` 不是"只动一个服务"；对 compose 与运行态长期漂移的集群，
+重建前先比对端口绑定，或直接带 `--no-deps`。
+
+### 待观察
+
+- `autoDataTask` 在 01:00 的历史失败（执行器不可达）预计下一次 01:00 自愈，未手动补跑。
+- 安全组是否封住 18080-18108、18090、13306 仍需从公网探测（仓库内没有防火墙配置）。
