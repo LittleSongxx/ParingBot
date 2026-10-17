@@ -49,5 +49,5 @@
 - **对账误报**：旧 `reconcile-loadtest.sh` 把订单/支付/库存按 1:1 比较，且把 `order_status=1` 当全部已支付；修正后按 payOrderId、POST_ORDER 幂等键、订单状态真实粒度比较，23:00–01:30 窗口 8/8 通过。5 笔客户端超时产生的待付款订单已在 15 分钟后收敛为 CLOSED，不混入已付款断言。
 - **admin 重启失败**：`apps-down` 约 3 分钟 > `TimeoutStopSec=180`，systemd 强杀 cgroup；三节点 unit 已改为 600 秒并 daemon-reload，重启改为顺序执行。
 - **category 热路径**：公开 `loadCategory` 去掉每请求二次分类查询 + Redis 写后，三节点已部署 `a2bfb19` 并预热复测 400 VU：543.6 req/s、p95 176.5ms、p99 563.1ms；不是严格 A/B，但未退化。node3 实例本身仍明显慢于 node2，作为后续替换/迁移项保留。
-- **CI 部署异常**：第二次 deploy run `39049599672` 因 namesrv OOM 失败；修复 namesrv 内存后 node1 手动恢复，node2/node3 已同步到 `a2bfb19`，`post_deploy_check.sh` 全部通过。
+- **CI 部署异常与复测**：第二次 deploy run `39049599672` 因 namesrv OOM 失败；修复 namesrv 内存后手动恢复。随后 `835d6a8` 的 run `39053891614` 部署成功，三节点健康、部署后探针全过，proxy/namesrv 重启计数保持 10/13。
 - 证据：`eval/verification/2026-10-18/ecs-loadtest/{node3-diagnosis,rocketmq-proxy-oom,rocketmq-namesrv-oom,loadgen-bootstrap-fix,reconcile-corrected,admin-restart-timeout,post-catfix-warm-400}.*`。

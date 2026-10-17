@@ -18,7 +18,7 @@
 
 | 项 | 值 |
 |---|---|
-| 部署 | 首轮 run `39038405815` / commit `d1365cc`；后续修复 commit `a2bfb19` 因 namesrv OOM 的 CI run `39049599672` 失败，手动恢复 node1 并同步 node2/node3；当前三节点均为 `a2bfb19` 构建 |
+| 部署 | 首轮 run `39038405815` / commit `d1365cc`；修复 commit `a2bfb19` 的 CI run `39049599672` 曾因 namesrv OOM 失败并手动恢复；最终 commit `835d6a8` 的 run `39053891614` 部署成功，node1/node2/node3 应用构建一致 |
 | 应用 | 9 个 Java 服务 + assistant + 双前端；三节点同 JAR 指纹 |
 | 节点 | node1 8c16g；node2/node3 4c8g |
 | 发压机 | node4 `172.17.40.108`，4c8g，同 VPC；先修复 Docker `172.17.0.0/16` 与 VPC 路由冲突 |
