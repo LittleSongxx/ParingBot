@@ -13,7 +13,7 @@ services:
       SMARTLECT_CANAL_MYSQL_PASSWORD: ${SMARTLECT_CANAL_MYSQL_PASSWORD:?run bootstrap}
       SMARTLECT_XXLJOB_MYSQL_PASSWORD: ${SMARTLECT_XXLJOB_MYSQL_PASSWORD:?run bootstrap}
       TZ: Asia/Shanghai
-    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_general_ci, --innodb_buffer_pool_size=512M, --max_connections=200,
+    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_general_ci, --innodb_buffer_pool_size=512M, --max_connections=300,
               --server-id=1, --log-bin=binlog, --binlog-format=ROW, --binlog-row-image=FULL]
     volumes:
       - mysql:/var/lib/mysql
@@ -22,7 +22,7 @@ services:
       # 建表脚本必须挂在 MySQL 的 initdb 目录；之前误挂在 xxl-job-admin 容器上，从未被执行。
       - ./sql/16-xxljob.sql:/docker-entrypoint-initdb.d/16-xxljob.sql:ro
     # 8c32g 后余量充足：512M buffer pool + 2g 上限（1g 时常驻 748MB 已逼近）；
-    # max_connections 160→200 给 assistant 线程本地复用与未来多副本留余量
+    # max_connections 160→300：三节点 17 个服务 × Hikari 16 的上界为 272，压测实测峰值 202，300 留出余量
     mem_limit: 2g
     healthcheck:
       test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysqladmin ping -h 127.0.0.1 -uroot --silent']

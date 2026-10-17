@@ -16,3 +16,4 @@ JVM 字体临时文件根因治理、全量复查（自检 + 集成档 + 三路�
 | [支付对账与订单状态日志.md](支付对账与订单状态日志.md) | 完成：mock complete HMAC + nonce 防重放；pay V5 渠道流水与日对账；order V7 状态历史 + 管理端只读接口；修复 `PayInfoDTO` Dubbo 序列化回归。demo/HMAC 证据已归档。 |
 | [热点库存原型.md](热点库存原型.md) | 完成（默认关闭）：Redis/Lua 分桶预占、commit/release/关单退款回补、对账任务与指标；Testcontainers Redis 测试通过；10/20 VU 压测 0 错误且库存守恒，未宣称吞吐提升。 |
 | [工程护栏与订单压测.md](工程护栏与订单压测.md) | 完成：ArchUnit 两条边界 + Maven Enforcer 禁止 app 互相依赖；订单压测 JSON 与 `docs/verification/order-load.md`；修复全量在售 ID 过滤导致的商品服务连接池/内存压力。最终集成档 BUILD SUCCESS（9 IT / 45 测试），行覆盖 38.7%。 |
+> 本日部署与压测在 2026-10-18 凌晨完成，跨日记录见 [2026-10-18 ECS 三节点部署与压测](../2026-10-18/ECS三节点部署与压测.md)。

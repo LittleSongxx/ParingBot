@@ -1,0 +1,27 @@
+{
+  "kind": "browse",
+  "label": "ecs-probe-600",
+  "launcher": "k6",
+  "base": "https://smartlect.cn",
+  "vus": 600,
+  "hold": "60s",
+  "requests": 41058,
+  "duration_s": 63.00086812,
+  "qps": 651.7053054220676,
+  "ok": 41058,
+  "error_rate": 0,
+  "business_errors": 0,
+  "business_error_rate": 0,
+  "latency_ms": {
+    "avg": 227.97649774141618,
+    "p50": 9.7981685,
+    "p90": 878.1685138000004,
+    "p95": 1280.8411805500002,
+    "p99": 2178.3126277500005,
+    "max": 3903.326367
+  },
+  "status": {
+    "200": 41058
+  },
+  "by_request": {}
+}

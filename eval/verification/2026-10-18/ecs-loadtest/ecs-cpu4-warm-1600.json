@@ -1,0 +1,27 @@
+{
+  "kind": "browse",
+  "label": "ecs-cpu4-warm-1600",
+  "launcher": "k6",
+  "base": "https://smartlect.cn",
+  "vus": 1600,
+  "hold": "60s",
+  "requests": 106983,
+  "duration_s": 63.00076143,
+  "qps": 1698.1223333128848,
+  "ok": 106983,
+  "error_rate": 0,
+  "business_errors": 0,
+  "business_error_rate": 0,
+  "latency_ms": {
+    "avg": 242.06103871642605,
+    "p50": 9.004001,
+    "p90": 983.6679396000001,
+    "p95": 1273.2495412999988,
+    "p99": 1816.2120570399975,
+    "max": 3387.409576
+  },
+  "status": {
+    "200": 106983
+  },
+  "by_request": {}
+}

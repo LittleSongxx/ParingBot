@@ -1,0 +1,43 @@
+# ECS 三节点部署与压测
+
+## 需求
+
+提交并推送本轮全部修改，在三节点 ECS 上部署，随后对最常见、最受关注的吞吐/延迟/错误指标做压测，并在发现瓶颈时做可回退的调优。
+
+## 部署
+
+- 本地提交 `d1365cc`，推送 `main`；push CI 通过。
+- GitHub Actions `workflow_dispatch` run `39038405815` 完成：backend/assistant/web 通过，node1 部署成功；node2/node3 通过 `sync-app-node.sh` 同步。
+- 三节点同一订单 JAR 指纹 `f4c36776411c7a8d8d8e053e46a2289f68a0ade0ec25bf7a20b6e930e30c3b24`；node1 12 进程、node2/node3 各 5 进程健康。
+- Flyway 真库：order V7 `order_status_log`、pay V5 `pay_mock_channel_ledger` 成功应用。
+- xxl-job 新增 `payDailyReconcile`、`hotStockReconcile`，登记为 18 个任务。
+- 部署前补充 `SMARTLECT_MOCK_PAY_SECRET`（未打印/未入库），备份 `runtime.env` 与 order/pay 数据库。
+- 部署后 `post_deploy_check.sh` 全部通过；演示账号完成一笔下单/支付/退款 smoke，HMAC、状态历史、渠道流水均正常。
+
+## 压测与调优
+
+- 发压机 node4 `172.17.40.108`（4c8g）；先修复 Docker 与 VPC 路由冲突。
+- 浏览链路默认 200 QPS/路由先触发 429；测试限流临时调到 2000，压完恢复 200。
+- node2/node3 的 JVM 处理器从 2 调到 4（与 4c8g 匹配），同步写回 `apply-sizing.sh`，避免下次 sync 回退。
+- MySQL `max_connections` 从 200 调到 300（`SET PERSIST`，compose 同步改为 300）；压测峰值达到 202，原上限没有余量。
+- 冷启动 600 VU（351 QPS/p95 5.2s）已判定无效；充分预热后 600 VU 为 840 QPS/p95 52ms。
+
+## 结果摘要
+
+- 浏览：1200 VU 1512 QPS/p95 540ms；1600 VU 约 1.7k QPS/p95 1.27–1.33s；2000 VU 吞吐平台约 1694 QPS/p95 2.48s。
+- 订单（三请求合计）：80 VU 96.7 QPS/p95 136ms；160 VU 168.3 QPS/p95 318ms；240 VU 204.4 QPS/p95 827ms；延迟拐点约 160–240 VU，尚未测得最终吞吐平台。
+- node3 是浏览链路热点（1600 VU 时 CPU 99.8%）；Redis/MySQL CPU 不是当前瓶颈。
+- 对账脚本 4 项失败已定位为脚本把 `order_status=1` 当已支付、历史迟到支付行和 bootstrap 失败数据；本轮支付成功数与已支付/已完成/已发货/部分退款合计一致。
+
+详见 [ecs-loadtest.md](../../verification/ecs-loadtest.md) 和 `eval/verification/2026-10-18/ecs-loadtest/`。
+
+## 发现与未完成
+
+- 三节点并行重启时 node1 的 admin 曾启动失败，重试后恢复；后续重启改为顺序执行以避免端口/进程竞争。
+- node3 的 product/gateway 实例明显慢于 node2，根因尚未定论，未做实例下线或流量重分配。
+- 订单链路没有继续上探到平台；MySQL 连接数在 240 VU 达到 202，已提高上限但还需观察长期稳定性。
+- 压测限流 2000 只用于测试，生产已恢复 200；不要把测试吞吐当作生产容量。
+
+## 关联版本
+
+部署 commit `d1365cc`；压测环境为同 VPC 三节点 ECS（node1 8c16g，node2/node3 4c8g），单 MySQL。

@@ -19,7 +19,16 @@ SSH4="ssh -i /root/.ssh/id_ed25519 -o BatchMode=yes -o ConnectTimeout=10 root@$L
 VUS="${1:-1200}"
 HOLD="${2:-80}"
 
-cnt() { curl -s -m 5 "http://$1:18106/actuator/prometheus" 2>/dev/null | awk '/^http_server_requests_seconds_count/{s+=$2} END{printf "%.0f", s+0}'; }
+cnt() {
+  # 集群形态下请求分散在三个 product 实例；只数 node1 会在负载起量后误判“未起量”。
+  local total=0 one
+  for host in "$NODE1_IP" "$NODE2_IP" "$NODE3_IP"; do
+    one=$(curl -s -m 5 "http://$host:18106/actuator/prometheus" 2>/dev/null \
+      | awk '/^http_server_requests_seconds_count/{s+=$2} END{printf "%.0f", s+0}')
+    total=$((total + ${one:-0}))
+  done
+  printf '%s' "$total"
+}
 metric() { curl -s -m 5 "http://$1:18106/actuator/prometheus" 2>/dev/null | awk -v k="$2" '$1 ~ "^"k"\\{"{printf "%.0f", $2*('"${3:-1}"')}'; }
 
 echo "[probe] 启动 $VUS 并发 × ${HOLD}s"

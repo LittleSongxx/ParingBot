@@ -1,0 +1,27 @@
+{
+  "kind": "browse",
+  "label": "ecs-resource-1600",
+  "launcher": "k6",
+  "base": "https://smartlect.cn",
+  "vus": 1600,
+  "hold": "60s",
+  "requests": 107889,
+  "duration_s": 63.001497564,
+  "qps": 1712.4831023326244,
+  "ok": 107889,
+  "error_rate": 0,
+  "business_errors": 0,
+  "business_error_rate": 0,
+  "latency_ms": {
+    "avg": 237.44345359612032,
+    "p50": 9.025031,
+    "p90": 947.1987415999996,
+    "p95": 1329.984257399997,
+    "p99": 2022.8484050399989,
+    "max": 4377.758722
+  },
+  "status": {
+    "200": 107889
+  },
+  "by_request": {}
+}

@@ -1,0 +1,52 @@
+{
+  "requests": 3261,
+  "duration_s": 62.716,
+  "qps": 52.0,
+  "ok": 3261,
+  "error_rate": 0.0,
+  "latency_ms": {
+    "avg": 53.08,
+    "p50": 39.16,
+    "p90": 108.53,
+    "p95": 122.54,
+    "p99": 165.47,
+    "max": 389.42
+  },
+  "status": {
+    "200": 3261
+  },
+  "errors": {
+    "add2Cart:business_error": 1
+  },
+  "business_errors": 1,
+  "business_error_rate": 0.0003,
+  "by_request": {
+    "add2Cart": {
+      "count": 1087,
+      "p50": 38.76,
+      "p95": 67.78,
+      "p99": 110.61,
+      "avg": 41.97
+    },
+    "payComplete": {
+      "count": 1087,
+      "p50": 14.43,
+      "p95": 22.69,
+      "p99": 43.45,
+      "avg": 15.75
+    },
+    "postOrder": {
+      "count": 1087,
+      "p50": 96.49,
+      "p95": 146.24,
+      "p99": 245.01,
+      "avg": 101.53
+    }
+  },
+  "kind": "order",
+  "vus": 40,
+  "hold": 60,
+  "label": "ecs-order-40",
+  "base": "https://smartlect.cn",
+  "wall_s": 62.716
+}

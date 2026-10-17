@@ -1,0 +1,27 @@
+{
+  "kind": "browse",
+  "label": "ecs-rl2000-600",
+  "launcher": "k6",
+  "base": "https://smartlect.cn",
+  "vus": 600,
+  "hold": "30s",
+  "requests": 18543,
+  "duration_s": 33.000369024,
+  "qps": 561.9028074054061,
+  "ok": 18543,
+  "error_rate": 0,
+  "business_errors": 0,
+  "business_error_rate": 0,
+  "latency_ms": {
+    "avg": 342.9984768541212,
+    "p50": 11.084018,
+    "p90": 1443.7675607999993,
+    "p95": 1842.2125722999992,
+    "p99": 2749.532135659998,
+    "max": 4148.260328
+  },
+  "status": {
+    "200": 18543
+  },
+  "by_request": {}
+}

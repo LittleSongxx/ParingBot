@@ -43,7 +43,9 @@ echo "[$(hostname)] $(nproc) 核 / $(awk '/MemTotal/{printf "%d", $2/1048576}' /
 set_env SMARTLECT_DB_POOL_MAX_SIZE "$POOL"
 
 if [ "$IS_REPLICA" -gt 0 ]; then
-  set_env SMARTLECT_JAVA_PROCESSORS 2
+  # 副本节点现在是 4c8g；2 处理器是 2c 时代的遗留。2026-10-18 ECS 压测把副本
+  # 从 2 调到 4 后，600/800 VU 的浏览吞吐明显改善；按机器规格设置，避免 sync 回退。
+  set_env SMARTLECT_JAVA_PROCESSORS "${SMARTLECT_TUNE_REPLICA_PROCESSORS:-4}"
   set_env SMARTLECT_JAVA_XMS 256m
   set_env SMARTLECT_JAVA_XMX 512m
 else

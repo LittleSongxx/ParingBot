@@ -299,6 +299,7 @@ python3 scripts/drills/fault_drills.py all
 
 - **演示规模**：单机 MySQL、演示目录（47 个商品 / 20 SKU 场景 + 8.7 万条索引）。浏览链路压测：集群峰值 832 req/s @1600 并发，p95 4655ms；可持续档 811 req/s @600 并发，p95 ≈200ms；发压工具自身有已知偏高口径。不是生产流量。
 - **订单链路压测**：本地单机 10/20 VU、30 秒、加购→下单→支付全链，0 业务错误；p95 分别为 67.6/57.3 ms（热点库存默认关）。热点库存开时 60.9/61.9 ms，差异在噪声内；这是低并发回归信号，不是容量结论。方法、库存守恒核对与原始 JSON 见 [订单链路压测](docs/verification/order-load.md)。
+- **ECS 三节点实测（2026-10-18）**：同 VPC 4c8g 发压机、测试限流 2000、副本 JVM 4 处理器；浏览 1200 VU 1512 req/s/p95 540ms，1600 VU 约 1.7k req/s/p95 1.27s，2000 VU 吞吐平台约 1694 req/s；订单 240 VU 204 req/s/p95 827ms，延迟拐点约 160–240 VU。三节点 17 个服务 × Hikari 16 的配置下 MySQL 连接峰值达到 202，已把 `max_connections` 调到 300。详见 [ECS 压测](docs/verification/ecs-loadtest.md)。
 - **MQ 是单点**：DLedger 三副本编排已就绪但线上未启用。
 - **Outbox 兜底按库注册**：`outboxDispatch` 在 order/user/product/cart/pay/admin 六个库各登记一份；其余域没有 `local_message_outbox`。
 - **幂等账本无业务参数**：`INCONCLUSIVE / MANUAL_REVIEW` 不能自动改判，需运维带业务参数核对；要自动闭环需要在业务行冗余幂等键（未做）。
