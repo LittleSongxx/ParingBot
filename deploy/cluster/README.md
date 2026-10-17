@@ -19,7 +19,7 @@ IP/端口集中定义在 [nodes.env](nodes.env)，脚本都从这里取，不再
 
 | 组件 | 形态 | 关键设计 |
 |---|---|---|
-| RocketMQ | DLedger 三副本（Raft 自动选主） | 每节点 broker+namesrv+proxy（host 网络）；5.x 任意精度定时消息经 gRPC proxy；Topic/订阅组 autoCreate 重建，Outbox 补投未决消息，单机数据卷不动 |
+| RocketMQ | DLedger 三副本（Raft 自动选主） | 每节点 broker+namesrv+proxy（host 网络）；5.x 任意精度定时消息经 gRPC proxy；Topic/订阅组 autoCreate 重建，Outbox 补投未决消息，单机数据卷不动。**注意**：线上 broker 目前仍以 `smartlect-single.conf` 运行（DLedger 编排就绪但未启用），与主 README「MQ 是单点」一致 |
 | Redis | 1 主（node1）+ 2 副本 + 3 Sentinel | host 网络；`replica-announce-ip` 必填（否则 sentinel 记错地址）；主库补 `masterauth` 以支持降级后再认证 |
 | Nacos | 3 节点 Raft | host 网络 8848/9848/7848；三成员**共用 node1 MySQL 的 `smartlect_nacos` 库**，所以从 standalone 切过来零数据迁移 |
 | MySQL | 仍单机（node1） | 端口绑定由 `SMARTLECT_MYSQL_BIND` 决定：单机默认 `127.0.0.1`，集群写 node1 内网 IP 供 node2/3 访问；主从/切换不在本次范围 |
