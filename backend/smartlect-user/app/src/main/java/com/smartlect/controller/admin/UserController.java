@@ -1,5 +1,7 @@
 package com.smartlect.controller.admin;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.smartlect.constants.AdminPermissions;
 import com.smartlect.component.RedisComponent;
 import com.smartlect.component.UserTempBanService;
 import com.smartlect.api.enums.UserStatusEnum;
@@ -40,6 +42,7 @@ public class UserController extends com.smartlect.controller.admin.ABaseControll
 
     // 改变用户状态
     @PostMapping("/changeStatus")
+    @SaCheckPermission(value = AdminPermissions.USER_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
     public ResponseVO changeStatus(@NotNull String userId, @NotNull Integer status){
         // 根据userId查询用户
         UserInfo userInfo = userInfoService.getUserInfoByUserId(userId);

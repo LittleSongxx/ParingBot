@@ -1,5 +1,7 @@
 package com.smartlect.controller.admin;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.smartlect.constants.AdminPermissions;
 import com.smartlect.component.UserTempBanService;
 import com.smartlect.entity.dto.BaiduImageCensorResultDTO;
 import com.smartlect.entity.query.ImageModerationRecordQuery;
@@ -45,6 +47,7 @@ public class ImageModerationController extends com.smartlect.controller.admin.AB
     }
 
     @PostMapping("/handleReview")
+    @SaCheckPermission(value = AdminPermissions.MODERATION_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
     public ResponseVO handleReview(Integer recordId, String action, String handleRemark) {
         imageModerationService.handleReview(recordId, action, handleRemark);
         return getSuccessResponseVO(null);
@@ -60,6 +63,7 @@ public class ImageModerationController extends com.smartlect.controller.admin.AB
     }
 
     @PostMapping("/unbanUser")
+    @SaCheckPermission(value = AdminPermissions.MODERATION_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
     public ResponseVO unbanUser(String userId) {
         if (!userTempBanService.manualUnban(userId)) {
             throw new BusinessException("该用户当前非临时封禁状态，无法解封");
@@ -68,6 +72,7 @@ public class ImageModerationController extends com.smartlect.controller.admin.AB
     }
 
     @PostMapping("/censorImage")
+    @SaCheckPermission(value = AdminPermissions.MODERATION_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
     public ResponseVO censorImage(@NotNull MultipartFile file) {
         try {
             BaiduImageCensorResultDTO result = imageModerationService.censorImageBytes(

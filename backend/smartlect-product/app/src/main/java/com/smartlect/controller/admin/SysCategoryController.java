@@ -1,5 +1,7 @@
 package com.smartlect.controller.admin;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.smartlect.constants.AdminPermissions;
 import com.smartlect.entity.po.SysProductProperty;
 import com.smartlect.entity.query.SysCategoryQuery;
 import com.smartlect.entity.po.SysCategory;
@@ -30,6 +32,7 @@ public class SysCategoryController extends com.smartlect.controller.admin.ABaseC
 	}
 
 	@PostMapping("/saveCategory")
+	@SaCheckPermission(value = AdminPermissions.PRODUCT_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
 	public ResponseVO saveCategory(SysCategory bean) {
 		sysCategoryService.saveCategory(bean);
 		return getSuccessResponseVO(null);
@@ -41,24 +44,28 @@ public class SysCategoryController extends com.smartlect.controller.admin.ABaseC
 	}
 
 	@PostMapping("/delCategory")
+	@SaCheckPermission(value = AdminPermissions.PRODUCT_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
 	public ResponseVO delCategory(SysCategory bean) {
 		sysCategoryService.deleteSysCategory(bean);
 		return getSuccessResponseVO(null);
 	}
 
 	@PostMapping("/changeCategorySort")
+	@SaCheckPermission(value = AdminPermissions.PRODUCT_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
 	public ResponseVO changeCategorySort(String categoryIds) {
 		sysCategoryService.changeCategorySort(categoryIds);
 		return getSuccessResponseVO(null);
 	}
 
 	@PostMapping("/saveProductProperty")
+	@SaCheckPermission(value = AdminPermissions.PRODUCT_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
 	public ResponseVO saveProductProperty(SysProductProperty bean) {
 		sysCategoryService.saveProductProperty(bean);
 		return getSuccessResponseVO(null);
 	}
 
 	@PostMapping("/delProductProperty")
+	@SaCheckPermission(value = AdminPermissions.PRODUCT_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
 	public ResponseVO delProductProperty(SysProductProperty bean) {
 		sysCategoryService.delProductProperty(bean);
 		return getSuccessResponseVO(null);

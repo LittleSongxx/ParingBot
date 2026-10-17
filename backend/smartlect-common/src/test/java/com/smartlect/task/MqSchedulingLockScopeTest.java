@@ -53,6 +53,7 @@ class MqSchedulingLockScopeTest {
         ReflectionTestUtils.setField(task, "mqCompensationLogService", service);
         ReflectionTestUtils.setField(task, "batchSize", 10);
         ReflectionTestUtils.setField(task, "maxRetries", 5);
+        ReflectionTestUtils.setField(task, "includeConsumeFailures", false);
         ReflectionTestUtils.setField(task, "applicationName", "smartlect-user");
         String expectedKey = Constants.REDIS_KEY_MQ_COMPENSATE_AUTO_REPLAY_LOCK
                 + ":smartlect-user";
@@ -61,6 +62,6 @@ class MqSchedulingLockScopeTest {
 
         task.autoReplay();
 
-        verify(service).autoReplayPendingSendFailures(10, 5);
+        verify(service).autoReplayPendingSendFailures(10, 5, false);
     }
 }

@@ -10,10 +10,14 @@
 对每个管理端端点：
 - 名称以写前缀开头（add/save/update/delete/del/change/commend/handle/set/…）或使用
   PUT/PATCH/DELETE 的，视为**写接口**；写接口必须满足其一：
-    ① 方法级或类级 `@SaCheckPermission`；② `@AdminSensitiveConfirm`（要求超管口令二次确认）；
-    ③ 命中 `TrialAdminAccess` 的拒绝清单或白名单；④ `@TrialReadable` 显式放宽。
+    ① 方法级或类级 `@SaCheckPermission`（且不能只写 admin:trial——展厅恰好持有它）；
+    ② `@TrialReadable` 显式放宽（仅 logout 这类"必须让展厅也能用"的接口）。
+  **不再接受**"登记在 TrialAdminAccess 拒绝清单里"作为保护证明：那份清单是展厅的第二道
+  防线，不是 RBAC。DATA_ANALYST / AUDITOR 等非展厅账号不受它约束——2026-10-17 之前，
+  发货/封禁/改分类等 15 个写接口因此对任何登录的管理员开放。
 - 名称既不属读前缀也不属写前缀的，视为**未分类** → 判失败（强制命名约定或显式登记）。
-- 反向检查：`TrialAdminAccess` 里列的每条路径都必须对应真实端点（防陈旧条目）。
+- 反向检查：`TrialAdminAccess` 里列的每条路径都必须对应真实端点（防陈旧条目），
+  清单仍然保留（展厅守卫继续使用），只是不再作为本门禁的通过条件。
 
 退出码：0 通过；1 有缺口；2 扫描失败。
 """
@@ -60,9 +64,14 @@ def endpoints() -> list[dict]:
                 r'@(Get|Post|Put|Delete|Patch)Mapping\((?:value\s*=\s*)?"([^"]+)"\)'
                 r'([\s\S]{0,400}?)public\s+\w[\w<>,\s\[\]]*\s+(\w+)\s*\(', source):
             verb, mapping, between, name = m.group(1), m.group(2), m.group(3), m.group(4)
+            perm_args = " ".join(re.findall(r'@SaCheckPermission\s*\(([\s\S]*?)\)\s*(?=@|\n|public)', between))
+            perm_literals = set(re.findall(r'"([^"]+)"', perm_args))
             found.append({
                 "file": path.name, "verb": verb, "path": base + mapping, "name": name,
                 "method_perm": "@SaCheckPermission" in between,
+                # 只写 admin:trial 等于没保护：展厅（公开口令）恰好持有这个权限点
+                "trial_only_perm": perm_literals == {"admin:trial"}
+                                   and "AdminPermissions." not in perm_args,
                 "confirm": "@AdminSensitiveConfirm" in between,
                 "trial_readable": "@TrialReadable" in between,
                 "class_perm": class_perm,
@@ -95,8 +104,8 @@ def main() -> int:
         if kind != "write":
             continue
         writes += 1
-        covered = (row["method_perm"] or row["class_perm"] or row["confirm"]
-                   or row["trial_readable"] or row["path"] in denied or row["path"] in allowed)
+        covered = ((row["method_perm"] and not row["trial_only_perm"])
+                   or row["class_perm"] or row["trial_readable"])
         if not covered:
             gaps.append(f"{row['file']} {row['verb']} {row['path']}（方法名 {row['name']}）")
 
@@ -114,8 +123,9 @@ def main() -> int:
     print(f"管理端端点 {len(rows)} 个，其中写接口 {writes} 个；"
           f"TrialAdminAccess 清单 {len(denied)} 拒 / {len(allowed)} 放行")
     if gaps:
-        print("\n未受保护的写接口（必须补 @SaCheckPermission / @AdminSensitiveConfirm，"
-              "或登记进 TrialAdminAccess）：", file=sys.stderr)
+        print("\n未受权限注解保护的写接口（拒绝清单不再算保护证明；"
+              "请补 @SaCheckPermission，或对 logout 这类接口用 @TrialReadable 显式放宽）：",
+              file=sys.stderr)
         for g in gaps:
             print(f"  - {g}", file=sys.stderr)
     if unclassified:

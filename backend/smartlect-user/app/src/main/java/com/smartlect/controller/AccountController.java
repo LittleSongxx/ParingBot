@@ -123,7 +123,10 @@ public class AccountController extends ABaseController{
     }
 
     // 获取验证码
+    // 4 位数字图片验证码可被低成本 OCR：不限流时等于给登录爆破发免费门票（IP 取 IpUtils 的可信值）
     @GetMapping("/checkCode")
+    @RateLimit(limitType = RateLimit.LimitType.IP, windowSeconds = 60, maxCount = 30,
+            message = "获取验证码过于频繁，请稍后再试")
     public ResponseVO checkCode(){
         CheckCodeVO checkCodeVO = CheckCodeGenerator.generate(redisComponent);
         return getSuccessResponseVO(checkCodeVO);
@@ -255,22 +258,9 @@ public class AccountController extends ABaseController{
     }
 
     private String getClientIp() {
-        HttpServletRequest request = currentRequest();
-
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-
-        // 如果是多个IP，取第一个
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-
-        return ip;
+        // 信任模型见 IpUtils：先信 nginx 写的 X-Real-IP，XFF 取最后一跳并做格式校验。
+        // 取 XFF 第一段会允许客户端伪造 IP，绕过登录锁定与 IP 限流（2026-10-16 审计）。
+        return com.smartlect.utils.IpUtils.resolveClientIp(currentRequest());
     }
 
     private HttpServletRequest currentRequest() {

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """注册 xxl-job 执行器组与任务定义（幂等，可反复执行）。
 
-批次三把九个 @Scheduled 任务迁成 @XxlJob handler（现役共十五个：含幂等对账上报与按库注册的
-Outbox 兜底投递），但 handler 只是"可被调用的
+批次三把九个 @Scheduled 任务迁成 @XxlJob handler（现役共十六个：含幂等对账上报、按库注册的
+Outbox 兜底投递与 coupon 的补偿重放），但 handler 只是"可被调用的
 入口"——任务本身（执行器组、cron、启用状态）存在 xxl-job 的库里，必须在调度
 中心登记才会被触发。只加注解不登记的结果是任务静默停摆：没有报错、没有日志，
 出问题时只表现为"业务该自动发生的事一直没发生"。
@@ -34,7 +34,8 @@ EXECUTORS = ['smartlect-admin', 'smartlect-cart', 'smartlect-coupon', 'smartlect
 # 绑定的服务必须是该 handler Bean 真正注册的那个（bean 开关注解见各服务 application.yml）：
 #   - outboxDispatch 是 common 的 handler，但 local_message_outbox 是各库本地表——
 #     必须按"有表且 mq.outbox.dispatch-enabled=true"的服务分别注册（各库各扫各的）；
-#   - mqCompensationReplay 同理绑在补偿日志量最大的 order 域，其余域按需再加；
+#   - mqCompensationReplay 绑在补偿日志量最大的 order 域；coupon 的退款还券是幂等消费，
+#     且消费失败不会再被其它收敛器重放，必须单独登记（2026-10-17：coupon 原先连表都没有）；
 #   - userTempBanReconcile 只在 user 注册，且受 app.common-scheduling.enabled 控制。
 JOBS = [
     ('smartlect-order', 'payOrderPoll', '*/5 * * * * ?', '支付单轮询（原 fixedDelay 5s）'),
@@ -55,6 +56,7 @@ JOBS = [
     ('smartlect-user', 'userTempBanReconcile', '0 * * * * ?', '临时封禁到期解封（原 fixedDelay 60s）'),
     ('smartlect-user', 'imageModerationCleanup', '0 15 * * * ?', '图片审核残留清理（原 cron 0 15 *）'),
     ('smartlect-coupon', 'couponRushReconcile', '0 */10 * * * ?', '秒杀库存对账（原 cron 0 */10）'),
+    ('smartlect-coupon', 'mqCompensationReplay', '0 * * * * ?', 'MQ 补偿重放（coupon 库本地表，含消费失败）'),
 ]
 
 

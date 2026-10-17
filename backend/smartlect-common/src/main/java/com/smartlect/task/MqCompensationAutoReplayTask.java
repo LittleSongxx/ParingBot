@@ -31,6 +31,10 @@ public class MqCompensationAutoReplayTask {
     @Value("${mq.compensation.auto-replay-max-retries:5}")
     private int maxRetries;
 
+    /** 消费失败（exchange=mq.consume）默认不自动重放，交给人工；coupon 的还券幂等，单独打开。 */
+    @Value("${mq.compensation.auto-replay-consume:false}")
+    private boolean includeConsumeFailures;
+
     @Value("${spring.application.name:unknown}")
     private String applicationName;
 
@@ -46,7 +50,8 @@ public class MqCompensationAutoReplayTask {
             return;
         }
         try {
-            int count = mqCompensationLogService.autoReplayPendingSendFailures(batchSize, maxRetries);
+            int count = mqCompensationLogService.autoReplayPendingSendFailures(
+                    batchSize, maxRetries, includeConsumeFailures);
             if (count > 0) {
                 metrics.compensationReplayed(count);
                 log.info("MQ 发送补偿自动重放完成，成功 {} 条", count);

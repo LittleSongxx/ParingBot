@@ -145,7 +145,7 @@ flowchart LR
   A -->|价格/库存回问| J
   J --> D["MySQL · Redis · RocketMQ"]
   M[("MySQL binlog")] -->|Canal| Q["RocketMQ"] -->|ProductIndexConsumer| E["ES 商品索引"]
-  X["xxl-job 2.5<br/>15 个定时任务"] -.->|调度| J
+  X["xxl-job 2.5<br/>16 个定时任务"] -.->|调度| J
   C["Nacos 2.5<br/>发现 + 配置中心"] -.->|注册 / 下发| J
   C -.-> A
 ```
@@ -173,7 +173,7 @@ flowchart LR
 | **缓存** | Caffeine L1 + Redis L2 + pub/sub 失效 + Canal 兜底 |
 | **消息** | RocketMQ 5.3（任意精度定时消息 · Outbox 可靠投递 · 定时回投重试） |
 | **变更捕获** | Canal 1.1.8（MySQL binlog → RocketMQ → ES 商品索引与缓存失效） |
-| **调度** | xxl-job 2.5（15 个定时任务：Outbox 兜底投递按库 ×6、订单超时、支付轮询、秒杀与退款对账、幂等账本上报等） |
+| **调度** | xxl-job 2.5（16 个定时任务：Outbox 兜底投递按库 ×6、订单超时、支付轮询、秒杀与退款对账、幂等账本上报、coupon 补偿重放等） |
 | **服务治理** | Nacos 2.5（服务发现 + 配置中心）· 锁/限流 Redisson 4.0 |
 | **模型** | OpenAI 兼容端点直连（端点 / 模型白名单 + MySQL 热切换）；缺配置时明确失败，不静默降级 |
 | **基础设施** | 10 个容器（MySQL 8.4 · Redis 7.4 · RocketMQ 5.3 三件套 · Nacos 2.5 · ES 8.19(IK) · Qdrant 1.15 · Canal 1.1.8 · xxl-job 2.5） |
@@ -272,12 +272,12 @@ Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预
 |---|---|---|
 | 站点 | `http://127.0.0.1/` | nginx 反代网关，`/actuator` 与业务端口不对公网开放 |
 | 网关健康 | `:18080/actuator/health` | 依赖 Redis / Nacos 的存活探针 |
-| 调度中心 | `:18090/xxl-job-admin` | 15 个任务的执行记录、手动触发、失败重试；**判断"任务在跑"看 handle_code=200**，只看触发会漏掉"调度成功但执行器不可达" |
+| 调度中心 | `:18090/xxl-job-admin` | 16 个任务的执行记录、手动触发、失败重试；**判断"任务在跑"看 handle_code=200**，只看触发会漏掉"调度成功但执行器不可达" |
 | 展厅账号策略 | `TrialAdminAccess` + `TrialAdminGuardInterceptor` | 公开口令的 gallery 账号：**读默认允许（隐私清单除外）、写默认拒绝**（退款复核显式放行）；清单完整性由 `scripts/check_admin_authz.py` 门禁强制 |
 | 配置中心 | `:18848` Nacos 控制台 | `SMARTLECT_GROUP` 下的配置；改完用 `scripts/nacos_config_push.py` 推送 |
 | 指标 | 各服务 `/actuator/prometheus` | JVM / Hikari / 线程池 / 业务指标；只从内网抓 |
 | 应用日志 | `run/logs/<服务>.log` | 启动失败先看这里；`run/logs/<服务>/nacos/` 是注册与配置客户端日志 |
-| MQ 补偿 | 各库 `mq_compensation_log` | 消费失败落库后由 `mqCompensationReplay` 自动重放 |
+| MQ 补偿 | 各库 `mq_compensation_log` | **发送失败/远程补偿**由 `mqCompensationReplay` 自动重放；**消费失败**默认留人工，仅 coupon（退款还券，幂等）打开自动重放（`mq.compensation.auto-replay-consume=true`） |
 | Outbox 水位 | 各库 `local_message_outbox` | 积压说明投递侧异常；`EXHAUSTED` 需人工介入 |
 | 副本节点版本 | node2/node3（见 `deploy/cluster/nodes.env`） | 副本应用 JAR 用 `deploy/cluster/scripts/sync-app-node.sh` 从 node1 同步（含重启与健康门禁）；**`deploy` 动词只更新 node1** |
 | 部署后核对 | `scripts/probes/post_deploy_check.sh https://smartlect.cn` | 展厅矩阵 ×8 + 多节点交替检测：同一路径若在期望码与其它码之间交替，说明有副本节点未更新 |

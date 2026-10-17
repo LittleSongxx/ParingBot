@@ -69,6 +69,20 @@ public class ProductionSafetyValidator {
     @Value("${spring.flyway.password:}")
     private String flywayPassword;
 
+    /** 空值在 Spring Boot 里等价于监听全部网卡；与 0.0.0.0 / :: 同属通配绑定。 */
+    @Value("${server.address:}")
+    private String serverAddress;
+
+    @Value("${management.endpoints.web.exposure.include:health,info}")
+    private String actuatorExposure;
+
+    /**
+     * 集群部署显式接受通配绑定（跨节点 Dubbo 与 nginx 上游依赖它）。
+     * 打开它等于把"应用端口只在内网"的责任交给安全组。
+     */
+    @Value("${smartlect.allow-wildcard-bind:false}")
+    private boolean allowWildcardBind;
+
     @PostConstruct
     public void validate() {
         if (!enforced()) {
@@ -108,6 +122,14 @@ public class ProductionSafetyValidator {
         if (devLoginBypass || System.getProperty("dev") != null) {
             errors.append("禁止生产开启 smartlect.dev-login-bypass 或 -Ddev; ");
         }
+        if (wildcardBind() && exposesPrometheus() && !allowWildcardBind) {
+            // 业务端口与 actuator 同端口：绑定通配地址时，任何能连到该端口的来源都能读到
+            // JVM/连接池/线程池指标，也绕过 nginx 直接调业务接口。仓库里没有防火墙配置，
+            // 所以生产模式必须显式二选一：绑内网 IP，或承认由安全组兜底。
+            errors.append("服务监听通配地址(").append(displayAddress())
+                    .append(")且 actuator 暴露 prometheus——请绑定内网 IP，"
+                            + "或设置 SMARTLECT_ALLOW_WILDCARD_BIND=true 并确认安全组封住 18080-18108; ");
+        }
         if (StringTools.isEmpty(projectFolder) || projectFolder.contains("./data")) {
             log.warn("生产建议将 PROJECT_FOLDER 指向持久化磁盘目录，当前={}", projectFolder);
         }
@@ -115,5 +137,29 @@ public class ProductionSafetyValidator {
             throw new IllegalStateException("生产就绪校验失败: " + errors);
         }
         log.info("生产就绪校验通过");
+    }
+
+    private boolean wildcardBind() {
+        return StringTools.isEmpty(serverAddress)
+                || "0.0.0.0".equals(serverAddress)
+                || "::".equals(serverAddress)
+                || "[::]".equals(serverAddress);
+    }
+
+    private String displayAddress() {
+        return StringTools.isEmpty(serverAddress) ? "未设置（等价 0.0.0.0）" : serverAddress;
+    }
+
+    private boolean exposesPrometheus() {
+        if (StringTools.isEmpty(actuatorExposure)) {
+            return false;
+        }
+        for (String item : actuatorExposure.split(",")) {
+            String value = item.trim();
+            if ("*".equals(value) || "prometheus".equals(value)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

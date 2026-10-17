@@ -90,6 +90,36 @@ class ProductionSafetyValidatorTest {
         org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, validator::validate);
     }
 
+    @Test
+    void productionRejectsWildcardBindWhenActuatorExposesPrometheus() {
+        ProductionSafetyValidator validator = validator(true);
+        ReflectionTestUtils.setField(validator, "serverAddress", "0.0.0.0");
+
+        assertThrows(IllegalStateException.class, validator::validate);
+    }
+
+    @Test
+    void emptyBindAddressCountsAsWildcard() {
+        ProductionSafetyValidator validator = validator(true);
+        ReflectionTestUtils.setField(validator, "serverAddress", "");
+
+        assertThrows(IllegalStateException.class, validator::validate);
+    }
+
+    @Test
+    void wildcardBindIsAcceptedWhenExplicitlyAcknowledged() {
+        ProductionSafetyValidator validator = validator(true);
+        ReflectionTestUtils.setField(validator, "serverAddress", "0.0.0.0");
+        ReflectionTestUtils.setField(validator, "allowWildcardBind", true);
+
+        assertDoesNotThrow(validator::validate);
+    }
+
+    @Test
+    void loopbackBindWithPrometheusIsAllowed() {
+        assertDoesNotThrow(() -> validator(true).validate());
+    }
+
     private static ProductionSafetyValidator validator(boolean productionReady) {
         return validator(productionReady, new String[0]);
     }
@@ -109,6 +139,10 @@ class ProductionSafetyValidatorTest {
         ReflectionTestUtils.setField(validator, "flywayEnabled", true);
         ReflectionTestUtils.setField(validator, "flywayUsername", "smartlect_flyway");
         ReflectionTestUtils.setField(validator, "flywayPassword", "strong-flyway-password");
+        // 默认按本地/单机形态：只绑回环，actuator 暴露 prometheus 也不构成风险
+        ReflectionTestUtils.setField(validator, "serverAddress", "127.0.0.1");
+        ReflectionTestUtils.setField(validator, "actuatorExposure", "health,info,prometheus");
+        ReflectionTestUtils.setField(validator, "allowWildcardBind", false);
         return validator;
     }
 }

@@ -1,0 +1,17 @@
+# 门禁（2026-10-17 审计修复批）
+
+管理端端点 84 个，其中写接口 32 个；TrialAdminAccess 清单 33 拒 / 3 放行
+check_admin_authz: 通过
+
+  smartlect-admin          行覆盖  49.2%  (299/608)
+  smartlect-common         行覆盖  33.9%  (1186/3498)
+  smartlect-gateway        行覆盖  55.8%  (192/344)
+  smartlect-cart           行覆盖  19.9%  (55/277)
+  smartlect-coupon         行覆盖  27.0%  (352/1304)
+  smartlect-order          行覆盖  50.1%  (1833/3658)
+  smartlect-pay            行覆盖  40.5%  (162/400)
+  smartlect-product        行覆盖  40.8%  (797/1954)
+  smartlect-stock          行覆盖  43.0%  (104/242)
+  smartlect-user           行覆盖  27.5%  (464/1687)
+  汇总（10 模块）        行覆盖  39.0%  (5444/13972)
+coverage_gate: 通过，且较基线提升（37.2% → 39.0%）；确认后可用 --update 抬升基线

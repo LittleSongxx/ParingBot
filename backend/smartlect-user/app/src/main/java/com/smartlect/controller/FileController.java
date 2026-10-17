@@ -85,17 +85,8 @@ public class FileController extends ABaseController{
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (StringTools.isEmpty(ip) || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
-        }
-        if (StringTools.isEmpty(ip) || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
+        // 与登录锁定/限流共用同一套信任模型：XFF 第一段可伪造，取最后一跳（IpUtils）
+        return com.smartlect.utils.IpUtils.resolveClientIp(request);
     }
 
     private static String resolveImageContentType(String suffix) {

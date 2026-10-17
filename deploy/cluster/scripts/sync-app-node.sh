@@ -57,6 +57,8 @@ path, ip, services = sys.argv[1], sys.argv[2], sys.argv[3]
 overrides = {
     'SMARTLECT_APP_SERVICES': services,
     'SMARTLECT_APP_BIND_ADDRESS': '0.0.0.0',
+    # 同 node1：显式确认通配绑定，应用端口的安全边界由安全组承担
+    'SMARTLECT_ALLOW_WILDCARD_BIND': 'true',
     'SMARTLECT_APP_REGISTER_IP': ip,
     'SMARTLECT_PROJECT_FOLDER': '/opt/smartlect/run/uploads/',
     # 执行器地址必须是副本节点在内网的真实 IP：调度中心容器跑在 node1，

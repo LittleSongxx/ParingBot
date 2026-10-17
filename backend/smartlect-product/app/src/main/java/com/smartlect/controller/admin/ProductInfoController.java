@@ -1,5 +1,7 @@
 package com.smartlect.controller.admin;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.smartlect.constants.AdminPermissions;
 import com.smartlect.annotation.AdminSensitiveConfirm;
 import com.smartlect.catalog.IsolatedCatalog;
 import com.smartlect.entity.dto.ProductSaveDTO;
@@ -36,12 +38,14 @@ public class ProductInfoController extends com.smartlect.controller.admin.ABaseC
 	}
 
 	@PostMapping("/addProduct")
+	@SaCheckPermission(value = AdminPermissions.PRODUCT_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
 	public ResponseVO addProduct(@RequestBody @Validated(Create.class) ProductSaveDTO productSaveDTO) {
 		productInfoService.saveProduct(productSaveDTO);
 		return getSuccessResponseVO(productSaveDTO.getProductInfo().getProductId());
 	}
 
 	@PostMapping("/updateProduct")
+	@SaCheckPermission(value = AdminPermissions.PRODUCT_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
 	@AdminSensitiveConfirm
 	public ResponseVO updateProduct(@RequestBody @Validated(Update.class) ProductSaveDTO productSaveDTO) {
 		productInfoService.saveProduct(productSaveDTO);
@@ -74,6 +78,7 @@ public class ProductInfoController extends com.smartlect.controller.admin.ABaseC
 	}
 
 	@PostMapping("/updateSkuStock")
+	@SaCheckPermission(value = AdminPermissions.PRODUCT_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
 	@AdminSensitiveConfirm
 	public ResponseVO updateSkuStock(@NotEmpty String productId, @NotEmpty String propertyValueIdHash, @NotNull Integer changeStock) {
 		productSkuService.updateStock(productId, propertyValueIdHash, changeStock);
@@ -81,6 +86,7 @@ public class ProductInfoController extends com.smartlect.controller.admin.ABaseC
 	}
 
 	@PostMapping("/updateProductStatus")
+	@SaCheckPermission(value = AdminPermissions.PRODUCT_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
 	@AdminSensitiveConfirm
 	public ResponseVO updateProductStatus(@NotNull String productId, @NotNull Integer status) {
 		productInfoService.updateProductStatus(productId,status);
@@ -88,6 +94,7 @@ public class ProductInfoController extends com.smartlect.controller.admin.ABaseC
 	}
 
 	@PostMapping("/deleteProduct")
+	@SaCheckPermission(value = AdminPermissions.PRODUCT_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
 	@AdminSensitiveConfirm
 	public ResponseVO deleteProduct(@NotNull String productId) {
 		productInfoService.deleteProduct(productId);
@@ -95,6 +102,7 @@ public class ProductInfoController extends com.smartlect.controller.admin.ABaseC
 	}
 
 	@PostMapping("/commendProduct")
+	@SaCheckPermission(value = AdminPermissions.PRODUCT_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
 	public ResponseVO commendProduct(@NotNull String productId, @NotNull Integer commendType) {
 		productInfoService.commendProduct(productId,commendType);
 		return getSuccessResponseVO(null);

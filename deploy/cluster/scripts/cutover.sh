@@ -52,6 +52,9 @@ updates = {
     "SPRING_DATA_REDIS_SENTINEL_MASTER": "mymaster",
     "SPRING_DATA_REDIS_SENTINEL_NODES": f"{n1}:26379,{n2}:26379,{n3}:26379",
     "SMARTLECT_APP_BIND_ADDRESS": "0.0.0.0",
+    # 集群必须绑通配（跨节点 Dubbo + nginx 上游）；这行是对启动守卫的显式确认：
+    # 18080-18108 只在内网可达的责任在安全组，见 deploy/cluster/README.md「安全组」。
+    "SMARTLECT_ALLOW_WILDCARD_BIND": "true",
     "SMARTLECT_APP_REGISTER_IP": n1,
     "SMARTLECT_PROJECT_FOLDER": "/opt/smartlect/run/uploads/",
     # assistant 仍单实例在 node1，但网关副本跑在三个节点上：base-url 必须指向 node1 的

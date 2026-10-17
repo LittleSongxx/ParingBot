@@ -89,10 +89,12 @@ app:
 
 mq:
   compensation:
-    # 必须显式关掉：MqCompensationAutoReplayTask 的开关是 matchIfMissing = true，
-    # 只要上面的 common-scheduling 打开它就会一起注册。而 mq_compensation_log 表只在
-    # order/admin/product/search 库里有，本库没有，任务每分钟会查一张不存在的表并打 error。
-    auto-replay-enabled: false
+    # V3 已建 mq_compensation_log；退款还券的消费失败会落库，由本任务每分钟重放。
+    # 开关语义（与源码一致）：@ConditionalOnProperty 只认显式 true，没有 matchIfMissing。
+    auto-replay-enabled: true
+    # 打开消费失败（exchange=mq.consume）的自动重放：退款还券是 USED→NOUSE 幂等条件更新，
+    # 重复重放不会造成二次返还。其它域保持默认 false，消费失败交给人工判断。
+    auto-replay-consume: true
 
 smartlect:
   rocketmq:

@@ -1,6 +1,8 @@
 package com.smartlect.controller.admin;
 
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.smartlect.constants.AdminPermissions;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.utils.FileUtils;
 import com.smartlect.utils.StringTools;
@@ -30,6 +32,7 @@ public class FileController extends com.smartlect.controller.admin.ABaseControll
     private FileUtils fileUtils;
 
     @PostMapping("/uploadImage")
+    @SaCheckPermission(value = AdminPermissions.PRODUCT_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
     public ResponseVO uploadImage(@NotNull MultipartFile file, Boolean createThumbnail) {
         String filePath = fileUtils.uploadImage(file, createThumbnail);
         return getSuccessResponseVO(filePath);

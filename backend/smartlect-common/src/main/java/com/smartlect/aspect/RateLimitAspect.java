@@ -13,6 +13,7 @@ import com.smartlect.exception.BusinessException;
 import com.smartlect.exception.HttpBusinessException;
 // 导入字符串工具类，用于空值判断
 import com.smartlect.utils.AuthCookieHelper;
+import com.smartlect.utils.IpUtils;
 import com.smartlect.utils.StringTools;
 // 导入 Jakarta 资源注入注解，替代 Spring 的 @Autowired
 import jakarta.annotation.Resource;
@@ -112,29 +113,8 @@ public class RateLimitAspect {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        // 1. 优先获取 X-Forwarded-For（多个代理时，第一个为真实 IP）
-        String ip = request.getHeader("X-Forwarded-For");
-        // 如果为空或为 unknown，尝试下一个请求头
-        if (StringTools.isEmpty(ip) || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("Proxy-Client-IP");
-        }
-        // 继续尝试 WL-Proxy-Client-IP（WebLogic 代理）
-        if (StringTools.isEmpty(ip) || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("WL-Proxy-Client-IP");
-        }
-        // 继续尝试 X-Real-IP（Nginx 等反向代理常用）
-        if (StringTools.isEmpty(ip) || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
-        }
-        // 最后使用 RemoteAddr（直接连接时的客户端 IP）
-        if (StringTools.isEmpty(ip) || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        // 如果 X-Forwarded-For 包含多个 IP（通过多个代理），取第一个
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        // 返回最终的客户端 IP
-        return ip;
+        // 统一走 IpUtils：XFF 第一段由客户端控制，取它等于把限流键交给攻击者；
+        // 先信 X-Real-IP，再取 XFF 最后一跳，并做格式校验（2026-10-16 审计的信任模型）。
+        return IpUtils.resolveClientIp(request);
     }
 }

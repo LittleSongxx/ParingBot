@@ -124,6 +124,9 @@ public class OrderPaymentService {
         }
         if (orderInfoList.stream().allMatch(o -> OrderFacts.isPaidOrBeyond(o.getOrderStatus()))) {
             log.info("paySuccess 幂等跳过 payOrderId={}", payOrderId);
+            // 券核销是事务外远程写：上次可能已翻单成功、核销失败。重投会命中这个早退分支，
+            // 若不在这里补一次，券会永久停在 CANT（退款也不还 CANT）。见 useCouponIfNeeded。
+            convergeCouponAfterPaid(orderInfoList);
             return;
         }
         if (orderInfoList.stream().anyMatch(o -> OrderFacts.isClosedOrCancelled(o.getOrderStatus()))) {
@@ -231,6 +234,8 @@ public class OrderPaymentService {
         String payOrderId = payOrderNotifyDTO.getPayOrderId();
         if (orderInfoList.stream().allMatch(o -> OrderStatusEnum.COMPLETED.getStatus().equals(o.getOrderStatus()))) {
             log.info("couponRush paySuccess 幂等跳过 payOrderId={}", payOrderId);
+            // 同普通路径：券激活在事务外，失败后重投只能走到这里，需幂等补一次激活
+            convergeCouponAfterPaid(orderInfoList);
             return;
         }
         if (orderInfoList.stream().anyMatch(o -> OrderFacts.isClosedOrCancelled(o.getOrderStatus()))) {
@@ -283,6 +288,8 @@ public class OrderPaymentService {
         if (latest.stream().allMatch(o -> OrderFacts.isPaidOrBeyond(o.getOrderStatus())
                 || OrderStatusEnum.COMPLETED.getStatus().equals(o.getOrderStatus()))) {
             log.info("paySuccess 幂等跳过 payOrderId={}", payOrderId);
+            // updatedCount==0 的竞争路径同样可能停在"已支付但券未收口"，这里一并补
+            convergeCouponAfterPaid(latest);
             return;
         }
         if (latest.stream().anyMatch(o -> OrderFacts.isClosedOrCancelled(o.getOrderStatus()))) {
@@ -319,6 +326,42 @@ public class OrderPaymentService {
         } catch (Exception e) {
             payOrderRedisComponent.clearLatePaymentRefundMark(payOrderId);
             throw new BusinessException("关单后支付退款失败：" + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 支付已推进、但事务外券动作可能没走完时的幂等收敛。
+     *
+     * <p>普通单：CANT→USED 核销；秒杀单：CANT→NOUSE 激活。两者都是事务外远程写，
+     * 首次失败后支付事件重投会命中"已支付/已完成"早退分支——没有这里，券会永久停在 CANT
+     * （CANT 既不在"我的券"里展示，退款还券也会跳过它）。</p>
+     *
+     * <p>排除 REFUNDED：全额退款已把券还成 NOUSE，再核销会永久重抛。</p>
+     */
+    private void convergeCouponAfterPaid(List<OrderInfo> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return;
+        }
+        List<OrderInfo> normal = new ArrayList<>();
+        List<OrderInfo> rush = new ArrayList<>();
+        for (OrderInfo order : orders) {
+            if (OrderFacts.isCouponRushOrder(order)) {
+                rush.add(order);
+            } else if (!OrderStatusEnum.REFUNDED.getStatus().equals(order.getOrderStatus())) {
+                normal.add(order);
+            }
+        }
+        useCouponIfNeeded(normal);
+        for (OrderInfo order : rush) {
+            if (!OrderStatusEnum.COMPLETED.getStatus().equals(order.getOrderStatus())) {
+                continue;
+            }
+            OrderCouponRelQuery relQuery = new OrderCouponRelQuery();
+            relQuery.setOrderId(order.getOrderId());
+            for (OrderCouponRel rel : orderCouponRelMapper.selectList(relQuery)) {
+                // activateUserCoupon 内部吞掉业务异常，重复调用是空操作
+                couponRushOrderService.activateUserCoupon(order.getUserId(), rel.getUserCouponId());
+            }
         }
     }
 

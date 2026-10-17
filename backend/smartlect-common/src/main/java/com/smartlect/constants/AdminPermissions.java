@@ -15,6 +15,10 @@ public final class AdminPermissions {
     public static final String PRODUCT_MANAGE = "product:manage";
     public static final String COUPON_MANAGE = "coupon:manage";
     public static final String USER_MANAGE_READ = "user:manage-read";
+    // 写侧补齐：user:manage-read 是只读，不能拿来保护禁用用户/删地址等写操作
+    public static final String USER_MANAGE = "user:manage";
+    public static final String SETTINGS_MANAGE = "settings:manage";
+    public static final String MODERATION_MANAGE = "moderation:manage";
 
     public static final String SUPER_ADMIN_ROLE = "SUPER_ADMIN";
     public static final String TRIAL_OPERATOR_ROLE = "TRIAL_OPERATOR";

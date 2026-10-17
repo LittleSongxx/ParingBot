@@ -1,5 +1,7 @@
 package com.smartlect.controller.admin;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.smartlect.constants.AdminPermissions;
 import com.smartlect.api.dto.OrderStatusDTO;
 import com.smartlect.api.enums.OrderStatusEnum;
 import com.smartlect.entity.enums.PageSize;
@@ -69,6 +71,7 @@ public class OrderController extends com.smartlect.controller.admin.ABaseControl
 
     // 发货
     @PostMapping("/delivery")
+    @SaCheckPermission(value = AdminPermissions.ORDER_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
     public ResponseVO delivery(OrderLogisticsInfo orderLogisticsInfo){
         orderLogisticsInfoService.delivery(orderLogisticsInfo);
         return getSuccessResponseVO(null);

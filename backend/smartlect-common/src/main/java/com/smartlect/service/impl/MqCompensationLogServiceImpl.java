@@ -138,6 +138,11 @@ public class MqCompensationLogServiceImpl implements MqCompensationLogService {
 
     @Override
     public int autoReplayPendingSendFailures(int batchSize, int maxRetryCount) {
+        return autoReplayPendingSendFailures(batchSize, maxRetryCount, false);
+    }
+
+    @Override
+    public int autoReplayPendingSendFailures(int batchSize, int maxRetryCount, boolean includeConsumeFailures) {
         if (batchSize <= 0) {
             batchSize = 10;
         }
@@ -154,7 +159,8 @@ public class MqCompensationLogServiceImpl implements MqCompensationLogService {
             if (replayed >= batchSize) {
                 break;
             }
-            if (MqConsumeReplayRouter.isConsumeFailure(row.getExchange())) {
+            boolean consumeFailure = MqConsumeReplayRouter.isConsumeFailure(row.getExchange());
+            if (consumeFailure && !includeConsumeFailures) {
                 continue;
             }
             int retry = row.getRetryCount() == null ? 0 : row.getRetryCount();
@@ -162,7 +168,9 @@ public class MqCompensationLogServiceImpl implements MqCompensationLogService {
                 continue;
             }
             try {
-                if (InternalApiHeaders.REMOTE_COMPENSATE_EXCHANGE.equals(row.getExchange())) {
+                if (consumeFailure) {
+                    replayConsumeFailure(row);
+                } else if (InternalApiHeaders.REMOTE_COMPENSATE_EXCHANGE.equals(row.getExchange())) {
                     replayRemoteCompensate(row);
                 } else {
                     replaySendFailure(row);

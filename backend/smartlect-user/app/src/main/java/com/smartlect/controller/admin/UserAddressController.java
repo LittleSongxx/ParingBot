@@ -1,5 +1,7 @@
 package com.smartlect.controller.admin;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.smartlect.constants.AdminPermissions;
 import com.smartlect.entity.query.UserAddressQuery;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.biz.UserAddressService;
@@ -28,6 +30,7 @@ public class UserAddressController extends com.smartlect.controller.admin.ABaseC
 	}
 
 	@PostMapping("/deleteUserAddressByAddressId")
+	@SaCheckPermission(value = AdminPermissions.USER_MANAGE, orRole = "SUPER_ADMIN", type = "admin")
 	public ResponseVO deleteUserAddressByAddressId(String addressId) {
 		userAddressService.deleteUserAddressByAddressId(addressId);
 		return getSuccessResponseVO(null);

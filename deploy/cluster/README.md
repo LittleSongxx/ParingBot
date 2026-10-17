@@ -28,6 +28,24 @@ IP/端口集中定义在 [nodes.env](nodes.env)，脚本都从这里取，不再
 （Redis 密码、Nacos token/identity、MySQL 密码），只新增 erlang cookie 一项。
 含密码的 `sentinel.conf` 也是构建期现场生成。仓库里没有任何凭据。
 
+## 安全组（应用端口不对公网）
+
+集群形态下应用绑 `0.0.0.0`——跨节点 Dubbo 与 nginx 上游需要它，这是有意为之，
+所以**应用端口的安全边界是安全组，不是应用配置**：
+
+- 公网只放行 **80/443**（nginx）与运维入口（22）。
+- **18080-18108 只对节点内网放行**（18080 网关、18101-18108 各服务、18180/18181 前端）。
+  任何一条放行到 `0.0.0.0/0` 的规则，都等于把 `/actuator/prometheus`（JVM/连接池/线程池指标）
+  和绕过 nginx 的业务接口直接暴露给外网。
+- 生产就绪模式（`SMARTLECT_PRODUCTION_READY=true` 或 prod profile）下，
+  `ProductionSafetyValidator` 会拒绝"通配绑定 + actuator 暴露 prometheus"的组合。
+  两个集群脚本已显式写入 `SMARTLECT_ALLOW_WILDCARD_BIND=true`，表示这条风险由安全组承担。
+- 核对（从公网执行，应超时或被拒绝）：
+
+  ```bash
+  curl -m 3 http://<公网IP>:18081/actuator/health
+  ```
+
 ## 执行顺序（全部在 node1）
 
 ```bash
