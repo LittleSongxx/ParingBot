@@ -1,0 +1,20 @@
+# node1 rocketmq-namesrv OOM（2026-10-18 部署期）
+
+docker inspect rocketmq-namesrv:
+  restarts=13
+  memory=402653184 (384 MiB before fix)
+  started=2026-10-17T16:43:52Z
+
+dmesg:
+  2026-10-18 00:43:04 Memory cgroup out of memory:
+  Killed process 1002666 (java), memcg docker-35e894f98b06..., task=java, anon-rss=369696kB
+  （该 memcg 对应 rocketmq-namesrv）
+
+影响：
+  第二次 CI 部署 run 39049599672 在启动 order 时等待 9876 超时；
+  node1 应用单元启动失败，站点短暂 502，手动修复 namesrv 内存后恢复。
+
+处置：
+  docker update --memory 805306368 --memory-swap 805306368 rocketmq-namesrv
+  deploy/compose.yaml: mem_limit 384m→768m，JAVA_OPT_EXT Xmx256m→384m
+  运行态 memory=805306368，namesrv 9876 端口可用；复测期间重启计数未再增加。

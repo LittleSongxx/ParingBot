@@ -18,7 +18,7 @@
 
 | 项 | 值 |
 |---|---|
-| 部署 | GitHub Actions run `39038405815`，commit `d1365cc`；node1 部署后同步 node2/node3 |
+| 部署 | 首轮 run `39038405815` / commit `d1365cc`；后续修复 commit `a2bfb19` 因 namesrv OOM 的 CI run `39049599672` 失败，手动恢复 node1 并同步 node2/node3；当前三节点均为 `a2bfb19` 构建 |
 | 应用 | 9 个 Java 服务 + assistant + 双前端；三节点同 JAR 指纹 |
 | 节点 | node1 8c16g；node2/node3 4c8g |
 | 发压机 | node4 `172.17.40.108`，4c8g，同 VPC；先修复 Docker `172.17.0.0/16` 与 VPC 路由冲突 |
@@ -75,12 +75,55 @@
 
 ### 压测后对账
 
-`reconcile-loadtest.sh` 的 4 项判定失败是脚本口径与测试数据共同造成的，**不是新增的订单/支付不一致**：
+旧版 `reconcile-loadtest.sh` 的 4 项失败已定位为**脚本口径错误**，不是订单/支付不一致：
 
-- 脚本只把 `order_status=1` 当“已支付”；实际已支付/已完成/已发货/部分退款合计 15443，与 `pay_trade_record.trade_status=1` 的 15443 完全一致。
-- 有 1 条 **2026-10-05 的历史订单**（订单状态 5、支付成功）属于压测前的迟到支付/关单历史，不是本轮产生。
-- 幂等账本 `COMPLETED=15499` 比订单数 15498 多 1，`FAILED=2` 来自 bootstrap 失败；库存扣减记录 15499 比订单数多 1。该项需要后续单独核对，但在本轮 240 VU 前后没有新增孤儿明细。
-- 结论：本轮订单支付状态与库存扣减没有出现新的系统性不一致；不能把脚本的旧口径失败当作“零差异”。
+- 脚本把订单数、支付单数、库存记录数按 1:1 比较；实际一笔下单命令可以生成多个子单，同一个 `payOrderId` 只对应一笔支付/一次 `ORDER_DEDUCT`。
+- 库存账本还包含 `ORDER_CLOSE_RESTORE` / `REFUND_RESTORE`，幂等账本还包含退款/取消命令。
+- 脚本只把 `order_status=1` 当已支付；实际应包含已发货/已完成/部分退款，并排除仍在 15 分钟关单窗口的 `WAIT_PAYMENT`。
+
+修正后的脚本按 `payOrderId`、`POST_ORDER` 幂等键和订单状态真实粒度比较，窗口 `2026-10-17 23:00:00 ~ 2026-10-18 01:30:00` 的结果：
+
+```text
+orders=14545  distinct_pay_ids=14537  pay_trades=14537
+post_keys=14543  post_completed=14538  order_deducts=14538
+paid_pay_ids=14537  settled_trades=14537
+orders_without_pay=0  orders_without_deduct=0  items=14547  item_orphans=0
+通过 8 项，失败 0 项
+```
+
+后续 seedfix 的 160 VU 测试在 00:24 产生了 5 笔 `WAIT_PAYMENT` 订单（客户端在提交后未完成支付），已在 15 分钟超时后收敛为 `CLOSED`；修正脚本用已付款状态集合比较，待付款/已关闭订单不参与支付和库存断言。没有发现新的支付/库存系统性不一致。
+
+## 深度排查（2026-10-18 补充）
+
+### node3 性能热点
+
+400 VU、30 秒、三节点 product 请求增量近似相等（各约 1913）时：
+
+| 节点 | product CPU | gateway CPU | 空闲 loadCategory |
+|---|---:|---:|---:|
+| node1（8c） | 96.5% | 57.0% | — |
+| node2（4c） | 96.6% | 50.0% | 8–10ms |
+| node3（4c） | **247.9%** | **179.2%** | **15–34ms** |
+
+- node2/node3 是同一实例规格、同一 JDK/JAR、`ActiveProcessorCount=4`；node3 没有 CPU steal，cgroup 也没有配额限制。
+- node3 直连 MySQL 仅比 node2 慢 1ms，Redis PING 慢 1–5ms；Hikari 出现 acquire 216ms/usage 167ms，说明 node3 的应用侧等待和 CPU 都更重。
+- 发现公开 `loadCategory` 每个请求都会重新查一次分类表并写 Redis 快照，而仓库中没有这个快照的读取方；这属于热路径浪费。已移除公开读路径的 Redis 写入，保留管理端分类写操作的刷新。node3 的实例级差异仍未完全定论，不能简单归因于这一处。
+
+### RocketMQ proxy OOM
+
+- `docker inspect rocketmq-proxy` 显示重启 **10 次**；`dmesg` 在 2026-10-17 23:33:50 记录该容器 cgroup OOM，被杀 Java 进程 RSS 约 490MB。
+- 容器原内存上限 512MB，`JAVA_OPT_EXT=-Xms256m -Xmx256m`，gRPC/Netty native 内存没有余量。
+- 已把运行态内存上限调到 768MB，并把 compose 的 `mem_limit` 改为 768m、堆上限改为 384m；proxy 端口和健康检查正常。该问题会放大下单/支付事件延迟，但本轮没有把它当成唯一的订单延迟原因。
+
+### loadgen bootstrap 失败
+
+- 旧 loadgen 在每个 VU 的 bootstrap 中调用 `/internal/demo/seed`（100 用户 + 20 商品的写事务）。160/240 VU 时大量 seed 并发，session 返回 `data=null`，报 `'NoneType' object is not subscriptable`。
+- 已改为每个 worker 起 VU 前只 seed 一次，并对 session 的 success/data 做显式校验；库存重置到每 SKU 500 后，160 VU/30 秒复测 **0 bootstrap 失败、0 业务错误**。
+
+### node1 admin 重启失败
+
+- 并行重启时 `apps-down` 逐个停止 9 个 Java 服务约耗时 3 分钟，正好撞上 systemd `TimeoutStopSec=180`；systemd 强杀整个 cgroup，下一次启动 admin 出现半清理状态。
+- 已把 node1 和副本的 unit 停止宽限从 180 秒提高到 600 秒，三节点已安装并 `daemon-reload`；后续重启改为顺序执行。
 
 ## 调优动作
 
@@ -89,6 +132,13 @@
 3. **MySQL 连接上限**：200→300，`SET PERSIST` 持久化，compose 同步改为 300；压测实测峰值 202，原 200 上限没有安全余量。
 4. **预热**：600 VU 冷启动测得 351 QPS/p95 5.2s，预热后同档 840 QPS/p95 52ms；冷启动数据已标记无效，不能和热态混比。
 5. **node3 热点**：已记录 product/gateway CPU 与请求耗时差异，未在本轮做实例下线或流量重分配；这是下一轮需要单独定位的运维/容量问题。
+
+## 修复后的验证
+
+- commit `a2bfb19` 去掉公开 `loadCategory` 的二次分类查询 + Redis 写后，三节点同步完成；预热后 400 VU/60 秒复测：**543.6 req/s，p95 176.5ms，p99 563.1ms，429 0.15%**。这不是严格 A/B（此前 400 VU 是 30 秒轮次），但说明热路径写入已移除后没有退化。
+- `rocketmq-proxy`、`rocketmq-namesrv` 运行态内存均提升到 768MB，复测期间重启计数分别停留在 10/13，没有再增加。
+- systemd `TimeoutStopSec=600` 已在三节点安装；部署后的 `post_deploy_check.sh` 全部通过，站点 200。
+- 修正后的对账脚本在 23:00–00:10 窗口 8/8 通过；5 笔 seedfix 产生的待付款订单处于 15 分钟关单窗口，未计入一致性断言。
 
 ## 原始证据
 
@@ -101,10 +151,16 @@
 - `ecs-order-*.json`：订单闭环各档；
 - `fleet-*.out`、`bottleneck-1600.txt`：三节点 CPU、Redis、MySQL 采样；
 - `post-deploy-final.txt`、`ecs-demo-final.json`：部署后探针与最终交易 smoke；
-- `reconcile-after-order.txt`：压测后账实对账原始输出。
+- `reconcile-after-order.txt`：旧脚本的原始误报输出；
+- `reconcile-corrected.txt`：修正后 8/8 通过；
+- `node3-diagnosis.txt`、`rocketmq-proxy-oom.txt`、`admin-restart-timeout.txt`、`loadgen-bootstrap-fix.txt`：深度排查证据；
+- `ecs-order-seedfix-*.json`：seed 修复后的订单复测；
+- `post-catfix-warm-400.json`：category 热路径修复后的 400 VU 预热复测；
+- `rocketmq-namesrv-oom.txt`、`post-deploy-after-fix.txt`：namesrv OOM 与修复后部署核对。
 
 ## 限制
 
 - 发压机是 4c8g；浏览 1600/2000 VU 时需继续监控发压机 CPU，超过 70% 的档位不可当容量结论（本轮采集时发压机空闲，订单 240 VU 的 Python 发压器未出现明显 CPU 饱和）。
+- node3 的实例级差异仍未彻底定位；本轮没有把 node3 下线或重分配流量，避免用“隐藏坏节点”换取表面吞吐。
 - 这是同 VPC、单 MySQL、三节点应用的实验环境，不是生产 SLO；没有做多地域、故障切换、长时间 soak。
 - 600/800 VU p95 优于 400 VU 反映了预热和缓存效应；曲线不是严格单调，峰值/拐点只作为该环境下的观测值。

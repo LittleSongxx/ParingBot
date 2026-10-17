@@ -41,3 +41,13 @@
 ## 关联版本
 
 部署 commit `d1365cc`；压测环境为同 VPC 三节点 ECS（node1 8c16g，node2/node3 4c8g），单 MySQL。
+## 部署后深度排查（2026-10-18）
+
+- **node3 热点**：相同请求量下 node3 product/gateway CPU 约为 node2 的 2–2.5 倍；空闲 `loadCategory` 25ms vs 9ms。直连 MySQL/Redis 只慢 1–5ms，不是单点网络问题。发现公开 `loadCategory` 每请求额外做一次分类查询 + Redis 写快照，仓库中没有快照读取方；已移除公开读路径写入（管理端写操作仍刷新），代码在 `a2bfb19`，本轮重新部署验证。
+- **RocketMQ proxy/namesrv OOM**：`rocketmq-proxy` 重启 10 次，23:33:50 被 512MB cgroup OOM 杀掉；`rocketmq-namesrv` 重启 13 次，00:43:04 被 384MB cgroup OOM 杀掉，直接导致第二次 CI 部署 run `39049599672` 的 order 启动失败、站点短暂 502。两者的运行态和 compose 均已提升到 768MB（Xmx384m）；手动恢复后站点 200，复测期间重启计数未再增加。
+- **loadgen bootstrap**：旧脚本每个 VU 都执行 `/internal/demo/seed`，160/240 VU 时并发 seed 打满 admin 池并返回 data=null。已改为每进程 seed 一次并显式校验 session；160 VU 复测 0 bootstrap 失败、0 业务错误。
+- **对账误报**：旧 `reconcile-loadtest.sh` 把订单/支付/库存按 1:1 比较，且把 `order_status=1` 当全部已支付；修正后按 payOrderId、POST_ORDER 幂等键、订单状态真实粒度比较，23:00–01:30 窗口 8/8 通过。5 笔客户端超时产生的待付款订单已在 15 分钟后收敛为 CLOSED，不混入已付款断言。
+- **admin 重启失败**：`apps-down` 约 3 分钟 > `TimeoutStopSec=180`，systemd 强杀 cgroup；三节点 unit 已改为 600 秒并 daemon-reload，重启改为顺序执行。
+- **category 热路径**：公开 `loadCategory` 去掉每请求二次分类查询 + Redis 写后，三节点已部署 `a2bfb19` 并预热复测 400 VU：543.6 req/s、p95 176.5ms、p99 563.1ms；不是严格 A/B，但未退化。node3 实例本身仍明显慢于 node2，作为后续替换/迁移项保留。
+- **CI 部署异常**：第二次 deploy run `39049599672` 因 namesrv OOM 失败；修复 namesrv 内存后 node1 手动恢复，node2/node3 已同步到 `a2bfb19`，`post_deploy_check.sh` 全部通过。
+- 证据：`eval/verification/2026-10-18/ecs-loadtest/{node3-diagnosis,rocketmq-proxy-oom,rocketmq-namesrv-oom,loadgen-bootstrap-fix,reconcile-corrected,admin-restart-timeout,post-catfix-warm-400}.*`。

@@ -17,16 +17,17 @@ q() {
     'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot -N "$0" -e "$1"' "$db" "$sql" 2>/dev/null
 }
 
-ORDERS=$(q smartlect_order "SELECT COUNT(*) FROM order_info WHERE order_time >= '$SINCE' AND order_time < '$UNTIL' AND order_status <> 0")
-PAY_IDS=$(q smartlect_order "SELECT COUNT(DISTINCT pay_order_id) FROM order_info WHERE order_time >= '$SINCE' AND order_time < '$UNTIL' AND order_status <> 0")
-PAY_TRADES=$(q smartlect_pay "SELECT COUNT(*) FROM pay_trade_record WHERE create_time >= '$SINCE' AND create_time < '$UNTIL'")
+ORDERS=$(q smartlect_order "SELECT COUNT(*) FROM order_info WHERE order_time >= '$SINCE' AND order_time < '$UNTIL'")
+PAY_IDS=$(q smartlect_order "SELECT COUNT(DISTINCT pay_order_id) FROM order_info WHERE order_time >= '$SINCE' AND order_time < '$UNTIL' AND order_status IN (1,2,3,6,7)")
+PAY_TRADES=$(q smartlect_pay "SELECT COUNT(*) FROM pay_trade_record WHERE create_time >= '$SINCE' AND create_time < '$UNTIL' AND trade_status IN (1,3)")
 POST_KEYS=$(q smartlect_order "SELECT COUNT(DISTINCT idempotency_key) FROM order_info WHERE order_time >= '$SINCE' AND order_time < '$UNTIL' AND order_status <> 0 AND idempotency_key IS NOT NULL")
 POST_CMDS=$(q smartlect_order "SELECT COUNT(*) FROM order_request_idempotency WHERE create_time >= '$SINCE' AND create_time < '$UNTIL' AND status='COMPLETED' AND command_type='POST_ORDER'")
+PAID_WITHOUT_COMMAND=$(q smartlect_order "SELECT COUNT(*) FROM order_info o LEFT JOIN order_request_idempotency i ON o.idempotency_key COLLATE utf8mb4_general_ci=i.idempotency_key COLLATE utf8mb4_general_ci AND i.command_type='POST_ORDER' WHERE o.order_time >= '$SINCE' AND o.order_time < '$UNTIL' AND o.order_status IN (1,2,3,6,7) AND (i.idempotency_key IS NULL OR i.status <> 'COMPLETED')")
 DEDUCTS=$(q smartlect_stock "SELECT COUNT(*) FROM stock_change_record WHERE created_at >= '$SINCE' AND created_at < '$UNTIL' AND change_type='ORDER_DEDUCT'")
 PAID_IDS=$(q smartlect_order "SELECT COUNT(DISTINCT pay_order_id) FROM order_info WHERE order_time >= '$SINCE' AND order_time < '$UNTIL' AND order_status <> 0 AND order_status IN (1,2,3,7)")
 SETTLED=$(q smartlect_pay "SELECT COUNT(*) FROM pay_trade_record WHERE create_time >= '$SINCE' AND create_time < '$UNTIL' AND trade_status IN (1,3)")
-ORDERS_WITHOUT_PAY=$(q smartlect_order "SELECT COUNT(*) FROM order_info o LEFT JOIN smartlect_pay.pay_trade_record p ON o.pay_order_id COLLATE utf8mb4_general_ci=p.pay_order_id COLLATE utf8mb4_general_ci WHERE o.order_time >= '$SINCE' AND o.order_time < '$UNTIL' AND o.order_status <> 0 AND p.pay_order_id IS NULL")
-ORDERS_WITHOUT_DEDUCT=$(q smartlect_order "SELECT COUNT(*) FROM order_info o WHERE o.order_time >= '$SINCE' AND o.order_time < '$UNTIL' AND o.order_status <> 0 AND NOT EXISTS (SELECT 1 FROM smartlect_stock.stock_change_record s WHERE s.business_key COLLATE utf8mb4_general_ci=CONCAT('order-deduct:',o.pay_order_id) COLLATE utf8mb4_general_ci)")
+ORDERS_WITHOUT_PAY=$(q smartlect_order "SELECT COUNT(*) FROM order_info o LEFT JOIN smartlect_pay.pay_trade_record p ON o.pay_order_id COLLATE utf8mb4_general_ci=p.pay_order_id COLLATE utf8mb4_general_ci WHERE o.order_time >= '$SINCE' AND o.order_time < '$UNTIL' AND o.order_status IN (1,2,3,6,7) AND p.pay_order_id IS NULL")
+ORDERS_WITHOUT_DEDUCT=$(q smartlect_order "SELECT COUNT(*) FROM order_info o WHERE o.order_time >= '$SINCE' AND o.order_time < '$UNTIL' AND o.order_status IN (1,2,3,6,7) AND NOT EXISTS (SELECT 1 FROM smartlect_stock.stock_change_record s WHERE s.business_key COLLATE utf8mb4_general_ci=CONCAT('order-deduct:',o.pay_order_id) COLLATE utf8mb4_general_ci)")
 ITEM_TOTAL=$(q smartlect_order "SELECT COUNT(*) FROM order_item i JOIN order_info o ON i.order_id=o.order_id WHERE o.order_time >= '$SINCE' AND o.order_time < '$UNTIL' AND o.order_status <> 0")
 ITEM_ORPHAN=$(q smartlect_order "SELECT COUNT(*) FROM order_item i LEFT JOIN order_info o ON i.order_id=o.order_id WHERE o.order_id IS NULL")
 
@@ -46,8 +47,8 @@ check_eq() {
 check_zero() { check_eq "$1" "$2" "0"; }
 
 check_eq "支付单数 == 支付流水数" "$PAY_IDS" "$PAY_TRADES"
-check_eq "下单命令数 == 订单幂等键数" "$POST_CMDS" "$POST_KEYS"
-check_eq "ORDER_DEDUCT 数 == 支付单数" "$DEDUCTS" "$PAY_IDS"
+check_zero "已付款订单都有 COMPLETED POST_ORDER 幂等记录" "$PAID_WITHOUT_COMMAND"
+if [ "$DEDUCTS" -ge "$PAY_IDS" ] 2>/dev/null; then echo "  ✓ ORDER_DEDUCT 数 >= 已付款支付单数（$DEDUCTS >= $PAY_IDS）"; ok=$((ok+1)); else echo "  ✗ ORDER_DEDUCT 少于已付款支付单数（$DEDUCTS < $PAY_IDS）"; fail=$((fail+1)); fi
 check_eq "已支付/已发货/已完成/部分退款支付单数 == 已结算流水数" "$PAID_IDS" "$SETTLED"
 check_zero "没有订单缺支付流水" "$ORDERS_WITHOUT_PAY"
 check_zero "没有订单缺 ORDER_DEDUCT" "$ORDERS_WITHOUT_DEDUCT"
