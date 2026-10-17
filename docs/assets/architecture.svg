@@ -90,5 +90,5 @@
   <rect x="44" y="568" width="1132" height="72" rx="12" fill="#f8fafc" stroke="#e2e8f0"/>
   <text x="64" y="592" fill="#94a3b8" font-size="12.5" font-weight="700" letter-spacing="1">数据面：10 个中间件容器（docker compose）</text>
   <text x="64" y="614" fill="#334155" font-size="12">MySQL 8.4（每服务独立库 · binlog ROW）· Redis 7.4 · RocketMQ 5.3（三件套 · 任意精度定时消息）· Nacos 2.5</text>
-  <text x="64" y="632" fill="#334155" font-size="12">ES 8.19 + IK · Qdrant 1.15 · Canal 1.1.8（binlog → MQ → 商品索引与缓存失效）· xxl-job 2.5（9 个任务）</text>
+  <text x="64" y="632" fill="#334155" font-size="12">ES 8.19 + IK · Qdrant 1.15 · Canal 1.1.8（binlog → MQ → 商品索引与缓存失效）· xxl-job 2.5（16 个任务）</text>
 </svg>

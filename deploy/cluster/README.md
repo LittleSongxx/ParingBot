@@ -22,11 +22,17 @@ IP/端口集中定义在 [nodes.env](nodes.env)，脚本都从这里取，不再
 | RocketMQ | DLedger 三副本（Raft 自动选主） | 每节点 broker+namesrv+proxy（host 网络）；5.x 任意精度定时消息经 gRPC proxy；Topic/订阅组 autoCreate 重建，Outbox 补投未决消息，单机数据卷不动 |
 | Redis | 1 主（node1）+ 2 副本 + 3 Sentinel | host 网络；`replica-announce-ip` 必填（否则 sentinel 记错地址）；主库补 `masterauth` 以支持降级后再认证 |
 | Nacos | 3 节点 Raft | host 网络 8848/9848/7848；三成员**共用 node1 MySQL 的 `smartlect_nacos` 库**，所以从 standalone 切过来零数据迁移 |
-| MySQL | 仍单机（node1） | 只增加内网绑定 172.21.131.151:13306 供 node2/3 访问；主从/切换不在本次范围 |
+| MySQL | 仍单机（node1） | 端口绑定由 `SMARTLECT_MYSQL_BIND` 决定：单机默认 `127.0.0.1`，集群写 node1 内网 IP 供 node2/3 访问；主从/切换不在本次范围 |
+| xxl-job | 单实例（node1 容器） | 调度中心端口绑定由 `SMARTLECT_XXLJOB_BIND` 决定（集群=node1 内网 IP）；容器需 `host.docker.internal` 映射才能回调宿主机执行器 |
 
 **为什么密钥不入库**：`gen-cluster-env.sh` 从 node1 既有的 `run/runtime.env` 读取
 （Redis 密码、Nacos token/identity、MySQL 密码），只新增 erlang cookie 一项。
 含密码的 `sentinel.conf` 也是构建期现场生成。仓库里没有任何凭据。
+
+**改端口绑定前先比对运行态**：`docker compose up -d --force-recreate <svc>` 会按声明**连带对齐依赖容器**。
+2026-10-17 实测：重建 xxl-job-admin 时 mysql 也被重建，两处长期未应用的
+`127.0.0.1` 绑定同时生效，导致全网新连接失败。重建前用
+`docker inspect` 对比 `Ports`，或确认 compose 与运行态一致后再动手。
 
 ## 安全组（应用端口不对公网）
 
@@ -34,7 +40,8 @@ IP/端口集中定义在 [nodes.env](nodes.env)，脚本都从这里取，不再
 所以**应用端口的安全边界是安全组，不是应用配置**：
 
 - 公网只放行 **80/443**（nginx）与运维入口（22）。
-- **18080-18108 只对节点内网放行**（18080 网关、18101-18108 各服务、18180/18181 前端）。
+- **18080-18108、18090、13306 只对节点内网放行**（18080 网关、18101-18108 各服务、18180/18181 前端、
+  调度中心 18090、MySQL 13306）。
   任何一条放行到 `0.0.0.0/0` 的规则，都等于把 `/actuator/prometheus`（JVM/连接池/线程池指标）
   和绕过 nginx 的业务接口直接暴露给外网。
 - 生产就绪模式（`SMARTLECT_PRODUCTION_READY=true` 或 prod profile）下，

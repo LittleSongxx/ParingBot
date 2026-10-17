@@ -234,7 +234,7 @@ python3 scripts/coverage_gate.py                  # 行覆盖率对比 backend/j
 ```bash
 ./scripts/dev.sh infra-check    # 中间件健康 + 权限隔离（app/flyway 只能碰自己的库）
 ./scripts/dev.sh apps-check     # 12 个进程健康 + Nacos 注册数
-python3 scripts/xxljob_setup.py # 幂等登记 15 个调度任务（只加注解不会执行）
+python3 scripts/xxljob_setup.py # 幂等登记 16 个调度任务（只加注解不会执行）
 ```
 
 公开评测（导购 / 客服两条线，各自的分母与指标，不合成总分）的题库与判分器在 `evals/`，运行入口 `scripts/eval_quality_v2.py`、`scripts/eval_support_eval.py`；原始证据按日期归档在 `eval/verification/`。
@@ -272,8 +272,8 @@ Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预
 |---|---|---|
 | 站点 | `http://127.0.0.1/` | nginx 反代网关，`/actuator` 与业务端口不对公网开放 |
 | 网关健康 | `:18080/actuator/health` | 依赖 Redis / Nacos 的存活探针 |
-| 调度中心 | `:18090/xxl-job-admin` | 16 个任务的执行记录、手动触发、失败重试；**判断"任务在跑"看 handle_code=200**，只看触发会漏掉"调度成功但执行器不可达" |
-| 展厅账号策略 | `TrialAdminAccess` + `TrialAdminGuardInterceptor` | 公开口令的 gallery 账号：**读默认允许（隐私清单除外）、写默认拒绝**（退款复核显式放行）；清单完整性由 `scripts/check_admin_authz.py` 门禁强制 |
+| 调度中心 | `:18090/xxl-job-admin` | 16 个任务的执行记录、手动触发、失败重试；**判断"任务在跑"看 handle_code=200**，只看触发会漏掉"调度成功但执行器不可达"；集群必须用 `SMARTLECT_XXLJOB_BIND=node1 内网 IP`（只绑回环时三节点执行器全部失联） |
+| 展厅账号策略 | `TrialAdminAccess` + `TrialAdminGuardInterceptor` | 公开口令的 gallery 账号：**读默认允许（隐私清单除外）、写默认拒绝**（退款复核显式放行）。清单是展厅的第二道防线，**不是 RBAC**：管理端写接口必须自带 `@SaCheckPermission`，由 `scripts/check_admin_authz.py` 强制（不再接受"在拒绝清单里"作为保护证明） |
 | 配置中心 | `:18848` Nacos 控制台 | `SMARTLECT_GROUP` 下的配置；改完用 `scripts/nacos_config_push.py` 推送 |
 | 指标 | 各服务 `/actuator/prometheus` | JVM / Hikari / 线程池 / 业务指标；只从内网抓 |
 | 应用日志 | `run/logs/<服务>.log` | 启动失败先看这里；`run/logs/<服务>/nacos/` 是注册与配置客户端日志 |
@@ -315,14 +315,16 @@ bash sync-app-node.sh node3 "gateway,product,order,user,cart"
 
 ## 已知边界与遗留
 
-- **演示规模**：单机 MySQL、演示目录（47 个商品 / 20 SKU 场景 + 8.7 万条索引）、压测注入的并发（集群峰值 832 req/s @1600 并发，p95 400ms 档），不是生产流量。
+- **演示规模**：单机 MySQL、演示目录（47 个商品 / 20 SKU 场景 + 8.7 万条索引）、压测注入的并发（集群峰值 832 req/s @1600 并发，p95 4655ms；可持续档 811 req/s @600 并发，p95 ≈200ms；压测工具自身有已知偏高口径），不是生产流量。
 - **MQ 是单点**：DLedger 三副本编排已就绪但线上未启用，如实记录。
-- **从机 Outbox 兜底不全**：兜底投递目前只挂在 order 组，pay / product 等库依赖 afterCommit 即时投递，没有调度重扫。
+- **Outbox 兜底按库注册**：`outboxDispatch` 在 order/user/product/cart/pay/admin 六个库各登记一份（各扫本库）；其余域没有 `local_message_outbox`，不适用。没有"一个任务扫所有库"的全局兜底。
 - **幂等账本无业务参数**：账本不存下游业务 id，因此 `INCONCLUSIVE / MANUAL_REVIEW` 不能自动改判，只能由运维带业务参数驱动核对（`scripts/reconcile_idempotency.py` + `orderIdempotencyReconcile` 上报）；要让它自动闭环，需要在业务行上冗余幂等键（列变更 + 回填，未做）。
 - **Sentinel 规则热更**（Nacos 数据源）已完成代码侧，线上演练未做。
-- **本地 xxl-job 执行器地址**：调度中心在容器、应用在宿主机，执行器必须自报
-  `http://host.docker.internal:<port>`（`SMARTLECT_XXLJOB_EXECUTOR_HOST` 由 bootstrap 注入，
-  端口按服务分配）；否则触发全部超时、兜底任务静默不执行——2026-10-16 故障演练定位并修复。
+- **xxl-job 的地址链**：应用在宿主机、调度中心在容器，两端都要能被对方访问——
+  执行器要自报"容器能回拨"的地址（单机 `host.docker.internal:<port>`，由 `SMARTLECT_XXLJOB_EXECUTOR_HOST` 注入；
+  副本节点用本机内网 IP），调度中心自身要绑"三节点都能访问"的地址（`SMARTLECT_XXLJOB_BIND`，
+  集群=node1 内网 IP，单机默认回环）。任一环节错，表现为"触发成功但任务不执行 / 执行器地址列表为空"，
+  且没有显式报错——2026-10-16（执行器地址）与 10-17（调度中心绑回环 + 容器缺 host 映射）各踩过一次。
 - **`deploy/seata/` 残留**：历史容器卷挂载留下的 root 属主空目录，未纳入版本控制，本地删除需 sudo。
 - **`smartlect_growth`**：助手库与账号沿用历史命名（环境变量已统一为 `SMARTLECT_ASSISTANT_*`），改名需数据迁移，暂不动。
 - **集成档进 CI 前的老问题**：`OutboxLeaseSqlIT` 曾因 MySQL 秒级 DATETIME 的四舍五入而抖动（创建时刻落在"未来 1 秒"），已回拨 create_time 修复。
