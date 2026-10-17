@@ -1,0 +1,18 @@
+# node1 admin 并行重启失败（2026-10-18）
+
+journalctl -u smartlect-apps:
+  22:40:59 Stopping smartlect-apps...
+  22:41:23 Stopped admin
+  22:43:59 smartlect-apps.service: Stopping timed out. Terminating.
+  22:44:18 Stopped smartlect-apps.service
+  22:47:24 Started Smartlect admin: PID 2214504, port 18101
+  22:47:24 Smartlect runtime failed: admin exited; inspect run/logs/smartlect-admin.log
+
+原因：apps-down 逐个停止 9 个 Java 服务耗时约 3 分钟，正好撞上 TimeoutStopSec=180；systemd
+强制终止整个 cgroup，下一次启动出现半清理状态。重试后恢复。
+
+处置：
+  deploy/cluster/app-node/smartlect-apps-node1.service
+  deploy/cluster/app-node/smartlect-apps.service
+  TimeoutStopSec=180 → 600
+  三个节点已安装新 unit 并 daemon-reload，当前 TimeoutStopUSec=10min。

@@ -12,13 +12,14 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class SysCategoryServiceImplTest {
 
     @Test
-    void categoryTreeUsesDatabaseAndRefreshesStaleRedisSnapshot() {
+    void categoryTreeReadsDatabaseWithoutWritingRedisOnHotPath() {
         SysCategoryMapper<SysCategory, SysCategoryQuery> mapper = mock(SysCategoryMapper.class);
         RedisComponent redis = mock(RedisComponent.class);
         SysCategoryServiceImpl service = new SysCategoryServiceImpl();
@@ -38,7 +39,7 @@ class SysCategoryServiceImplTest {
         assertEquals(List.of("20003"),
                 result.get(0).getChildren().stream()
                         .map(SysCategory::getCategoryId).toList());
-        verify(redis).saveCategory2Redis(databaseRows);
+        verify(redis, never()).saveCategory2Redis(any());
     }
 
     private static SysCategory category(String id, String parentId, String name) {

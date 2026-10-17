@@ -46,9 +46,8 @@ public class SysCategoryServiceImpl implements SysCategoryService {
 	public List<SysCategory> findListByParam(SysCategoryQuery param) {
 		List<SysCategory> list = this.sysCategoryMapper.selectList(param);
 		if (Boolean.TRUE.equals(param.getParent())) {
-			// MySQL is the source of truth. Refresh the snapshot instead of allowing
-			// an unversioned Redis value to replace a newer imported catalogue.
-			saveCategoryToRedis();
+			// 公开读路径只查 MySQL；分类快照的 Redis 写入放到管理端写操作/显式刷新，
+			// 避免每个首页请求多做一次全表查询和一次 Redis 写（2026-10-18 ECS 压测热点）。
 			list = findChildren(list, Constants.ZERO_STR);
 		}
 		if (Boolean.TRUE.equals(param.getPropertyQuery())) {

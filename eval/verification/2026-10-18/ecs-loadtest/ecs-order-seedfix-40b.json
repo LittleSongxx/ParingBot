@@ -1,0 +1,50 @@
+{
+  "requests": 1677,
+  "duration_s": 33.512,
+  "qps": 50.04,
+  "ok": 1677,
+  "error_rate": 0.0,
+  "latency_ms": {
+    "avg": 71.25,
+    "p50": 41.43,
+    "p90": 155.51,
+    "p95": 208.46,
+    "p99": 328.98,
+    "max": 629.53
+  },
+  "status": {
+    "200": 1677
+  },
+  "errors": {},
+  "business_errors": 0,
+  "business_error_rate": 0.0,
+  "by_request": {
+    "add2Cart": {
+      "count": 559,
+      "p50": 38.98,
+      "p95": 121.71,
+      "p99": 180.75,
+      "avg": 52.73
+    },
+    "payComplete": {
+      "count": 559,
+      "p50": 15.77,
+      "p95": 24.31,
+      "p99": 60.81,
+      "avg": 17.83
+    },
+    "postOrder": {
+      "count": 559,
+      "p50": 118.17,
+      "p95": 276.91,
+      "p99": 434.88,
+      "avg": 143.2
+    }
+  },
+  "kind": "order",
+  "vus": 40,
+  "hold": 30,
+  "label": "ecs-order-seedfix-40b",
+  "base": "https://smartlect.cn",
+  "wall_s": 33.512
+}

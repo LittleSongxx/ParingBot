@@ -22,7 +22,9 @@ ExecStartPre=/usr/bin/python3 scripts/runtime.py wait-cluster --timeout 300
 ExecStart=/usr/bin/python3 scripts/runtime.py up
 ExecStop=/usr/bin/python3 scripts/runtime.py apps-down
 TimeoutStartSec=900
-TimeoutStopSec=180
+# 2026-10-18 实测：负载后 apps-down 逐个停 9 个服务用了约 3 分钟，正好撞上 180s，
+# systemd 强制终止整个 cgroup，下一次启动 admin 出现半清理状态。放宽到 600s。
+TimeoutStopSec=600
 
 [Install]
 WantedBy=multi-user.target

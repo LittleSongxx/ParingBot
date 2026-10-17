@@ -1,0 +1,14 @@
+===== 压测数据对账（2026-10-17 23:00:00 ~ 2026-10-18 00:30:00） =====
+  orders=14540  distinct_pay_ids=14538  pay_trades=14538
+  post_keys=14538  post_completed=14538  order_deducts=14538
+  paid_pay_ids=14537  settled_trades=14537
+  orders_without_pay=0  orders_without_deduct=0  items=14542  item_orphans=0
+  ✓ 支付单数 == 支付流水数（14538）
+  ✓ 下单命令数 == 订单幂等键数（14538）
+  ✓ ORDER_DEDUCT 数 == 支付单数（14538）
+  ✓ 已支付/已发货/已完成/部分退款支付单数 == 已结算流水数（14537）
+  ✓ 没有订单缺支付流水（0）
+  ✓ 没有订单缺 ORDER_DEDUCT（0）
+  ✓ 没有孤儿订单明细（0）
+  ✓ 明细数 >= 订单数（14542 >= 14540）
+  通过 8 项，失败 0 项

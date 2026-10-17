@@ -50,8 +50,10 @@ services:
     ports:
       - "127.0.0.1:${SMARTLECT_ROCKETMQ_NAMESRV_PORT:-9876}:9876"
     environment:
-      JAVA_OPT_EXT: "-Xms256m -Xmx256m"
-    mem_limit: 384m
+      JAVA_OPT_EXT: "-Xms256m -Xmx384m"
+    # 2026-10-18 压测期发现 proxy 多次被 512m cgroup OOM 杀掉（重启 10 次），
+    # 提高到 768m 给 gRPC/Netty native 内存留余量；broker/namesrv 不动。
+    mem_limit: 768m
     healthcheck:
       test: [CMD-SHELL, 'bash -c "echo > /dev/tcp/127.0.0.1/9876"']
       interval: 5s
@@ -119,8 +121,10 @@ services:
     ports:
       - "127.0.0.1:${SMARTLECT_ROCKETMQ_GRPC_PORT:?run bootstrap}:8081"
     environment:
-      JAVA_OPT_EXT: "-Xms256m -Xmx256m"
-    mem_limit: 384m
+      JAVA_OPT_EXT: "-Xms256m -Xmx384m"
+    # 2026-10-18 压测期发现 proxy 多次被 512m cgroup OOM 杀掉（重启 10 次），
+    # 提高到 768m 给 gRPC/Netty native 内存留余量；broker/namesrv 不动。
+    mem_limit: 768m
     healthcheck:
       test: [CMD-SHELL, 'bash -c "echo > /dev/tcp/127.0.0.1/8081"']
       interval: 5s

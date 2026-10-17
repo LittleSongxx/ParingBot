@@ -1,0 +1,20 @@
+# node1 rocketmq-proxy OOM 证据（2026-10-18）
+
+docker inspect rocketmq-proxy:
+  restarts=10
+  memory=536870912 (512 MiB before fix)
+  state.OOMKilled=false (Docker 的当前状态标志，不代表历史)
+  started=2026-10-17T15:34:36Z
+
+dmesg:
+  2026-10-17 23:33:50 node1 Memory cgroup out of memory:
+  Killed process 687503 (java), memcg docker-bc1123ad0672..., task=java, anon-rss=490704kB
+  （该 memcg 对应 rocketmq-proxy）
+
+docker logs rocketmq-proxy:
+  多次出现 "Killed" → "startup successfully"，重启计数 10
+
+处置：
+  docker update --memory 805306368 --memory-swap 805306368 rocketmq-proxy
+  运行态 memory=805306368，proxy gRPC 端口可用
+  deploy/compose.yaml: mem_limit 384m→768m，JAVA_OPT_EXT Xmx256m→384m

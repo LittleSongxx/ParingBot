@@ -215,13 +215,17 @@ class OrderSession:
 
     async def bootstrap(self, client):
         admin = self.args.admin
-        await client.post(f"{admin}/internal/demo/seed", json={}, headers=self.internal_headers())
+        # 夹具 seed 是 100 个用户 + 20 个商品的写事务，只能由 worker 在起 VU 前做一次；
+        # 每个 VU 都 seed 会在 160+ VU 时把 admin 连接池/事务打满（2026-10-18 实测）。
         session = await client.post(
             f"{admin}/internal/demo/session",
             params={"userIndex": self.user_index, "password": self.demo_password},
             headers=self.internal_headers())
         session.raise_for_status()
-        payload = session.json()["data"]
+        body = session.json()
+        payload = body.get("data") if isinstance(body, dict) else None
+        if not isinstance(payload, dict):
+            raise RuntimeError(f"demo session failed: {body}")
         self.user_id = payload["userId"]
         self.address_id = payload["addressId"]
         self.token_user = payload["token"]
@@ -319,6 +323,15 @@ def worker(kind, args, secrets, vus, hold, queue):
                               keepalive_expiry=30.0)
         async with httpx.AsyncClient(timeout=TIMEOUT, limits=limits,
                                      follow_redirects=False, verify=False) as client:
+            if kind == "order":
+                seed = await client.post(
+                    f"{args.admin}/internal/demo/seed", json={},
+                    headers={"Content-Type": "application/json",
+                             "X-Internal-Token": secrets["SMARTLECT_INTERNAL_TOKEN"]})
+                seed.raise_for_status()
+                seed_body = seed.json()
+                if seed_body.get("status") != "success":
+                    raise RuntimeError(f"demo seed failed: {seed_body}")
             started = time.monotonic()
             deadline = started + hold
             tasks = []
