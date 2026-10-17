@@ -6,7 +6,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import java.util.regex.Pattern;
 
 /**
- * 日志脱敏转换器（ADR-0021）：手机号/邮箱/身份证在进入日志前打码。
+ * 日志脱敏转换器（ADR-0009）：手机号/邮箱/身份证在进入日志前打码。
  * 此前全仓无任何脱敏手段，收货地址、邮箱等 PII 直接落日志与 MQ 补偿 payload。
  * 用法：logback 配置注册 conversionWord 后，pattern 用 %maskingMsg 替代 %m。
  */

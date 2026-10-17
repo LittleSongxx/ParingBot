@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
 
 @RestController
 // 边界说明（2026-10-16 复核）：本类是订单域的**内部 RPC 表面**——Dubbo provider 直接委托它
-// （ADR-0017 的既定形态），因此它承担参数装配与响应裁剪，而不是"薄薄一层转发"。
+// （ADR-0008 的既定形态），因此它承担参数装配与响应裁剪，而不是"薄薄一层转发"。
 // 规则是：**不直连 mapper**（需要聚合查询就收回 OrderItemService 这类服务），
 // 也不在这里写事务；改动时请守住这两条，否则内部面会退化成第二个业务实现。
 @RequestMapping("/internal/order/commerce")

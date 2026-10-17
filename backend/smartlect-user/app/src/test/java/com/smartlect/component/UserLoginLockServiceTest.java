@@ -17,7 +17,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** 用户登录失败锁定（ADR-0022）：5 次失败锁定 15 分钟，成功后清零。 */
+/** 用户登录失败锁定（ADR-0009）：5 次失败锁定 15 分钟，成功后清零。 */
 @ExtendWith(MockitoExtension.class)
 class UserLoginLockServiceTest {
 

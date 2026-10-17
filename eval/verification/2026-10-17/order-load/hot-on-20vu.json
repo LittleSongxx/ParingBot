@@ -1,0 +1,50 @@
+{
+  "requests": 816,
+  "duration_s": 32.722,
+  "qps": 24.94,
+  "ok": 816,
+  "error_rate": 0.0,
+  "latency_ms": {
+    "avg": 31.69,
+    "p50": 19.48,
+    "p90": 54.55,
+    "p95": 61.85,
+    "p99": 183.16,
+    "max": 265.25
+  },
+  "status": {
+    "200": 816
+  },
+  "errors": {},
+  "business_errors": 0,
+  "business_error_rate": 0.0,
+  "by_request": {
+    "add2Cart": {
+      "count": 272,
+      "p50": 19.09,
+      "p95": 35.57,
+      "p99": 70.3,
+      "avg": 20.96
+    },
+    "payComplete": {
+      "count": 272,
+      "p50": 11.09,
+      "p95": 18.65,
+      "p99": 34.41,
+      "avg": 12.32
+    },
+    "postOrder": {
+      "count": 272,
+      "p50": 51.06,
+      "p95": 160.54,
+      "p99": 247.43,
+      "avg": 61.8
+    }
+  },
+  "kind": "order",
+  "vus": 20,
+  "hold": 30,
+  "label": "hot-on-20vu",
+  "base": "http://127.0.0.1:18082",
+  "wall_s": 32.722
+}

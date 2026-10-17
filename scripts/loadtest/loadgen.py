@@ -15,6 +15,8 @@
 import argparse
 import asyncio
 import fcntl
+import hashlib
+import hmac
 import json
 import multiprocessing as mp
 import os
@@ -28,6 +30,20 @@ import httpx
 
 TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=30.0)
 PROCESSES = max(1, min(4, os.cpu_count() or 1))
+MOCK_PAY_SECRET_DEFAULT = "smartlect-dev-mock-pay-secret"
+
+
+def mock_pay_headers(secrets, pay_order_id, amount_cents=None):
+    """与 Java MockPaymentSignatureVerifier 相同的规范化字符串。"""
+    timestamp = str(int(time.time()))
+    nonce = os.urandom(12).hex()
+    amount = "" if amount_cents is None else str(amount_cents)
+    canonical = "\n".join(("POST", "/internal/pay/mock/complete", str(pay_order_id),
+                           amount, timestamp, nonce))
+    secret = secrets.get("SMARTLECT_MOCK_PAY_SECRET") or MOCK_PAY_SECRET_DEFAULT
+    signature = hmac.new(secret.encode(), canonical.encode(), hashlib.sha256).hexdigest()
+    return {"X-Mock-Pay-Timestamp": timestamp, "X-Mock-Pay-Nonce": nonce,
+            "X-Mock-Pay-Signature": signature}
 
 
 def percentile(values, pct):
@@ -211,9 +227,9 @@ class OrderSession:
         self.token_user = payload["token"]
 
         product_ids = await client.post(
-            f"{self.args.product}/internal/product/listOnSaleProductIds",
+            f"{self.args.product}/internal/product/listOnSaleProductIds?productIdPrefix=910000000000",
             json={}, headers=self.internal_headers())
-        ids = [pid for pid in product_ids.json()["data"] if str(pid).startswith("910000000000")]
+        ids = [pid for pid in (product_ids.json().get("data") or []) if str(pid).startswith("910000000000")]
         snapshot = await client.post(
             f"{self.args.product}/internal/product/snapshotBatch",
             json={"productIds": ids}, headers=self.internal_headers())
@@ -286,7 +302,9 @@ async def order_vu(client, args, recorder, deadline, secrets, vu_index, budget=N
 
         await timed(client, recorder, "payComplete", "POST",
                     f"{args.pay}/internal/pay/mock/complete",
-                    json={"payOrderId": pay_order_id}, headers=session.internal_headers())
+                    json={"payOrderId": pay_order_id},
+                    headers={**session.internal_headers(),
+                             **mock_pay_headers(secrets, pay_order_id)})
         await asyncio.sleep(random.uniform(args.think_min, args.think_max))
 
 

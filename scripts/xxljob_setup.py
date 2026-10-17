@@ -52,6 +52,8 @@ JOBS = [
     ('smartlect-order', 'mqCompensationReplay', '0 * * * * ?', 'MQ 补偿重放（原 fixedDelay 60s）'),
     ('smartlect-order', 'orderAutoReceiptReconcile', '0 */10 * * * ?', '订单自动确认收货对账（原 fixedDelay 600s）'),
     ('smartlect-order', 'orderIdempotencyReconcile', '0 */5 * * * ?', '幂等账本待核对上报（每 5 分钟）'),
+    ('smartlect-pay', 'payDailyReconcile', '0 10 3 * * ?', 'Mock 渠道日对账（只报告差异，不自动改账）'),
+    ('smartlect-stock', 'hotStockReconcile', '0 */10 * * * ?', '热点库存桶对账（未启用时直接返回）'),
     ('smartlect-admin', 'autoDataTask', '0 0 1 * * ?', '管理端统计快照（原 cron 0 0 1）'),
     ('smartlect-user', 'userTempBanReconcile', '0 * * * * ?', '临时封禁到期解封（原 fixedDelay 60s）'),
     ('smartlect-user', 'imageModerationCleanup', '0 15 * * * ?', '图片审核残留清理（原 cron 0 15 *）'),

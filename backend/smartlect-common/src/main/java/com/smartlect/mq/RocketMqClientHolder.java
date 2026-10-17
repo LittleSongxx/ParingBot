@@ -58,7 +58,7 @@ public class RocketMqClientHolder {
         for (Map.Entry<String, String> entry : properties.entrySet()) {
             builder.addProperty(entry.getKey(), entry.getValue());
         }
-        // 链路追踪贯穿（ADR-0021）：随消息携带发送线程的 traceId，消费端据此恢复 MDC
+        // 链路追踪贯穿（ADR-0009）：随消息携带发送线程的 traceId，消费端据此恢复 MDC
         String traceId = org.slf4j.MDC.get(com.smartlect.constants.InternalApiHeaders.TRACE_ID_MDC);
         if (traceId != null && !traceId.isEmpty()) {
             builder.addProperty("traceId", traceId);

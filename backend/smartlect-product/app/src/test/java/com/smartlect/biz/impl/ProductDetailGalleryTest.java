@@ -1,6 +1,9 @@
 package com.smartlect.biz.impl;
 
+import com.smartlect.api.enums.ProductStatusEnum;
 import com.smartlect.api.support.StockRpcSupport;
+import com.smartlect.component.ProductCacheService;
+import com.smartlect.exception.BusinessException;
 import com.smartlect.component.ProductBloomFilterComponent;
 import com.smartlect.entity.po.ProductInfo;
 import com.smartlect.entity.po.ProductPropertyValue;
@@ -18,8 +21,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
@@ -40,6 +45,7 @@ class ProductDetailGalleryTest {
     private final ProductSkuMapper<ProductSku, ProductSkuQuery> productSkuMapper = mock(ProductSkuMapper.class);
     private final ProductBloomFilterComponent bloomFilter = mock(ProductBloomFilterComponent.class);
     private final StockRpcSupport stockRpcSupport = mock(StockRpcSupport.class);
+    private final ProductCacheService cacheService = mock(ProductCacheService.class);
 
     @BeforeEach
     void setUp() {
@@ -48,8 +54,6 @@ class ProductDetailGalleryTest {
         ReflectionTestUtils.setField(service, "productSkuMapper", productSkuMapper);
         ReflectionTestUtils.setField(service, "productBloomFilterComponent", bloomFilter);
         ReflectionTestUtils.setField(service, "stockRpcSupport", stockRpcSupport);
-        com.smartlect.component.ProductCacheService cacheService =
-                mock(com.smartlect.component.ProductCacheService.class);
         ReflectionTestUtils.setField(service, "productCacheService", cacheService);
         ReflectionTestUtils.setField(service, "metrics", new com.smartlect.metrics.SmartlectMetrics(
                 new io.micrometer.core.instrument.simple.SimpleMeterRegistry()));
@@ -70,6 +74,39 @@ class ProductDetailGalleryTest {
         pv.setPropertyGallery(gallery);
         pv.setPropertyValue("星夜银");
         return pv;
+    }
+
+    @Test
+    void publicDetailRejectsOffSaleProduct() {
+        ProductInfo info = new ProductInfo();
+        info.setProductId("p1");
+        info.setStatus(ProductStatusEnum.OFF_SALE.getStatus());
+        when(productInfoMapper.selectByProductId("p1")).thenReturn(info);
+
+        assertThrows(BusinessException.class, () -> service.getProduct4VOByProductId("p1", true));
+    }
+
+    @Test
+    void adminPreviewStillAllowsOffSaleProduct() {
+        ProductInfo info = new ProductInfo();
+        info.setProductId("p1");
+        info.setStatus(ProductStatusEnum.OFF_SALE.getStatus());
+        when(productInfoMapper.selectByProductId("p1")).thenReturn(info);
+
+        assertDoesNotThrow(() -> service.getProduct4VOByProductId("p1", false));
+    }
+
+    @Test
+    void cachedOffSaleSnapshotIsRejectedForPublicButAllowedForAdmin() {
+        ProductInfo info = new ProductInfo();
+        info.setProductId("p1");
+        info.setStatus(ProductStatusEnum.OFF_SALE.getStatus());
+        Product4VO cached = new Product4VO();
+        cached.setProductInfo(info);
+        when(cacheService.get("p1")).thenReturn(cached);
+
+        assertThrows(BusinessException.class, () -> service.getProduct4VOByProductId("p1", true));
+        assertDoesNotThrow(() -> service.getProduct4VOByProductId("p1", false));
     }
 
     @Test

@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 批次一 P0 一致性修复的真库回归（ADR-0018）：
+ * 批次一 P0 一致性修复的真库回归（ADR-0001）：
  * 1) quote claim-first——并发占用恰好一个赢家、失败释放后可重新占用；
  * 2) 幂等账本 REQUIRES_NEW——外层事务回滚后 FAILED 留痕仍独立提交。
  */

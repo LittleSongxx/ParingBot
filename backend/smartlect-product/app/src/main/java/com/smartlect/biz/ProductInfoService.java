@@ -40,6 +40,11 @@ public interface ProductInfoService {
 
 	Product4VO getProduct4VOByProductId(@NotEmpty String productId);
 
+	/**
+	 * @param requireOnSale 公开详情必须为在售；管理端预览传 false，可查看下架商品。
+	 */
+	Product4VO getProduct4VOByProductId(@NotEmpty String productId, boolean requireOnSale);
+
 	void updateSkuStock(@NotNull String skuId, @NotNull Integer stock);
 
 	void updateProductStatus(@NotNull String productId, @NotNull Integer status);

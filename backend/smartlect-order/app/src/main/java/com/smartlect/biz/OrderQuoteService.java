@@ -171,7 +171,7 @@ public class OrderQuoteService {
     }
 
     /**
-     * claim-first 短事务占用（ADR-0018）：在行锁事务内完成 校验 + 一次性占用。
+     * claim-first 短事务占用（ADR-0002）：在行锁事务内完成 校验 + 一次性占用。
      * 旧实现 lock 的 FOR UPDATE 脱离事务上下文即释放、consume 又发生在建单副作用之后，
      * 并发重复请求会先落单再被 409 挡下，留下无支付意图的孤儿订单。
      * 现在占用发生在任何建单副作用之前；失败用 {@link #release} 逆向释放。

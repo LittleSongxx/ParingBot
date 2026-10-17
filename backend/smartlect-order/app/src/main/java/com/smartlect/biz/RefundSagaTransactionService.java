@@ -278,7 +278,7 @@ public class RefundSagaTransactionService {
                 aggregateEvent, order) == 0) {
             log.info("退款聚合状态已被并发推进 orderId={}，跳过", order.getOrderId());
         }
-        // 退款全额还券（ADR-0020）：整单全额退（无剩余正常明细）时，把核销的券经 Outbox
+        // 退款全额还券（ADR-0006）：整单全额退（无剩余正常明细）时，把核销的券经 Outbox
         // 事件返还（USED→NOUSE，券过期由消费端跳过）。事件与退款收尾同事务落库，
         // 消费端幂等（容器租约 + 条件更新双保险）。部分退款不还券。
         if (aggregateEvent == OrderStateEvent.FULL_REFUND && (normalCount == null || normalCount == 0)) {

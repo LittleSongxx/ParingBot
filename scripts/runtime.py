@@ -151,6 +151,7 @@ def bootstrap():
             "SMARTLECT_DEMO_ENABLED": "true", "SMARTLECT_DEMO_PASSWORD": secrets.token_hex(24),
             "SMARTLECT_VISITOR_SECRET": secrets.token_hex(32),
             "SMARTLECT_ATTRIBUTION_SECRET": secrets.token_hex(32),
+            "SMARTLECT_MOCK_PAY_SECRET": secrets.token_hex(32),
             "SMARTLECT_ALLOWED_ORIGINS": "http://127.0.0.1:" + env["SMARTLECT_GATEWAY_PORT"],
             "SMARTLECT_WEB_USER_PORT": web_port,
             "SMARTLECT_WEB_ADMIN_PORT": admin_port,
@@ -196,7 +197,8 @@ def bootstrap():
                      "INTERNAL_TOKEN", "INTERNAL_OPS_TOKEN",
                      "ASSISTANT_MYSQL_PASSWORD", "CANAL_MYSQL_PASSWORD",
                      "XXLJOB_MYSQL_PASSWORD", "XXLJOB_TOKEN",
-                     "ADMIN_PASSWORD", "DEMO_PASSWORD", "VISITOR_SECRET", "ATTRIBUTION_SECRET"]
+                     "ADMIN_PASSWORD", "DEMO_PASSWORD", "VISITOR_SECRET", "ATTRIBUTION_SECRET",
+                     "MOCK_PAY_SECRET"]
     for key in password_keys:
         env[f"SMARTLECT_{key}"] = secrets.token_hex(24)
     env["SMARTLECT_NACOS_AUTH_TOKEN"] = base64.b64encode(secrets.token_bytes(48)).decode()

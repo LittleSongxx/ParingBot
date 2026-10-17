@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 支付轮询对账（ADR-0018）：旧实现被永不置位的 isPayTradeInitiated 过滤闸卡成死路径，
+ * 支付轮询对账（ADR-0002）：旧实现被永不置位的 isPayTradeInitiated 过滤闸卡成死路径，
  * 新实现按"创建超过 N 分钟仍待付款"直接查渠道。这里锁定轮询集合与逐单容错语义。
  */
 @ExtendWith(MockitoExtension.class)

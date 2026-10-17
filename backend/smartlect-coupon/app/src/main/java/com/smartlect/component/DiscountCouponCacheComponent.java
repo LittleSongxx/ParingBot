@@ -30,7 +30,7 @@ public class DiscountCouponCacheComponent {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
-    // ADR-0021 后 Bean 定义返回 Executor（ThreadPoolTaskExecutor，非 ExecutorService），
+    // ADR-0009 后 Bean 定义返回 Executor（ThreadPoolTaskExecutor，非 ExecutorService），
     // 注入类型必须与之对齐——此前按旧类型 ExecutorService 注入，装配期
     // "required a bean of type ExecutorService" 让 coupon 服务启动即退（2026-10-15 线上部署实测）
     @Resource

@@ -18,7 +18,7 @@ import java.util.Map;
 public class DateUtil {
 
     private static final Object lockObj = new Object();
-    // ADR-0023：读在锁外的 HashMap 存在理论竞态，换 ConcurrentHashMap（双检锁保留可简化为 computeIfAbsent）
+    // ADR-0009：读在锁外的 HashMap 存在理论竞态，换 ConcurrentHashMap（双检锁保留可简化为 computeIfAbsent）
     private static final Map<String, ThreadLocal<SimpleDateFormat>> sdfMap = new ConcurrentHashMap<>();
 
     private static SimpleDateFormat getSdf(final String pattern) {
@@ -46,7 +46,7 @@ public class DateUtil {
     }
 
     public static Date parse(String dateStr, String pattern) {
-        // ADR-0023：旧兜底"解析失败回退当前时间"是危险语义（坏输入变合法时间）。
+        // ADR-0009：旧兜底"解析失败回退当前时间"是危险语义（坏输入变合法时间）。
         // 现调用方均为自格式化字符串回读（format→parse 闭环），解析失败按程序错误抛出。
         try {
             return getSdf(pattern).parse(dateStr);

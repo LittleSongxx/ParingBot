@@ -72,6 +72,12 @@ public class CouponInternalService {
         if (coupon == null) {
             throw new BusinessException("优惠券不存在");
         }
+        CouponStatusEnum templateStatus = CouponStatusEnum.getByStatus(coupon.getStatus());
+        if (templateStatus == CouponStatusEnum.STOP || templateStatus == CouponStatusEnum.OVERDUE) {
+            // FINISH 只表示模板库存发完，用户手里已发的券仍然可用；
+            // 已停用/已过期模板不再允许新的核销。
+            throw new BusinessException("优惠券已停用或过期");
+        }
         if (coupon.getValidStartTime() != null && now.before(coupon.getValidStartTime())) {
             throw new BusinessException("优惠券未到使用时间");
         }
@@ -142,7 +148,7 @@ public class CouponInternalService {
 
 
     /**
-     * 退款全额还券（ADR-0020）：USED→NOUSE 条件更新，幂等可重放。
+     * 退款全额还券（ADR-0006）：USED→NOUSE 条件更新，幂等可重放。
      * 返回 true 表示终态成功（已还/无需还/券过期跳过），消费端据此确认；
      * false 仅在数据缺失时返回（同样按终态处理并留痕，不无限重投）。
      */

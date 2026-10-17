@@ -92,7 +92,7 @@ public class RocketMqConsumerContainer implements SmartInitializingSingleton {
 
     ConsumeResult dispatch(SmartlectMessageListener<Object> listener, MessageView view) {
         SmartlectMqMessage message = wrap(view);
-        // 链路追踪贯穿（ADR-0021）：消费线程此前无 MDC，日志与 HTTP/Dubbo 链路无法串联
+        // 链路追踪贯穿（ADR-0009）：消费线程此前无 MDC，日志与 HTTP/Dubbo 链路无法串联
         String priorTraceId = org.slf4j.MDC.get(com.smartlect.constants.InternalApiHeaders.TRACE_ID_MDC);
         String messageTraceId = message.properties() == null ? null : message.properties().get("traceId");
         if (messageTraceId != null && !messageTraceId.isEmpty()) {

@@ -24,7 +24,7 @@ public class DubboSentinelRulesConfig {
     @Resource
     private Environment environment;
 
-    // ADR-0023：可选 Nacos 动态数据源——配置 smartlect.sentinel.dubbo-rules-data-id 后，
+    // ADR-0009：可选 Nacos 动态数据源——配置 smartlect.sentinel.dubbo-rules-data-id 后，
     // 熔断规则由配置中心热更（JSON 数组，字段同 DegradeRule），代码注册的规则仅作兜底默认。
     @Value("${smartlect.sentinel.dubbo-rules-data-id:}")
     private String dubboRulesDataId;

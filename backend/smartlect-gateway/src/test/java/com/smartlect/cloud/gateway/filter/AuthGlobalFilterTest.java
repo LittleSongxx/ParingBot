@@ -162,6 +162,28 @@ class AuthGlobalFilterTest {
     }
 
     @Test
+    void productReadPathsArePublicButOtherProductPathsRequireLogin() {
+        properties.setWebExcludePaths(List.of("/api/product/loadCategory", "/api/product/loadCommendProduct",
+                "/api/product/loadProduct", "/api/product/getProduct"));
+        for (String path : List.of("/api/product/loadCategory", "/api/product/loadCommendProduct",
+                "/api/product/loadProduct", "/api/product/getProduct")) {
+            MockServerWebExchange exchange = MockServerWebExchange.from(
+                    MockServerHttpRequest.post(path).header("X-User-Id", "attacker").build());
+            AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
+            filter.filter(exchange, capture(forwarded)).block();
+            assertNotNull(forwarded.get());
+            assertNull(forwarded.get().getRequest().getHeaders().getFirst("X-User-Id"));
+        }
+        // 精确白名单之外的商品路径仍必须登录；不能再用 /api/product/** 整前缀放行。
+        MockServerWebExchange write = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/product/updatePrice").build());
+        AtomicReference<ServerWebExchange> forwardedWrite = new AtomicReference<>();
+        filter.filter(write, capture(forwardedWrite)).block();
+        assertNull(forwardedWrite.get());
+        assertEquals(HttpStatus.UNAUTHORIZED, write.getResponse().getStatusCode());
+    }
+
+    @Test
     void traditionalOrdersAndSimilarButDifferentPrefixesStillRequireLogin() {
         for (String path : List.of("/api/order/loadMyOrder", "/admin-api/order/loadDataList",
                 "/api/assistant-other/session", "/admin-api/assistant-other/session")) {

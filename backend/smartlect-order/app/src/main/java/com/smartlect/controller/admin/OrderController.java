@@ -7,15 +7,19 @@ import com.smartlect.api.enums.OrderStatusEnum;
 import com.smartlect.entity.enums.PageSize;
 import com.smartlect.entity.po.OrderInfo;
 import com.smartlect.entity.po.OrderLogisticsInfo;
+import com.smartlect.entity.po.OrderStatusLog;
 import com.smartlect.entity.query.OrderInfoQuery;
 import com.smartlect.entity.vo.PaginationResultVO;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.biz.OrderInfoService;
 import com.smartlect.biz.OrderLogisticsInfoService;
+import com.smartlect.mappers.OrderStatusLogMapper;
 import com.smartlect.security.TrialOrderPrivacy;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotEmpty;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -34,6 +38,8 @@ public class OrderController extends com.smartlect.controller.admin.ABaseControl
     private OrderInfoService orderInfoService;
     @Resource
     private OrderLogisticsInfoService orderLogisticsInfoService;
+    @Resource
+    private OrderStatusLogMapper orderStatusLogMapper;
 
     @PostMapping("/loadOrder")
     public ResponseVO loadOrder(Integer pageNo, Integer pageSize, String productNameFuzzy, Integer orderStatus){
@@ -60,6 +66,13 @@ public class OrderController extends com.smartlect.controller.admin.ABaseControl
         return getSuccessResponseVO(Arrays.stream(OrderStatusEnum.values())
                 .map(OrderStatusDTO::getByStatus)
                 .collect(Collectors.toList()));
+    }
+
+    /** 订单状态历史：只读，按写入顺序返回；展厅账号可读（不涉及买家隐私）。 */
+    @GetMapping("/{orderId}/statusLog")
+    public ResponseVO statusLog(@PathVariable String orderId) {
+        List<OrderStatusLog> logs = orderStatusLogMapper.selectByOrderId(orderId);
+        return getSuccessResponseVO(logs);
     }
 
     // 获取收货地址

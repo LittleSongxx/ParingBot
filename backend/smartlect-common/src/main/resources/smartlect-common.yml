@@ -72,7 +72,7 @@ smartlect:
     auth-enabled: ${SMARTLECT_INTERNAL_AUTH_ENABLED:true}
   sentinel:
     # 键名曾为 feign-rules-enabled，与 Java 读取的 dubbo-rules-enabled 不一致（开关永不生效），
-    # 已修复对齐（ADR-0023）
+    # 已修复对齐（ADR-0009）
     dubbo-rules-enabled: ${SMARTLECT_SENTINEL_DUBBO_RULES:true}
     # 可选：Dubbo 熔断规则上 Nacos 动态数据源（配置 data-id 后热更生效，代码规则降级为兜底）。
     # 仓库默认关；生产经 runtime.env 的 SMARTLECT_SENTINEL_DUBBO_RULES_DATA_ID 启用，

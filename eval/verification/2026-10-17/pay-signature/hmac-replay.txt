@@ -1,0 +1,4 @@
+payOrderId 999766571604701890131842990932
+no signature -> (401, '{"status":"error","code":401,"info":"MOCK_PAY_SIGNATURE_INVALID","data":null}')
+valid signature -> (200, '{"status":"success","code":200,"info":"请求成功","data":{"userId":"9100000042","payOrderId":"999766571604701890131842990932","amount":7291.00,"channelOrderId":"smartlect-mock-999766571604701890131842990932","tradeStatus":1}}')
+same nonce replay -> (409, '{"status":"error","code":409,"info":"MOCK_PAY_REQUEST_REPLAYED","data":null}')

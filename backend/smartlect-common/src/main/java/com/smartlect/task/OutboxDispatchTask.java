@@ -30,7 +30,7 @@ public class OutboxDispatchTask {
     @Value("${mq.outbox.dispatch-batch-size:10}")
     private int batchSize;
 
-    // ADR-0023：锁只是防抖（互斥由 DB 租约保证），TTL 可配——默认 4s 略短于串行批量耗时，
+    // ADR-0004：锁只是防抖（互斥由 DB 租约保证），TTL 可配——默认 4s 略短于串行批量耗时，
     // 默认批量同时降到 10 缩短单轮时长
     @Value("${mq.outbox.dispatch-lock-ttl-seconds:4}")
     private int dispatchLockTtlSeconds;

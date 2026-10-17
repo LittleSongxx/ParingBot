@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * 登录/登出/autoLogin 的 Sa-Token 行为（ADR-0011 Step 1）。
+ * 登录/登出/autoLogin 的 Sa-Token 行为（ADR-0008 Step 1）。
  * standalone MockMvc + Sa-Token 内存 dao：MVC 上下文经 RequestContextHolder 生效，
  * 断言 Cookie 下发、会话建立与登出后的会话清除。
  */

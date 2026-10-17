@@ -7,6 +7,7 @@ import com.smartlect.api.dto.SkuStockChangeDTO;
 import com.smartlect.api.dto.SkuStockDTO;
 import com.smartlect.api.dto.SkuStockQueryDTO;
 import com.smartlect.api.vo.ProductTotalStockVO;
+import com.smartlect.component.HotSkuStockGate;
 import com.smartlect.domain.SkuStock;
 import com.smartlect.exception.BusinessException;
 import com.smartlect.mappers.SkuStockMapper;
@@ -16,6 +17,8 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
@@ -41,6 +44,8 @@ public class SkuStockService {
     private SkuStockMapper skuStockMapper;
     @Resource
     private StockChangeRecordMapper stockChangeRecordMapper;
+    @Resource
+    private HotSkuStockGate hotSkuStockGate;
 
     public SkuStockDTO getStock(String productId, String propertyValueIdHash) {
         SkuStock row = skuStockMapper.selectByKey(productId, propertyValueIdHash);
@@ -86,6 +91,8 @@ public class SkuStockService {
             metrics.stockInsufficient();
             throw new BusinessException("库存不足");
         }
+        afterCommit(() -> hotSkuStockGate.reconcileSku(
+                dto.getProductId(), dto.getPropertyValueIdHash()));
         return affected;
     }
 
@@ -95,6 +102,7 @@ public class SkuStockService {
             throw new BusinessException("库存最低为0");
         }
         skuStockMapper.upsert(productId, propertyValueIdHash, stock);
+        afterCommit(() -> hotSkuStockGate.reconcileSku(productId, propertyValueIdHash));
     }
 
     public int totalByProductId(String productId) {
@@ -157,15 +165,22 @@ public class SkuStockService {
             return 0;
         }
         Map<String, Integer> merged = mergeBySku(batch.getItems());
+        hotSkuStockGate.reserve(batch.getBusinessKey(), merged);
         int total = 0;
-        for (Map.Entry<String, Integer> entry : new TreeMap<>(merged).entrySet()) {
-            String[] parts = entry.getKey().split("\0", 2);
-            int affected = skuStockMapper.changeStock(parts[0], parts[1], entry.getValue());
-            if (affected <= 0) {
-                metrics.stockInsufficient();
-                throw new BusinessException("库存不足");
+        try {
+            for (Map.Entry<String, Integer> entry : new TreeMap<>(merged).entrySet()) {
+                String[] parts = entry.getKey().split("\0", 2);
+                int affected = skuStockMapper.changeStock(parts[0], parts[1], entry.getValue());
+                if (affected <= 0) {
+                    metrics.stockInsufficient();
+                    throw new BusinessException("库存不足");
+                }
+                total += affected;
             }
-            total += affected;
+            hotSkuStockGate.commit(batch.getBusinessKey(), merged);
+        } catch (RuntimeException ex) {
+            hotSkuStockGate.release(batch.getBusinessKey(), merged);
+            throw ex;
         }
         return total;
     }
@@ -189,13 +204,15 @@ public class SkuStockService {
         if (affected <= 0) {
             throw new BusinessException("退款库存恢复失败");
         }
+        afterCommit(() -> hotSkuStockGate.replenish(
+                dto.getProductId(), dto.getPropertyValueIdHash(), dto.getChangeAmount()));
         return affected;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public int restoreOrderStock(OrderStockRestoreDTO dto) {
         Map<String, Integer> merged = orderRestoreItems(dto);
-        // 恢复前置校验（ADR-0018）：只有真实扣减过（order-deduct 账本记录存在）的支付单才允许回补。
+        // 恢复前置校验（ADR-0003）：只有真实扣减过（order-deduct 账本记录存在）的支付单才允许回补。
         // 下单 Phase4 扣减失败留下的待付款单被超时/手动关闭时，走这里会跳过回补，
         // 不再把从未扣过的库存加回去造成虚增。deduct 记录自此不再删除（审计链保留），
         // 重复恢复仍由 order-close 幂等键挡住，两者职责分离。
@@ -223,6 +240,9 @@ public class SkuStockService {
                 throw new BusinessException("关单库存恢复失败");
             }
             total += affected;
+        }
+        if (total > 0) {
+            afterCommit(() -> hotSkuStockGate.restoreOrder(dto.getPayOrderId(), merged));
         }
         return total;
     }
@@ -280,6 +300,19 @@ public class SkuStockService {
                     merged.merge(key, item.getChangeAmount(), Integer::sum);
                 });
         return merged;
+    }
+
+    private void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 
     public static String orderDeductBusinessKey(String payOrderId) {

@@ -76,7 +76,7 @@ class ProductionSafetyValidatorTest {
 
     @Test
     void prodProfileEnforcesValidationEvenWithoutSwitch() {
-        // ADR-0022：忘设 smartlect.production-ready 的 prod 部署不再裸奔
+        // ADR-0009：忘设 smartlect.production-ready 的 prod 部署不再裸奔
         org.springframework.mock.env.MockEnvironment env = new org.springframework.mock.env.MockEnvironment();
         env.setActiveProfiles("prod");
         ProductionSafetyValidator bare = new ProductionSafetyValidator(env);

@@ -47,7 +47,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 批次二秒杀流程统一（ADR-0019）的结构性锚定：
+ * 批次二秒杀流程统一（ADR-0002）的结构性锚定：
  * 1) RUSH_TIMEOUT 关单消息必须写入建单短事务回调内（与订单同事务落库）；
  * 2) 创建占位券（远程）在事务外，失败补偿释放预占、订单交由超时关单收敛；
  * 3) 秒杀支付链路全部远程调用不占用本地事务。

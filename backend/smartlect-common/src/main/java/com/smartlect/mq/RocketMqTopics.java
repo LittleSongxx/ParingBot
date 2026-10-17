@@ -7,7 +7,7 @@ import java.util.Set;
 /**
  * RocketMQ 拓扑：Topic/Tag 常量、历史队列名映射与延迟语义。
  *
- * <p>迁移自 RabbitMQ 的 6 交换机/18 队列模型（2026-10-13，ADR-0016）：
+ * <p>迁移自 RabbitMQ 的 6 交换机/18 队列模型（2026-10-13，ADR-0004）：
  * Direct 交换机 + routingKey 收敛为 Topic + Tag；5 组 TTL+死信延迟队列收敛为
  * 发送侧定时消息（任意精度，RocketMQ 5.x）；27 个 .retry.N 派生队列由
  * 消费失败时的定时回投取代（间隔 5s/30s/120s，见 {@link #RETRY_DELAYS_MS}）。

@@ -36,7 +36,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 退款全额还券钩子（ADR-0020）：仅整单全额退（无剩余正常明细）时发还券事件，
+ * 退款全额还券钩子（ADR-0006）：仅整单全额退（无剩余正常明细）时发还券事件，
  * 事件与 Saga 收尾同事务（sendAfterCommit 在调用方事务内落 Outbox）。
  */
 @ExtendWith(MockitoExtension.class)

@@ -21,7 +21,7 @@ public class ProductionSafetyValidator {
 
     private final org.springframework.core.env.Environment environment;
 
-    // ADR-0022：prod profile 自动启用校验（忘设开关的生产部署不再裸奔）；本地默认仍仅告警
+    // ADR-0009：prod profile 自动启用校验（忘设开关的生产部署不再裸奔）；本地默认仍仅告警
     public ProductionSafetyValidator(Environment environment) {
         this.environment = environment;
     }
@@ -90,7 +90,7 @@ public class ProductionSafetyValidator {
             return;
         }
         StringBuilder errors = new StringBuilder();
-        // ADR-0022：弱值检查升级——除已知字面量外，长度下限 24（内部/运维令牌均为 48-hex 运行时生成）
+        // ADR-0009：弱值检查升级——除已知字面量外，长度下限 24（内部/运维令牌均为 48-hex 运行时生成）
         if (StringTools.isEmpty(internalToken)
                 || WEAK_INTERNAL.equals(internalToken)
                 || internalToken.length() < MIN_TOKEN_LENGTH) {

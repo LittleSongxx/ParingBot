@@ -126,8 +126,16 @@ public class ProductInternalService {
     }
 
     public List<String> listOnSaleProductIds() {
+        return listOnSaleProductIds(null);
+    }
+
+    /** prefix 只服务演示/压测夹具：避免为了 20 个演示商品把 8.7 万条在售 ID 全量拉进内存。 */
+    public List<String> listOnSaleProductIds(String productIdPrefix) {
         ProductInfoQuery query = new ProductInfoQuery();
         query.setStatus(ProductStatusEnum.ON_SALE.getStatus());
+        if (productIdPrefix != null && !productIdPrefix.isBlank()) {
+            query.setProductIdFuzzy(productIdPrefix.trim());
+        }
         List<ProductInfo> list = productInfoMapper.selectList(query);
         if (list == null || list.isEmpty()) {
             return Collections.emptyList();

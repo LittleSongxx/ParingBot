@@ -4,6 +4,7 @@ import com.smartlect.api.dto.PayInfoDTO;
 import com.smartlect.api.dto.PayOrderNotifyDTO;
 import com.smartlect.api.enums.PayChannelEnum;
 import com.smartlect.biz.PayChannel;
+import com.smartlect.biz.PayMockChannelLedgerService;
 import com.smartlect.biz.PayTradeRecordService;
 import com.smartlect.mq.RocketMqTopics;
 import com.smartlect.constants.TransactionalMqSender;
@@ -27,12 +28,14 @@ public class PayChannel4Mock implements PayChannel {
     private final PayTradeRecordService trades;
     private final TransactionalMqSender transactionalMqSender;
     private final JdbcTemplate jdbc;
+    private final PayMockChannelLedgerService ledger;
 
     public PayChannel4Mock(PayTradeRecordService trades, TransactionalMqSender transactionalMqSender,
-                           JdbcTemplate jdbc) {
+                           JdbcTemplate jdbc, PayMockChannelLedgerService ledger) {
         this.trades = trades;
         this.transactionalMqSender = transactionalMqSender;
         this.jdbc = jdbc;
+        this.ledger = ledger;
     }
 
     @Override
@@ -49,10 +52,12 @@ public class PayChannel4Mock implements PayChannel {
     }
 
     /** Commit the simulated charge before notifying order, so a lost response is replayable. */
+    @Transactional(rollbackFor = Exception.class)
     public PaymentResult completePayment(String payOrderId) {
         return completePayment(null, payOrderId, null);
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public PaymentResult completePayment(String userId, String payOrderId, Long expectedAmountCents) {
         PayTradeRecord record = requireIntent(payOrderId);
         if (userId != null) {
@@ -74,6 +79,8 @@ public class PayChannel4Mock implements PayChannel {
         if (!Objects.equals(record.getTradeStatus(), 1) && !Objects.equals(record.getTradeStatus(), 3)) {
             throw new BusinessException("支付状态发生变化，请重新查询");
         }
+        // 渠道确认过的事实先落流水（与支付意图状态同一事务）；重放由 event_id 唯一键吸收。
+        ledger.recordComplete(record.getPayOrderId(), record.getPayAmount());
         if (Objects.equals(record.getTradeStatus(), 1)) {
             // 支付成功经 Outbox 事件通知 order（幂等键=payOrderId），取代同步 RPC 回调，
             // 断开 pay→order 运行时调用环；order 侧消费与重放都由同一幂等键去重。
@@ -125,6 +132,7 @@ public class PayChannel4Mock implements PayChannel {
             if (!record.getPayOrderId().equals(refund.sourcePayOrderId()) || refund.amount().compareTo(refundAmount) != 0) {
                 throw new BusinessException("退款幂等标识与原请求不一致");
             }
+            ledger.recordRefund(refundOrderId, record.getPayOrderId(), refundAmount);
             return;
         }
         if (!Objects.equals(record.getTradeStatus(), 1)) {
@@ -139,6 +147,7 @@ public class PayChannel4Mock implements PayChannel {
         }
         jdbc.update("INSERT INTO pay_mock_refund (refund_order_id, source_pay_order_id, refund_amount) VALUES (?, ?, ?)",
                 refundOrderId, record.getPayOrderId(), refundAmount);
+        ledger.recordRefund(refundOrderId, record.getPayOrderId(), refundAmount);
         if (total.compareTo(record.getPayAmount()) == 0) {
             trades.markRefunded(record.getPayOrderId());
         }
@@ -148,7 +157,7 @@ public class PayChannel4Mock implements PayChannel {
     public void closeOrder(String payOrderId) {
         requireId(payOrderId, 32);
         if (trades.findByPayOrderId(payOrderId) == null) {
-            // 关单幂等（ADR-0018）：支付意图可能从未创建（下单 Phase4 失败的孤儿单），
+            // 关单幂等（ADR-0002）：支付意图可能从未创建（下单 Phase4 失败的孤儿单），
             // 与 markClosed 对不存在记录 0 行静默的语义对齐，视为已关闭。
             // 否则超时关单消息会因这里抛错而无限重投。
             return;

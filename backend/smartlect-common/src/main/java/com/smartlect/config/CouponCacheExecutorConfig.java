@@ -15,7 +15,7 @@ public class CouponCacheExecutorConfig {
 
     public static final String CACHE_REBUILD_EXECUTOR = "CACHE_REBUILD_EXECUTOR";
 
-    // ADR-0021：改用 ThreadPoolTaskExecutor 以获得 MDC 传播装饰器；语义保持——
+    // ADR-0009：改用 ThreadPoolTaskExecutor 以获得 MDC 传播装饰器；语义保持——
     // 固定 10 线程 + 队列 500 + CallerRuns 回压 + daemon 命名线程。
     @Bean(name = CACHE_REBUILD_EXECUTOR)
     public Executor couponCacheRebuildExecutor(MeterRegistry meterRegistry) {

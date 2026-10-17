@@ -28,7 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 退款全额还券（ADR-0020）：USED→NOUSE 条件更新幂等；券过期/状态不符终态跳过。
+ * 退款全额还券（ADR-0006）：USED→NOUSE 条件更新幂等；券过期/状态不符终态跳过。
  */
 @ExtendWith(MockitoExtension.class)
 class RefundCouponReturnServiceTest {

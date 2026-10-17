@@ -285,7 +285,7 @@ def seed_demo_behavior(java, config, catalog_items):
                     }],
                 }, session=session, key='%s:persona:%s:%s' % (
                     PLAYBOOK_VERSION, session['userId'], persona['order']))
-                java.request('pay', '/internal/pay/mock/complete', data={'payOrderId': pay['payOrderId']})
+                java.request('pay', '/internal/pay/mock/complete', data={'payOrderId': pay['payOrderId']}, session=session)
                 ordered = persona['order']
             except CommerceError:
                 ordered = None

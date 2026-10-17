@@ -1,0 +1,8 @@
+管理端端点 85 个，其中写接口 32 个；TrialAdminAccess 清单 33 拒 / 3 放行
+check_admin_authz: 通过
+LEGACY docs/adr/legacy-map.md:16: ADR-0019 (legacy)
+LEGACY docs/adr/legacy-map.md:17: ADR-0020 (legacy)
+LEGACY docs/adr/legacy-map.md:18: ADR-0021 (legacy)
+  smartlect-user           行覆盖  27.5%  (464/1687)
+  汇总（10 模块）        行覆盖  38.7%  (5566/14386)
+coverage_gate: 通过（基线 38.7%，容差 1pp）

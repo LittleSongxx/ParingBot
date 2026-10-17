@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 共享日志配置（ADR-0021）：置于 smartlect-common resources 根，9 个依赖 common 的服务
+<!-- 共享日志配置（ADR-0009）：置于 smartlect-common resources 根，9 个依赖 common 的服务
      由 Spring Boot classpath 搜索自动拾取（此前全仓无任何 logback 配置、无脱敏）。
      网关不依赖 common，另有独立的一份最小配置。仅输出控制台——进程编排（runtime.py）
      负责重定向到 run/logs/<服务>.log；logging.level.* 仍可通过 springProperty 生效。 -->

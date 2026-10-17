@@ -1,7 +1,7 @@
 package com.smartlect.api.dto;
 
 /**
- * 退款全额还券事件（ADR-0020）：order 侧 Saga 收尾在短事务内经 Outbox 发出，
+ * 退款全额还券事件（ADR-0006）：order 侧 Saga 收尾在短事务内经 Outbox 发出，
  * coupon 侧消费做幂等还券（USED→NOUSE，券过期则跳过）。
  */
 public class RefundCouponReturnDTO {

@@ -2,9 +2,11 @@ package com.smartlect.state;
 
 import com.smartlect.api.enums.OrderStatusEnum;
 import com.smartlect.entity.po.OrderInfo;
+import com.smartlect.entity.po.OrderStatusLog;
 import com.smartlect.entity.query.OrderInfoQuery;
 import com.smartlect.exception.BusinessException;
 import com.smartlect.mappers.OrderInfoMapper;
+import com.smartlect.mappers.OrderStatusLogMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -12,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,6 +34,8 @@ class OrderStateMachineTest {
 
     @Mock
     private OrderInfoMapper<OrderInfo, OrderInfoQuery> orderInfoMapper;
+    @Mock
+    private OrderStatusLogMapper orderStatusLogMapper;
 
     @InjectMocks
     private OrderStateMachine stateMachine;
@@ -130,6 +135,20 @@ class OrderStateMachineTest {
     }
 
     @Test
+    void partialPayOrderTransitionRollsBackInsteadOfLoggingPhantomRows() {
+        OrderInfo first = new OrderInfo();
+        first.setOrderId("o-1");
+        OrderInfo second = new OrderInfo();
+        second.setOrderId("o-2");
+        when(orderInfoMapper.selectList(any())).thenReturn(List.of(first, second));
+        when(orderInfoMapper.updateByParam(any(), any())).thenReturn(1);
+
+        assertThrows(BusinessException.class, () -> stateMachine.transitionPayOrder(
+                "po-1", OrderStatusEnum.WAIT_PAYMENT, OrderStateEvent.USER_CANCEL));
+        verify(orderStatusLogMapper, never()).insert(any());
+    }
+
+    @Test
     void divergentTargetsAcrossExpectedStatesRejected() {
         // WAIT_PAYMENT--DELETE--> 无边；集合内非法组合在解析期抛出
         assertThrows(BusinessException.class, () -> stateMachine.transition("o-1",
@@ -141,5 +160,61 @@ class OrderStateMachineTest {
         when(orderInfoMapper.updateByParam(any(), any())).thenReturn(null);
         assertEquals(0, stateMachine.transition("o-1", OrderStatusEnum.WAIT_PAYMENT,
                 OrderStateEvent.PAY_SUCCESS));
+    }
+
+    @Test
+    void successfulCasWritesStatusLogWithObservedFromState() {
+        OrderInfo current = new OrderInfo();
+        current.setOrderStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+        current.setPayOrderId("po-1");
+        when(orderInfoMapper.selectByOrderId("o-1")).thenReturn(current);
+        when(orderInfoMapper.updateByParam(any(), any())).thenReturn(1);
+
+        stateMachine.transition("o-1", OrderStatusEnum.WAIT_PAYMENT, OrderStateEvent.PAY_SUCCESS);
+
+        ArgumentCaptor<OrderStatusLog> log = ArgumentCaptor.forClass(OrderStatusLog.class);
+        verify(orderStatusLogMapper).insert(log.capture());
+        assertEquals("o-1", log.getValue().getOrderId());
+        assertEquals("po-1", log.getValue().getPayOrderId());
+        assertEquals(OrderStatusEnum.WAIT_PAYMENT.getStatus(), log.getValue().getFromStatus());
+        assertEquals(OrderStatusEnum.PAID.getStatus(), log.getValue().getToStatus());
+        assertEquals(OrderStateEvent.PAY_SUCCESS.name(), log.getValue().getEvent());
+        assertEquals("SYSTEM", log.getValue().getOperatorType());
+    }
+
+    @Test
+    void failedCasAndIdempotentReentryWriteNoStatusLog() {
+        when(orderInfoMapper.selectByOrderId("o-1")).thenReturn(new OrderInfo());
+        when(orderInfoMapper.updateByParam(any(), any())).thenReturn(0);
+        assertEquals(0, stateMachine.transition("o-1", OrderStatusEnum.WAIT_PAYMENT,
+                OrderStateEvent.PAY_SUCCESS));
+        verify(orderStatusLogMapper, never()).insert(any());
+
+        OrderInfo alreadyPartial = new OrderInfo();
+        alreadyPartial.setOrderStatus(OrderStatusEnum.PARTIALLY_REFUNDED.getStatus());
+        when(orderInfoMapper.selectByOrderId("o-1")).thenReturn(alreadyPartial);
+        assertEquals(1, stateMachine.transition("o-1", OrderStatusEnum.PARTIALLY_REFUNDED,
+                OrderStateEvent.PARTIAL_REFUND));
+        verify(orderStatusLogMapper, never()).insert(any());
+    }
+
+    @Test
+    void payOrderTransitionWritesOneLogPerAffectedOrder() {
+        OrderInfo first = new OrderInfo();
+        first.setOrderId("o-1");
+        first.setPayOrderId("po-1");
+        OrderInfo second = new OrderInfo();
+        second.setOrderId("o-2");
+        second.setPayOrderId("po-1");
+        when(orderInfoMapper.selectList(any())).thenReturn(List.of(first, second));
+        when(orderInfoMapper.updateByParam(any(), any())).thenReturn(2);
+
+        stateMachine.transitionPayOrder("po-1", OrderStatusEnum.WAIT_PAYMENT, OrderStateEvent.USER_CANCEL);
+
+        ArgumentCaptor<OrderStatusLog> logs = ArgumentCaptor.forClass(OrderStatusLog.class);
+        verify(orderStatusLogMapper, org.mockito.Mockito.times(2)).insert(logs.capture());
+        assertEquals(List.of("o-1", "o-2"), logs.getAllValues().stream()
+                .map(OrderStatusLog::getOrderId).toList());
+        assertEquals(OrderStatusEnum.CANCELLED.getStatus(), logs.getAllValues().get(0).getToStatus());
     }
 }

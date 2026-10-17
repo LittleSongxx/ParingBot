@@ -26,6 +26,7 @@ import com.smartlect.entity.enums.MessageReliabilityLevelEnum;
 import com.smartlect.entity.po.OrderCouponRel;
 import com.smartlect.entity.po.OrderInfo;
 import com.smartlect.entity.po.OrderItem;
+import com.smartlect.entity.po.OrderStatusLog;
 import com.smartlect.entity.query.OrderCouponRelQuery;
 import com.smartlect.entity.query.OrderInfoQuery;
 import com.smartlect.entity.query.OrderItemQuery;
@@ -33,6 +34,8 @@ import com.smartlect.exception.BusinessException;
 import com.smartlect.mappers.OrderCouponRelMapper;
 import com.smartlect.mappers.OrderInfoMapper;
 import com.smartlect.mappers.OrderItemMapper;
+import com.smartlect.mappers.OrderStatusLogMapper;
+import com.smartlect.state.OrderStateEvent;
 import com.smartlect.support.MqIdempotencyKeys;
 import com.smartlect.utils.OrderPayAmountUtil;
 import com.smartlect.utils.StringTools;
@@ -60,6 +63,8 @@ public class CouponRushOrderServiceImpl implements CouponRushOrderService {
 
 	@Resource
 	private OrderItemMapper<OrderItem, OrderItemQuery> orderItemMapper;
+	@Resource
+	private OrderStatusLogMapper orderStatusLogMapper;
 
 	@Resource
 	private OrderCouponRelMapper<OrderCouponRel, OrderCouponRelQuery> orderCouponRelMapper;
@@ -85,7 +90,7 @@ private CouponRushRedisComponent couponRushRedisComponent;
 	@Resource
 	private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
-	// 事务模型（ADR-0019，对齐 postOrder 三阶段）：旧实现两个入口整体 @Transactional，
+	// 事务模型（ADR-0002，对齐 postOrder 三阶段）：旧实现两个入口整体 @Transactional，
 	// 把 Lua 预占/远程锁资源/建支付意图等远程调用全部包进本地事务（普通下单路径已修掉的
 	// RPC-in-TX 反模式）。现改为：只读校验在事务外 → Redis/远程预占在事务外 →
 	// 订单/关系/明细 + RUSH_TIMEOUT Outbox 消息收进 TransactionTemplate 短本地事务 →
@@ -144,7 +149,7 @@ private CouponRushRedisComponent couponRushRedisComponent;
 
 			// Phase 3: 短本地事务建单（order + rel + item + RUSH_TIMEOUT Outbox 原子落库，零远程调用）。
 			// 曾经的 @Transactional 整体包裹既占连接又把远程调用卷进本地事务；
-			// 关单消息必须与订单同事务（ADR-0018 同款约束），否则会重演孤儿订单窗口。
+			// 关单消息必须与订单同事务（ADR-0004 同款约束），否则会重演孤儿订单窗口。
 			OrderInfo orderInfo;
 			try {
 				orderInfo = transactionTemplate.execute(status ->
@@ -309,6 +314,17 @@ private CouponRushRedisComponent couponRushRedisComponent;
 		orderInfo.setPayOrderId(payOrderId);
 		orderInfo.setSubject(buildCouponRushOrderSubject(discountCoupon.getCouponName()));
 		orderInfoMapper.insert(orderInfo);
+		if (orderStatusLogMapper != null) {
+			OrderStatusLog statusLog = new OrderStatusLog();
+			statusLog.setOrderId(orderId);
+			statusLog.setPayOrderId(payOrderId);
+			statusLog.setToStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+			statusLog.setEvent(OrderStateEvent.CREATE.name());
+			statusLog.setOperatorType("USER");
+			statusLog.setOperatorId(userId);
+			statusLog.setRemark("coupon-rush-create");
+			orderStatusLogMapper.insert(statusLog);
+		}
 
 		OrderCouponRel rel = new OrderCouponRel();
 		rel.setOrderId(orderId);
@@ -331,7 +347,7 @@ private CouponRushRedisComponent couponRushRedisComponent;
 		orderItem.setCover("");
 		orderItemMapper.insert(orderItem);
 
-		// RUSH_TIMEOUT 关单消息与订单同事务写入 Outbox（对齐普通下单 Phase 3，ADR-0018/0019）：
+		// RUSH_TIMEOUT 关单消息与订单同事务写入 Outbox（对齐普通下单 Phase 3，ADR-0004/0019）：
 		// 订单存在则必然有关单收敛路径，占位券失败也不会留下永久挂起的待付款单。
 		// 载荷必须与消费端（RocketMqOrderDeadListListener，payloadType=RushingCouponMessageDTO）
 		// 一致：此前发的是只填 orderId 的 PayOrderMessageDTO，消费端读到的 userId/couponId/

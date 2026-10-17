@@ -2,9 +2,11 @@ package com.smartlect.state;
 
 import com.smartlect.api.enums.OrderStatusEnum;
 import com.smartlect.entity.po.OrderInfo;
+import com.smartlect.entity.po.OrderStatusLog;
 import com.smartlect.entity.query.OrderInfoQuery;
 import com.smartlect.exception.BusinessException;
 import com.smartlect.mappers.OrderInfoMapper;
+import com.smartlect.mappers.OrderStatusLogMapper;
 import com.smartlect.utils.StringTools;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
@@ -25,6 +27,8 @@ public class OrderStateMachine {
 
     @Resource
     private OrderInfoMapper<OrderInfo, OrderInfoQuery> orderInfoMapper;
+    @Resource
+    private OrderStatusLogMapper orderStatusLogMapper;
 
     public boolean canTransition(Integer currentStatus, OrderStateEvent event) {
         if (currentStatus == null || event == null) {
@@ -71,9 +75,9 @@ public class OrderStateMachine {
             throw new IllegalArgumentException("订单ID和前置状态不能为空");
         }
         OrderStatusEnum target = resolveCommonTarget(expectedStates, event);
+        OrderInfo current = orderInfoMapper.selectByOrderId(orderId);
         if (expectedStates.size() == 1 && expectedStates.iterator().next() == target && patch == null) {
             // 幂等重入：期望状态即目标状态时退化为读比对，避免无谓 UPDATE。
-            OrderInfo current = orderInfoMapper.selectByOrderId(orderId);
             return current != null && target.getStatus().equals(current.getOrderStatus()) ? 1 : 0;
         }
         OrderInfo update = patch == null ? new OrderInfo() : patch;
@@ -81,7 +85,15 @@ public class OrderStateMachine {
         OrderInfoQuery query = new OrderInfoQuery();
         query.setOrderId(orderId);
         applyExpectedStates(query, expectedStates);
-        return nullToZero(orderInfoMapper.updateByParam(update, query));
+        int rows = nullToZero(orderInfoMapper.updateByParam(update, query));
+        if (rows > 0) {
+            Integer from = current != null ? current.getOrderStatus()
+                    : expectedStates.size() == 1 ? expectedStates.iterator().next().getStatus() : null;
+            String payOrderId = current != null ? current.getPayOrderId()
+                    : patch != null ? patch.getPayOrderId() : null;
+            recordLog(orderId, payOrderId, from, target, event, "state-machine");
+        }
+        return rows;
     }
 
     public int transitionPayOrder(String payOrderId, OrderStatusEnum expectedState, OrderStateEvent event) {
@@ -94,7 +106,37 @@ public class OrderStateMachine {
         OrderInfoQuery query = new OrderInfoQuery();
         query.setPayOrderId(payOrderId);
         query.setOrderStatus(expectedState.getStatus());
-        return nullToZero(orderInfoMapper.updateByParam(update, query));
+        OrderInfoQuery before = new OrderInfoQuery();
+        before.setPayOrderId(payOrderId);
+        before.setOrderStatus(expectedState.getStatus());
+        java.util.List<OrderInfo> beforeList = orderInfoMapper.selectList(before);
+        int rows = nullToZero(orderInfoMapper.updateByParam(update, query));
+        if (rows > 0 && beforeList != null && rows < beforeList.size()) {
+            // 批量 UPDATE 只影响部分子单：同事务回滚（含已写日志），避免把未流转的单写成已流转。
+            throw new BusinessException("支付订单状态已变化，请重试");
+        }
+        if (rows > 0 && beforeList != null) {
+            for (OrderInfo order : beforeList) {
+                recordLog(order.getOrderId(), payOrderId, expectedState.getStatus(), target, event, "pay-order");
+            }
+        }
+        return rows;
+    }
+
+    private void recordLog(String orderId, String payOrderId, Integer from, OrderStatusEnum to,
+                           OrderStateEvent event, String remark) {
+        if (orderStatusLogMapper == null) {
+            return;
+        }
+        OrderStatusLog log = new OrderStatusLog();
+        log.setOrderId(orderId);
+        log.setPayOrderId(payOrderId);
+        log.setFromStatus(from);
+        log.setToStatus(to.getStatus());
+        log.setEvent(event.name());
+        log.setOperatorType("SYSTEM");
+        log.setRemark(remark);
+        orderStatusLogMapper.insert(log);
     }
 
     private OrderStatusEnum resolveCommonTarget(Collection<OrderStatusEnum> expectedStates, OrderStateEvent event) {

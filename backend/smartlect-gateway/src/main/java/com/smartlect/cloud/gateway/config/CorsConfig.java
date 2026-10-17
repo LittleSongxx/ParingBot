@@ -10,7 +10,7 @@ import org.springframework.web.util.pattern.PathPatternParser;
 import java.util.Arrays;
 
 /**
- * CORS（ADR-0023）：此前全仓无任何 CORS 配置（隐性依赖 nginx 同源拓扑，跨域直接坏）。
+ * CORS（ADR-0009）：此前全仓无任何 CORS 配置（隐性依赖 nginx 同源拓扑，跨域直接坏）。
  * 默认关闭；配置 smartlect.cors.allowed-origin-patterns 后启用（逗号分隔，
  * 开发环境如 http://localhost:18180,http://127.0.0.1:18180），携带凭证。
  */

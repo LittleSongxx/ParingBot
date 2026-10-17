@@ -50,8 +50,8 @@ def transaction_scenario(seed):
     client.request("admin", "/internal/demo/seed")
     session = client.request("admin", "/internal/demo/session", form={
         "userIndex": seed % 100, "password": config["SMARTLECT_DEMO_PASSWORD"]})
-    ids = client.request("product", "/internal/product/listOnSaleProductIds")
-    ids = sorted(product for product in ids if product.startswith("910000000000"))
+    ids = client.request("product", "/internal/product/listOnSaleProductIds?productIdPrefix=910000000000")
+    ids = sorted(ids)
     snapshot = client.request("product", "/internal/product/snapshotBatch", data={"productIds": ids})
     assert len(snapshot["products"]) == 20 and len(snapshot["skus"]) == 40
     skus = sorted(snapshot["skus"], key=lambda sku: (sku["productId"], sku["propertyValueIds"]))
@@ -92,8 +92,8 @@ def transaction_scenario(seed):
     rejected(lambda: client.request("gateway", "/api/order/postOrder", data=changed,
                                    session=session, key=run_id + "-buy"), "Changed purchase rejected under same idempotency key")
 
-    settled = client.request("pay", "/internal/pay/mock/complete", data={"payOrderId": pay_id})
-    duplicate = client.request("pay", "/internal/pay/mock/complete", data={"payOrderId": pay_id})
+    settled = client.request("pay", "/internal/pay/mock/complete", data={"payOrderId": pay_id}, session=session)
+    duplicate = client.request("pay", "/internal/pay/mock/complete", data={"payOrderId": pay_id}, session=session)
     assert cents(settled["amount"]) == expected_cents and duplicate["channelOrderId"] == settled["channelOrderId"]
     assert [stock(sku) for sku in selected] == after_order
 
@@ -134,7 +134,7 @@ def transaction_scenario(seed):
     wait_for(lambda: stock(cancel_sku), lambda value: value == cancel_before, "cancel stock restoration")
     client.request("gateway", "/api/order/cancelOrder", form=cancel_form, session=session, key=run_id + "-cancel")
     assert stock(cancel_sku) == cancel_before
-    rejected(lambda: client.request("pay", "/internal/pay/mock/complete", data={"payOrderId": cancel_pay["payOrderId"]}),
+    rejected(lambda: client.request("pay", "/internal/pay/mock/complete", data={"payOrderId": cancel_pay["payOrderId"]}, session=session),
              "Cancelled payment intent rejects settlement")
     passed("Cancellation and replay restore stock exactly once")
 

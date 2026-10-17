@@ -11,7 +11,7 @@ import reactor.core.publisher.Mono;
 import java.security.SecureRandom;
 
 /**
- * 链路追踪入口过滤器（ADR-0021）：网关是外部流量的第一跳，负责统一生成/透传 traceId——
+ * 链路追踪入口过滤器（ADR-0009）：网关是外部流量的第一跳，负责统一生成/透传 traceId——
  * 服务间继续由 X-Trace-Id / traceparent 头 + MDC 贯穿（common 的 TraceIdFilter 与
  * Dubbo Filter 已就绪，此前缺的正是入口这一环，跨服务日志无法串联）。
  * order=-300：先于 internal(-200) 与 auth(-100)，所有下游过滤都能读到追踪头。

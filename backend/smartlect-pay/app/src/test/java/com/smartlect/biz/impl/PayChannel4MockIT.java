@@ -1,7 +1,12 @@
 package com.smartlect.biz.impl;
 
+import com.smartlect.biz.PayMockChannelLedgerService;
 import com.smartlect.biz.PayTradeRecordService;
+import com.smartlect.metrics.SmartlectMetrics;
 import com.smartlect.entity.po.PayTradeRecord;
+import com.smartlect.task.PayDailyReconcileTask;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.test.util.ReflectionTestUtils;
 import com.smartlect.exception.BusinessException;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +44,7 @@ class PayChannel4MockIT {
         var datasource = new DriverManagerDataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword());
         Flyway.configure().dataSource(datasource).locations("classpath:db/migration").load().migrate();
         jdbc = new JdbcTemplate(datasource);
+        jdbc.update("DELETE FROM pay_mock_channel_ledger");
         jdbc.update("DELETE FROM pay_mock_refund");
         jdbc.update("DELETE FROM pay_trade_record");
         jdbc.update("INSERT INTO pay_trade_record (trade_id, order_id, user_id, pay_order_id, pay_channel, pay_amount, trade_status, create_time) "
@@ -46,7 +52,7 @@ class PayChannel4MockIT {
         PayTradeRecordService trades = mock(PayTradeRecordService.class);
         when(trades.findByPayOrderId(anyString())).thenAnswer(call -> {
             // 对缺失行返回 null 而不是抛错——对齐生产实现 MyBatis selectOne 的语义，
-            // 使"支付意图不存在"的幂等路径（closeOrder/queryOrder，ADR-0018）可被测到。
+            // 使"支付意图不存在"的幂等路径（closeOrder/queryOrder，ADR-0002）可被测到。
             List<PayTradeRecord> rows = jdbc.query(
                     "SELECT * FROM pay_trade_record WHERE pay_order_id = ?", (row, index) -> {
                         PayTradeRecord record = new PayTradeRecord();
@@ -61,7 +67,7 @@ class PayChannel4MockIT {
         });
         doAnswer(call -> jdbc.update("UPDATE pay_trade_record SET trade_status = 3 WHERE pay_order_id = ?",
                 call.getArgument(0, String.class))).when(trades).markRefunded(anyString());
-        ProxyFactory proxy = new ProxyFactory(new PayChannel4Mock(trades, mock(com.smartlect.constants.TransactionalMqSender.class), jdbc));
+        ProxyFactory proxy = new ProxyFactory(new PayChannel4Mock(trades, mock(com.smartlect.constants.TransactionalMqSender.class), jdbc, new PayMockChannelLedgerService(jdbc)));
         proxy.setProxyTargetClass(true);
         proxy.addAdvice(new TransactionInterceptor(new DataSourceTransactionManager(datasource),
                 new AnnotationTransactionAttributeSource()));
@@ -105,7 +111,7 @@ class PayChannel4MockIT {
 
     @Test
     void closeOrderTreatsMissingIntentAsAlreadyClosed() {
-        // ADR-0018：下单 Phase4 失败的孤儿单没有支付意图；超时关单消息到达时
+        // ADR-0004：下单 Phase4 失败的孤儿单没有支付意图；超时关单消息到达时
         // closeOrder 必须幂等成功，否则关单消费者会无限重投。
         assertDoesNotThrow(() -> channel.closeOrder("pay-missing-intent"));
     }
@@ -123,5 +129,37 @@ class PayChannel4MockIT {
         } catch (BusinessException rejected) {
             return false;
         }
+    }
+
+    @Test
+    void completeAndRefundWriteIdempotentChannelLedgerRows() {
+        channel.completePayment("pay-1");
+        channel.completePayment("pay-1");
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM pay_mock_channel_ledger WHERE event_type='COMPLETE'", Integer.class));
+        channel.refund("pay-1", "refund-ledger", new BigDecimal("30.00"));
+        channel.refund("pay-1", "refund-ledger", new BigDecimal("30.00"));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM pay_mock_channel_ledger WHERE event_type='REFUND'", Integer.class));
+        assertEquals(new BigDecimal("90.00"), jdbc.queryForObject(
+                "SELECT amount FROM pay_mock_channel_ledger WHERE event_id='complete:pay-1'", BigDecimal.class));
+    }
+
+    @Test
+    void dailyReconcileReportsMissingLedgerWithoutChangingData() {
+        channel.completePayment("pay-1");
+        channel.refund("pay-1", "refund-reconcile", new BigDecimal("30.00"));
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        PayDailyReconcileTask task = new PayDailyReconcileTask();
+        ReflectionTestUtils.setField(task, "jdbc", jdbc);
+        ReflectionTestUtils.setField(task, "metrics", new SmartlectMetrics(registry));
+        task.reconcile();
+        assertNull(registry.find("smartlect_pay_reconcile_diff_total").counter());
+
+        jdbc.update("DELETE FROM pay_mock_channel_ledger WHERE event_type='REFUND'");
+        task.reconcile();
+        assertEquals(1.0, registry.get("smartlect_pay_reconcile_diff_total")
+                .tags("type", "refund_missing").counter().count());
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM pay_mock_refund", Integer.class));
     }
 }

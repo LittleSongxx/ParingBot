@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** 日志脱敏（ADR-0021）：手机号/身份证/邮箱打码，其余内容不动。 */
+/** 日志脱敏（ADR-0009）：手机号/身份证/邮箱打码，其余内容不动。 */
 class MaskingMessageConverterTest {
 
     @Test

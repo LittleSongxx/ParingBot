@@ -8,7 +8,7 @@ public final class AdminPermissions {
     public static final String ANALYTICS_READ = "analytics:read";
     public static final String ANALYTICS_EXPORT = "analytics:export";
     public static final String AUDIT_READ = "audit:read";
-    // ADR-0022 权限粒度细化
+    // ADR-0008 权限粒度细化
     public static final String OPS_COMPENSATION_READ = "ops:compensation-read";
     public static final String OPS_TOOL = "ops:tool";
     public static final String ORDER_MANAGE = "order:manage";

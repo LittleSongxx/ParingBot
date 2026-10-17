@@ -1,0 +1,7 @@
+1460 inner=1460 bodyScroll=1460 figW=956 svgW=954 textMin=10.49 figOverflowX=hidden
+1180 inner=1180 bodyScroll=1180 figW=812 svgW=860 textMin=9.46 figOverflowX=auto
+1000 inner=1000 bodyScroll=1000 figW=632 svgW=860 textMin=9.46 figOverflowX=auto
+920 inner=920 bodyScroll=920 figW=850 svgW=860 textMin=9.46 figOverflowX=auto
+860 inner=860 bodyScroll=860 figW=790 svgW=860 textMin=9.46 figOverflowX=auto
+700 inner=700 bodyScroll=700 figW=630 svgW=860 textMin=9.46 figOverflowX=auto
+390 inner=500 bodyScroll=500 figW=430 svgW=860 textMin=9.46 figOverflowX=auto

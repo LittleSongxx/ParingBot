@@ -58,7 +58,7 @@ public class RedisComponent {
         redisTemplate.delete(Constants.REDIS_KEY_CHECK_CODE + checkCodeKey);
     }
 
-    // ===== 管理端 Sa-Token 会话（ADR-0011 Step 2）=====
+    // ===== 管理端 Sa-Token 会话（ADR-0008 Step 2）=====
     // common 不引 Sa-Token SDK，按 Sa-Token 1.39 键布局裸读写：
     //   {tokenName}:{loginType}:token:{token}     -> adminId 裸字符串
     //   {tokenName}:{loginType}:session:{adminId} -> Account-Session JSON，dataMap.adminPrincipal 即 AdminPrincipalDTO
@@ -164,7 +164,7 @@ public class RedisComponent {
         return values;
     }
 
-    // ===== 用户端 web 会话（Sa-Token 键布局，ADR-0011 Step 1）=====
+    // ===== 用户端 web 会话（Sa-Token 键布局，ADR-0008 Step 1）=====
     // 登录态由 user 服务 StpUtil 写入；common 不依赖 Sa-Token SDK，按下述格式裸读写：
     //   token:login:token:{token}     -> loginId 裸字符串
     //   token:login:session:{loginId} -> Account-Session JSON，dataMap.userInfo 即 TokenUserInfoDTO
@@ -285,7 +285,7 @@ public class RedisComponent {
             }
             return list.isArray() ? list : null;
         } catch (Exception e) {
-            // ADR-0022：解析失败此前静默 null（故障不可观测），升级为 warn 留痕
+            // ADR-0009：解析失败此前静默 null（故障不可观测），升级为 warn 留痕
             log.warn("解析 Sa-Token 账号会话失败：{}", e.getMessage());
             return null;
         }

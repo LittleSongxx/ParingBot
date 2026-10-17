@@ -67,6 +67,18 @@ class ProductCartServiceTest {
     }
 
     @Test
+    void invalidSkuCombinationIsRejectedInsteadOfFallingBackToDefaultSku() {
+        when(productCartMapper.selectByProductIdAndPropertyValueIdHashAndUserId(
+                eq("p1"), anyString(), eq("u1"))).thenReturn(null);
+        when(productRpcSupport.snapshotBatch(any())).thenReturn(new com.smartlect.api.dto.ProductSnapshotBatchVO());
+        when(productRpcSupport.toSkuMapByPropertyValueIds(any())).thenReturn(java.util.Map.of());
+
+        assertThrows(BusinessException.class,
+                () -> service.add2Cart(cart("u1", "p1", "not-a-real-sku", 1)));
+        verify(productCartMapper, never()).insert(any(ProductCart.class));
+    }
+
+    @Test
     void overLimitQuantityIsRejected() {
         when(productCartMapper.selectByProductIdAndPropertyValueIdHashAndUserId(
                 eq("p1"), anyString(), eq("u1"))).thenReturn(null);

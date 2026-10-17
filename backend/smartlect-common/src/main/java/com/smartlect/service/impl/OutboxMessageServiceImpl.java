@@ -121,7 +121,7 @@ public class OutboxMessageServiceImpl implements OutboxMessageService {
                 return;
             }
         }
-        // ADR-0023：租约与退避时间全部由数据库 NOW() 推导（SQL 侧 DATE_ADD），
+        // ADR-0004：租约与退避时间全部由数据库 NOW() 推导（SQL 侧 DATE_ADD），
         // 消除跨实例应用时钟漂移超过租约期导致的双重投递窗口
         Date now = new Date();
         Integer claimed = localMessageOutboxMapper.claimForDispatch(

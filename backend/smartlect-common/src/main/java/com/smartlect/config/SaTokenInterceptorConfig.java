@@ -11,7 +11,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * Sa-Token 服务端注解鉴权（ADR-0011 Step 3）。
+ * Sa-Token 服务端注解鉴权（ADR-0008 Step 3）。
  *
  * <p>取代 GlobalOperationAspect + AppInterceptor：
  * 用户端 /api/** 路径由 @SaCheckLogin 拦截（SaInterceptor 全局注册）；

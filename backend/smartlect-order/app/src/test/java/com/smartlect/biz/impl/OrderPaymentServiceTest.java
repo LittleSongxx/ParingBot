@@ -46,7 +46,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 批次二支付回调短事务化（ADR-0019）的结构性锚定：
+ * 批次二支付回调短事务化（ADR-0002）的结构性锚定：
  * assertSettled（远程读）在短事务之前，券核销与 markSuccess（远程写）在短事务之后——
  * 远程调用不再占用本地数据库连接。
  */

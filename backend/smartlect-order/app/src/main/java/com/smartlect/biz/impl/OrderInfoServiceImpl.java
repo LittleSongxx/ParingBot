@@ -49,7 +49,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 订单门面（ADR-0019）：对外保持 {@link OrderInfoService} 契约不变，交易写路径委托给
+ * 订单门面（ADR-0002）：对外保持 {@link OrderInfoService} 契约不变，交易写路径委托给
  * 三个领域服务——{@link OrderCreationService}（下单/报价）、{@link OrderPaymentService}
  * （支付回调）、{@link OrderCancellationService}（取消/关单）；本类保留查询/富化/统计与
  * 确认收货。曾为 1509 行的上帝类，拆分后各职责单一、可独立演进。

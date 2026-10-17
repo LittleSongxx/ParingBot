@@ -24,6 +24,9 @@ public class SmartlectMetrics {
     public static final String PRODUCT_CACHE = "smartlect_product_cache_total";
     public static final String SLOW_SQL = "smartlect_sql_slow_total";
     public static final String IDEMPOTENT_STUCK = "smartlect_idempotent_stuck_total";
+    public static final String PAY_RECONCILE_DIFF = "smartlect_pay_reconcile_diff_total";
+    public static final String STOCK_HOT_RESERVE = "smartlect_stock_hot_reserve_total";
+    public static final String STOCK_HOT_RECONCILE_DIFF = "smartlect_stock_hot_reconcile_diff_total";
 
     private final MeterRegistry registry;
 
@@ -72,6 +75,23 @@ public class SmartlectMetrics {
     /** 慢 SQL：按 mapperId 计数（阈值见 smartlect.sql.slow-threshold-ms，默认 200ms）。 */
     public void slowSql(String mapperId) {
         Counter.builder(SLOW_SQL).tag("mapper", mapperId).register(registry).increment();
+    }
+
+    /** 热点库存预占结果：reserved / insufficient / fallback（Redis 不可用时退回 DB 条件更新）。 */
+    public void hotStockReserve(String result) {
+        Counter.builder(STOCK_HOT_RESERVE).tag("result", result).register(registry).increment();
+    }
+
+    /** 热点库存桶与 DB 快照不一致的次数（只在无活跃预占时重置）。 */
+    public void hotStockReconcileDiff() {
+        Counter.builder(STOCK_HOT_RECONCILE_DIFF).register(registry).increment();
+    }
+
+    /** Mock 支付日对账差异：type = complete_missing / complete_orphan / complete_amount / refund_missing ... */
+    public void payReconcileDiff(String type, long count) {
+        if (count > 0) {
+            Counter.builder(PAY_RECONCILE_DIFF).tag("type", type).register(registry).increment(count);
+        }
     }
 
     /** 商品详情缓存：layer = l1 / l2 / db，result = hit / miss / error / load。 */

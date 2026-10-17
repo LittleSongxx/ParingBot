@@ -98,6 +98,11 @@ smartlect:
     endpoints: ${SMARTLECT_ROCKETMQ_ENDPOINTS:127.0.0.1:8081}
   payment:
     mode: ${SMARTLECT_PAYMENT_MODE:mock}
+    mock-signature:
+      # 本地由 scripts/dev.sh bootstrap 生成随机密钥；生产必须显式设置（启动时会校验）。
+      enabled: ${SMARTLECT_MOCK_PAY_SIGNATURE_ENABLED:true}
+      secret: ${SMARTLECT_MOCK_PAY_SECRET:smartlect-dev-mock-pay-secret}
+      ttl-seconds: ${SMARTLECT_MOCK_PAY_TTL_SECONDS:300}
   internal:
     token: ${SMARTLECT_INTERNAL_TOKEN:}
     auth-enabled: true

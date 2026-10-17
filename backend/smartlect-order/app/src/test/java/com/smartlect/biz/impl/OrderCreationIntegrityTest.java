@@ -90,7 +90,7 @@ class OrderCreationIntegrityTest {
     @Mock
     private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
-    // 下单域已拆分为 OrderCreationService（ADR-0019）；构造器注入由 @InjectMocks 完成
+    // 下单域已拆分为 OrderCreationService（ADR-0002）；构造器注入由 @InjectMocks 完成
     @InjectMocks
     private OrderCreationService service;
 
@@ -299,7 +299,7 @@ class OrderCreationIntegrityTest {
 
     @Test
     void payTimeoutMessageIsWrittenInsidePhase3Transaction() {
-        // ADR-0018：超时关单消息必须与订单落库同事务写入 Outbox——旧实现在 Phase 4
+        // ADR-0004：超时关单消息必须与订单落库同事务写入 Outbox——旧实现在 Phase 4
         // 末尾才发送，扣库存/建支付意图失败会留下既无支付意图又无关单消息的永久孤儿订单。
         ProductItem line = item("p1", "v1", "ignored");
         PostOrderDTO request = request(List.of(line));

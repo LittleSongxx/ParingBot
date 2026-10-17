@@ -5,30 +5,28 @@
 <h1 align="center">Smartlect</h1>
 
 <p align="center">
-  <b>一家会按商品回答的店</b><br/>
-  C 端商城 + 商家后台，中间放一个有界 ReAct 导购 Agent
+  <b>一家店，九个 Java 服务，一套最终一致性</b><br/>
+  C 端商城 + 商家后台，交易、库存、订单、支付、退款全在 Java 后端
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Vue-3-42b883?style=flat-square&amp;logo=vuedotjs&amp;logoColor=white" />
   <img src="https://img.shields.io/badge/Java-17-orange?style=flat-square&amp;logo=openjdk&amp;logoColor=white" />
-  <img src="https://img.shields.io/badge/Spring_Cloud-2025-6db33f?style=flat-square&amp;logo=springboot&amp;logoColor=white" />
-  <img src="https://img.shields.io/badge/Python-3.11+-3776ab?style=flat-square&amp;logo=python&amp;logoColor=white" />
-  <img src="https://img.shields.io/badge/LangGraph-1.2-bounded-1a1a2e?style=flat-square" />
-  <img src="https://img.shields.io/badge/Elasticsearch_+_Qdrant-混检-005571?style=flat-square&amp;logo=elasticsearch&amp;logoColor=white" />
-  <img src="https://img.shields.io/badge/MySQL_·_Redis_·_RocketMQ-10_容器-4479a1?style=flat-square&amp;logo=mysql&amp;logoColor=white" />
+  <img src="https://img.shields.io/badge/Spring_Boot-3.5-6db33f?style=flat-square&amp;logo=springboot&amp;logoColor=white" />
+  <img src="https://img.shields.io/badge/Spring_Cloud_Alibaba-2025-6db33f?style=flat-square&amp;logo=spring&amp;logoColor=white" />
+  <img src="https://img.shields.io/badge/MySQL_·_Redis_·_RocketMQ-交易数据面-4479a1?style=flat-square&amp;logo=mysql&amp;logoColor=white" />
   <a href="https://github.com/LittleSongxx/Smartlect/actions/workflows/ci.yml"><img src="https://github.com/LittleSongxx/Smartlect/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
 </p>
 
 <p align="center">
-  <img src="docs/assets/screenshots/home.png" alt="智选商城首页：分类、确定性精选、货架来自交易权威" width="100%" />
+  <img src="docs/assets/screenshots/home.png" alt="智选商城首页：分类、精选商品与购物车入口" width="100%" />
 </p>
 
 ---
 
-**Smartlect 是一套可演示的单店。** 前面是能逛的商城，后面是商家后台，中间不是聊天机器人套了个商城皮——货架、价格、库存来自 Java 目录；导购默认钉在「正在问本商品」；店规写成文档，发布之后才允许被引用。
+**Smartlect 是一套可演示的单店 Java 交易后端。** 浏览器只负责把状态画出来；商品、库存、购物车、优惠券、订单、支付、退款分别由 9 个 Spring Boot 服务负责。每个服务只写自己的 schema，跨服务一致性靠本地事务 + Outbox + 幂等账本 + 补偿 + 对账收敛。
 
-模型可以建议，不能成交。下单、退款、经营授权都要人点确认。价格和库存不进向量，每次重问交易服务。支付是模拟的，没有真实资金。
+支付是本地模拟，不接真实渠道；没有真实资金，也没有把 mock 支付当成生产支付。
 
 线上可以直接点：[用户端](https://smartlect.cn/) · [管理端](https://smartlect.cn/admin/)。
 
@@ -36,73 +34,54 @@
 
 | 端 | 账号 | 密码 | 能做什么 | 不能做什么 |
 | --- | --- | --- | --- | --- |
-| 用户端 | `shopper@smartlect.demo` | `Visit-Smartlect-2026` | 逛店、问导购、加购、模拟下单（已预置收货地址和体验券） | 改密、改资料、注册新号 |
-| 用户端 | `visitor@smartlect.demo` | `Visit-Smartlect-2026` | 逛店、看商品、问导购 | 下单、加购、改密、改地址、注册新号 |
-| 管理端 | `gallery` | `Visit-Smartlect-2026` | 看板、商品、订单、退款复核、知识库 | 改库存、发知识、发券、发货、管账号、看用户隐私 |
+| 用户端 | `shopper@smartlect.demo` | `Visit-Smartlect-2026` | 逛店、加购、模拟下单（已预置收货地址和体验券） | 改密、改资料、注册新号 |
+| 用户端 | `visitor@smartlect.demo` | `Visit-Smartlect-2026` | 逛店、看商品 | 下单、加购、改密、改地址、注册新号 |
+| 管理端 | `gallery` | `Visit-Smartlect-2026` | 看板、商品、订单、退款复核 | 改库存、发券、发货、管账号、看用户隐私 |
 
 ---
 
-## 逛店的时候在发生什么
+## 一笔订单在 Java 后端里怎么走
 
 <table>
 <tr>
 <td width="33%" valign="top">
 
-**① 逛店**
+**① 逛店与加购**
 
-首页、分类、搜索、商品详情都是一家真店的皮。货架来自 Java 目录，不是为聊天临时拼的卡片。
+首页、分类、搜索、商品详情都读商品域。详情走 Caffeine L1 + Redis L2，库存不进缓存；搜索走 ES 文本过滤，再回 MySQL 做分类、价格、排序和分页。
 
-搜索走 ES 的 IK 分词，索引由 Canal 从 MySQL binlog 增量同步——查询链路不依赖同步链路。
-
-</td>
-<td width="33%" valign="top">
-
-**② 问这件**
-
-在商品页打开导购，范围钉在「正在问本商品」。Shopping Agent 按这件检索**已发布**资料；答不上来就承认。
-
-价格和库存不在向量里，每次回问交易服务。
+购物车只保存“想买什么”：唯一键合并、数量累加、不锁库存。
 
 </td>
 <td width="33%" valign="top">
 
-**③ 下单**
+**② 下单**
 
-加购、结算、支付走 Java 交易域：订单幂等账本、库存条件更新、事务性 Outbox 投递事件。
+订单服务按五阶段编排：读准备 → 锁券 → 短本地事务 → 事务外扣库存/建支付意图 → 失败补偿。
 
-下单和退款都会弹出确认，模型不能替你点。
+订单、明细、物流、券关系和 15 分钟关单消息写在同一个本地事务里；库存扣减用条件更新，重复请求由幂等账本挡住。
+
+</td>
+<td width="33%" valign="top">
+
+**③ 支付与售后**
+
+支付服务维护自己的支付单，支付成功发事件；订单服务收到事件后 CAS 订单状态、核销券。订单已关闭后的迟到支付原路退款。
+
+退款是持久化 Saga：按明细退、支付确认、库存回补、整单全退才退券；失败可重试，耗尽转人工复核。
 
 </td>
 </tr>
 </table>
 
-<p align="center">
-  <img src="docs/assets/screenshots/product-guide.png" alt="商品页导购浮层：问这件，范围钉在当前商品" width="100%" />
-  <br/>
-  <em>商品页打开导购，浮层标题是「问这件」，默认钉在当前商品；想聊全店政策再点「改问全店」。</em>
-</p>
-
 <table>
 <tr>
-<td width="50%"><img src="docs/assets/screenshots/cart.png" alt="购物车" /><br/><b>加购之后</b> — 规格与单价来自商品域，小计随数量实时算</td>
-<td width="50%"><img src="docs/assets/screenshots/orders.png" alt="我的订单" /><br/><b>下单之后</b> — 状态以订单域为准，可继续支付或取消</td>
+<td width="50%"><img src="docs/assets/screenshots/product-detail.png" alt="商品详情：SKU、价格和实时库存" /><br/><b>商品详情</b> — 规格、价格与实时库存；选规格时才向库存服务取数</td>
+<td width="50%"><img src="docs/assets/screenshots/cart.png" alt="购物车：规格、单价与小计" /><br/><b>购物车</b> — 唯一键合并；加购价只是展示快照，结算按商品快照重新计价</td>
 </tr>
-</table>
-
----
-
-## 导购现场
-
-**回答有出处，敢说不知道。** 店规写成可以单独发布的文档，草稿保存与发布分离；撤回后不再被新的客服引用。每条结论挂着它引用的那一节，点开能对。
-
-**可并行的活派给子智能体。** 遇到对比多件商品这类互相独立的检索，通过 `task_dispatch` 派发 1–3 个子智能体并发跑，各算各的上下文与预算，结果回到主线合成。
-
-**提案要人点确认。** 需要落交易时，Agent 生成的是一张待确认提案，不是直接下单；确认动作始终留在人这一侧。
-
-<table>
 <tr>
-<td width="50%"><img src="docs/assets/screenshots/assistant.png" alt="智能客服：带引用的回答" /><br/><b>带引用的回答</b> — 结论挂到具体文档版本，引用可展开</td>
-<td width="50%"><img src="docs/assets/screenshots/product-sku.png" alt="规格选择面板" /><br/><b>规格与库存</b> — 选规格时才向库存服务取数，页面不缓存旧值</td>
+<td width="50%"><img src="docs/assets/screenshots/checkout.png" alt="结算页：地址、优惠券与支付方式" /><br/><b>结算</b> — 地址、优惠券、支付方式在提交前一次确认</td>
+<td width="50%"><img src="docs/assets/screenshots/orders.png" alt="我的订单：状态、金额与退款入口" /><br/><b>下单之后</b> — 状态以订单域为准；可继续支付、取消或申请退款</td>
 </tr>
 </table>
 
@@ -110,16 +89,24 @@
 
 ## 后台看的是同一份数据
 
-管理端不做第二套真相：订单状态以订单域为准，商品上下架改的是商品域，知识库发布的是检索用的那一份。
+管理端不做第二套真相：订单状态以订单域为准，商品上下架改的是商品域，库存以库存服务为准。`admin` 服务只做 Dubbo 聚合、统计、设置和运维出口。
 
 <table>
 <tr>
-<td width="50%"><img src="docs/assets/screenshots/admin-product.png" alt="管理端商品管理" /><br/><b>商品</b> — 检索、上下架、SKU 与价格区间</td>
-<td width="50%"><img src="docs/assets/screenshots/admin-order.png" alt="管理端订单管理" /><br/><b>订单</b> — 发货与状态流转，买家信息默认隐藏</td>
+<td width="50%"><img src="docs/assets/screenshots/admin-dashboard.png" alt="管理端看板：今日数据与近七日曲线" /><br/><b>看板</b> — 今日订单/销售额/用户/商品与近 7 日曲线，数据来自各域聚合</td>
+<td width="50%"><img src="docs/assets/screenshots/admin-order.png" alt="管理端订单：状态、金额与发货入口" /><br/><b>订单</b> — 状态流转、发货、买家信息默认隐藏；写操作回到订单域</td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/assets/screenshots/admin-knowledge.png" alt="管理端知识库" /><br/><b>知识库</b> — 草稿/发布分离，索引失败可重试</td>
-<td width="50%"><img src="docs/assets/screenshots/checkout.png" alt="结算页" /><br/><b>结算</b> — 地址、优惠券、支付方式在提交前一次确认</td>
+<td width="50%"><img src="docs/assets/screenshots/admin-refund-review.png" alt="管理端退款复核：待复核退款与审批动作" /><br/><b>退款复核</b> — 支付/库存重试耗尽的退款单转人工，可 approve/reject</td>
+<td width="50%" valign="top">
+
+**权限边界**
+
+用户端和管理端是两套 Sa-Token realm：用户 `token`，管理端 `adminToken`。网关只校验会话键存在性，角色、权限点和数据归属由服务端判定。
+
+公开演示的 `gallery` 账号默认只读；退款复核是显式放行的例外。写接口必须有权限注解，CI 有授权门禁。
+
+</td>
 </tr>
 </table>
 
@@ -128,36 +115,30 @@
 ## 架构
 
 <p align="center">
-  <img src="docs/assets/architecture.png" alt="Smartlect 架构：Vue 双端 → 网关(Sa-Token 会话键) → Python 导购 Agent ｜ Java 交易权威 → 数据面" width="100%" />
+  <img src="docs/assets/backend-architecture.png" alt="Smartlect Java 后端架构：Vue 双端 → 网关 → 9 个 Java 服务 → MySQL/Redis/RocketMQ/Nacos/ES/Canal/xxl-job" width="100%" />
 </p>
 
-这条边界是刻意画的：浏览器只负责把状态画出来，Python 负责「问什么、检索什么、下一步计划什么」，真正改价格、扣库存、落订单的，只有 Java。
-
-系统里只有一个领域 Agent——Shopping，用有界 ReAct 循环。没有总指挥，没有把检索或记账再包装成 Agent。
+浏览器只负责把状态画出来；真正改价格、扣库存、落订单、退款的只有 Java。网关不做业务鉴权，也不向下游注入身份头；下游从 Sa-Token 会话重新取身份。
 
 ```mermaid
 flowchart LR
-  B["浏览器<br/>Vue 3 双端"] --> N["nginx<br/>TLS · 静态 · /api 不缓冲"]
-  N --> G["Gateway :18080<br/>Sa-Token 会话键 · Sentinel"]
-  G -->|/api/assistant| A["Assistant :18000<br/>FastAPI + LangGraph"]
-  G -->|/api/**| J["Java 交易域 · 9 服务"]
-  A -->|混检| R["ES 8.19 + Qdrant 1.15"]
-  A -->|价格/库存回问| J
-  J --> D["MySQL · Redis · RocketMQ"]
+  B["浏览器<br/>Vue 3 双端"] --> N["nginx<br/>TLS · 静态 · /api 反代"]
+  N --> G["Gateway :18080<br/>Trace · Sa-Token 会话键 · Sentinel"]
+  G --> J["9 个 Java 服务<br/>user · product · stock · cart<br/>order · pay · coupon · admin"]
+  J --> D["MySQL · Redis · RocketMQ · Nacos"]
   M[("MySQL binlog")] -->|Canal| Q["RocketMQ"] -->|ProductIndexConsumer| E["ES 商品索引"]
-  X["xxl-job 2.5<br/>16 个定时任务"] -.->|调度| J
-  C["Nacos 2.5<br/>发现 + 配置中心"] -.->|注册 / 下发| J
-  C -.-> A
+  X["xxl-job 2.5<br/>定时 / 对账"] -.->|调度| J
 ```
 
-**两条主链**
+**三条主链**
 
 | 链路 | 路径 |
 |---|---|
-| 浏览 | nginx → Gateway（限流/鉴权）→ product → Caffeine L1 → Redis L2 → MySQL；未命中回源，Canal 兜底失效 |
-| 导购 | 浏览器 → Assistant 选工具 → ES + Qdrant 混检（只查已发布知识）→ 价格库存回问 Java → 带引用作答或出提案，人点确认才下单 |
+| 浏览 | nginx → Gateway（会话键/限流）→ product → Caffeine L1 → Redis L2 → MySQL；未命中回源，库存实时回补 |
+| 交易写 | Gateway → order → product 快照 / coupon 锁券 / stock 条件扣减 / pay 支付意图；本地事务只覆盖订单库，远程写幂等 + 补偿 |
+| 异步读模型 | MySQL binlog → Canal → RocketMQ → ProductIndexConsumer → ES；同时失效商品详情缓存 |
 
-**一致性没有用分布式事务框架。** 本地事务 + 事务性 Outbox 投递到 RocketMQ 做最终一致；订单幂等账本挡住重复提交，库存用条件更新，延迟队列取消超时未付款单，补偿日志自动重放失败的消费者。五层防线与各自的收敛者（关单消息 / 补偿重放 / 对账任务 / 人工重放接口）写在 §关键决策。
+**一致性没有用分布式事务框架。** 本地事务 + 事务性 Outbox 投递到 RocketMQ 做最终一致；订单幂等账本挡住重复提交，库存用条件更新 + 变更账本，延迟消息关单，补偿日志和 xxl-job 负责重放与对账。关键取舍与证据见 [ADR 索引](docs/adr/README.md)。
 
 ---
 
@@ -166,27 +147,23 @@ flowchart LR
 | | |
 |---|---|
 | **前端** | Vue 3 · Vite · Element Plus · TypeScript（用户端）· JavaScript（管理端） |
-| **交易** | Java 17 · Spring Boot 3.5 · Spring Cloud 2025 + Dubbo 3.3 · 9 个服务 · MyBatis + PageHelper |
-| **鉴权** | Sa-Token 1.39（网关读会话键 + 服务端 `@SaCheckLogin` / `@SaCheckPermission`） |
-| **Agent** | Python 3.11 · FastAPI · LangGraph 1.2 · openai SDK（兼容模式端点白名单） |
-| **检索** | Elasticsearch 8.19（IK BM25 + 商品索引）· Qdrant 1.15（HNSW dense）→ RRF → gte-rerank |
+| **交易** | Java 17 · Spring Boot 3.5 · Spring Cloud Alibaba 2025 · Dubbo 3.3 · 9 个服务 · MyBatis + PageHelper |
+| **鉴权** | Sa-Token 1.39（双 realm；网关读会话键 + 服务端 `@SaCheckLogin` / `@SaCheckPermission`） |
 | **缓存** | Caffeine L1 + Redis L2 + pub/sub 失效 + Canal 兜底 |
-| **消息** | RocketMQ 5.3（任意精度定时消息 · Outbox 可靠投递 · 定时回投重试） |
+| **搜索** | Elasticsearch 8.19（IK/standard 分词 + 商品索引）；ES 不可达时回退 SQL LIKE |
+| **消息** | RocketMQ 5.3（Outbox 可靠投递 · 15min/1h/7d 延迟消息 · 消费幂等 · 补偿重放） |
 | **变更捕获** | Canal 1.1.8（MySQL binlog → RocketMQ → ES 商品索引与缓存失效） |
-| **调度** | xxl-job 2.5（16 个定时任务：Outbox 兜底投递按库 ×6、订单超时、支付轮询、秒杀与退款对账、幂等账本上报、coupon 补偿重放等） |
-| **服务治理** | Nacos 2.5（服务发现 + 配置中心）· 锁/限流 Redisson 4.0 |
-| **模型** | OpenAI 兼容端点直连（端点 / 模型白名单 + MySQL 热切换）；缺配置时明确失败，不静默降级 |
-| **基础设施** | 10 个容器（MySQL 8.4 · Redis 7.4 · RocketMQ 5.3 三件套 · Nacos 2.5 · ES 8.19(IK) · Qdrant 1.15 · Canal 1.1.8 · xxl-job 2.5） |
+| **调度** | xxl-job 2.5（Outbox 兜底投递按库、订单超时、支付轮询/日对账、秒杀与退款对账、幂等账本上报、补偿重放） |
+| **服务治理** | Nacos 2.5（服务发现 + 配置中心）· Redisson 4.0（锁/限流）· Sentinel（网关/ Dubbo 规则） |
+| **基础设施** | MySQL 8.4 · Redis 7.4 · RocketMQ 5.3 · Nacos 2.5 · Elasticsearch 8.19(IK) · Canal 1.1.8 · xxl-job 2.5 |
 
 ```
 backend/   gateway · user · product · stock · cart · order · pay · coupon · admin
-assistant/ Shopping Agent · RAG（ES+Qdrant 混检）· 提案确认 · 子智能体派发
 web/       用户端与管理端（Vue 3）
 deploy/    容器编排（compose）· nginx · SQL 初始化 · 集群编排
-scripts/   dev.sh 入口 · runtime.py 进程编排 · 压测与验证工具 · 故障演练
-evals/     quality-v2（导购 / 客服）
-eval/verification/  评测与发布的原始证据库（按日期归档）
-docs/      改动记录（按日归档的功能点）· 资产（架构图/截图）
+scripts/   dev.sh 入口 · runtime.py 进程编排 · 压测/故障演练/校验工具
+eval/verification/  压测、演练与发布证据（按日期归档）
+docs/      改动记录（按日归档）· ADR · 架构图/截图
 ```
 
 ---
@@ -195,20 +172,22 @@ docs/      改动记录（按日归档的功能点）· 资产（架构图/截�
 
 ```bash
 ./scripts/dev.sh bootstrap     # 探测空闲端口、生成本机凭证（run/runtime.env，权限 600）
-./scripts/dev.sh build         # 编译 Java + assistant venv + 双前端
-./scripts/dev.sh infra-up      # 起 10 个中间件容器并等待健康
-./scripts/dev.sh up            # 按依赖顺序拉起 12 个应用进程
+./scripts/dev.sh build         # 编译 Java + 双前端
+./scripts/dev.sh infra-up      # 起 MySQL/Redis/RocketMQ/Nacos/ES/Canal/xxl-job 并等待健康
+./scripts/dev.sh up            # 按依赖顺序拉起应用进程与前端
 ```
 
-用户端 [http://127.0.0.1:18180/](http://127.0.0.1:18180/) ，管理端 [http://127.0.0.1:18181/admin/](http://127.0.0.1:18181/admin/) 。需要一套示例货架时再执行 `./scripts/dev.sh seed-store`。
+用户端 [http://127.0.0.1:18180/](http://127.0.0.1:18180/)，管理端 [http://127.0.0.1:18181/admin/](http://127.0.0.1:18181/admin/)。需要一套示例货架时再执行 `./scripts/dev.sh seed-store`。
 
 端口由 bootstrap 探测空闲值并写进 `run/runtime.env`，下表是默认值：
 
 | 层 | 端口 |
 |---|---|
-| 中间件 | MySQL 13306 · Redis 16379 · RocketMQ gRPC 8081 · Nacos 18848 · ES 9200 · Qdrant 6333 · Canal 11111 · xxl-job 18090 |
-| 应用 | gateway 18080 · admin 18101 · cart 18102 · pay 18103 · order 18104 · user 18105 · product 18106 · coupon 18107 · stock 18108 · assistant 18000 |
+| 中间件 | MySQL 13306 · Redis 16379 · RocketMQ gRPC 8081 · Nacos 18848 · ES 9200 · Canal 11111 · xxl-job 18090 |
+| Java | gateway 18080 · admin 18081 · user 18082 · product 18083 · stock 18084 · cart 18085 · order 18086 · pay 18087 · coupon 18088 |
 | 前端 | 用户端 18180 · 管理端 18181 |
+
+本地 `run/runtime.env` 可能把 Java 端口覆盖为 `18101–18108`、网关覆盖为 `18082`；以启动日志和 `run/runtime.env` 为准。
 
 已经部署的副本：[用户端](https://smartlect.cn/) · [管理端](https://smartlect.cn/admin/)。试用账密见上文，超管密码不在此公开。
 
@@ -216,14 +195,15 @@ docs/      改动记录（按日归档的功能点）· 资产（架构图/截�
 
 ## 怎么验证它真的能跑
 
-仓库带 [CI](https://github.com/LittleSongxx/Smartlect/actions/workflows/ci.yml)，backend 一档跑的是**集成档而不是单测档**：`mvn -Pintegration verify`（单测 + 7 个 testcontainers 真库 IT + jacoco），再加一道覆盖率棘轮：
+仓库带 [CI](https://github.com/LittleSongxx/Smartlect/actions/workflows/ci.yml)，backend 一档跑的是**集成档而不是单测档**：`mvn -Pintegration verify`（单测 + 9 个 Testcontainers IT + JaCoCo），再加覆盖率棘轮和管理端授权门禁：
 
 ```bash
-mvn -B -f backend/pom.xml -Pintegration verify   # 单测 + 真库 IT（Outbox 租约 SQL、金额分摊、下单一致性…）
+mvn -B -f backend/pom.xml -Pintegration verify   # 单测 + 真库 IT（Outbox 租约、金额分摊、下单一致性…）
 python3 scripts/coverage_gate.py                  # 行覆盖率对比 backend/jacoco-baseline.txt（±1pp 容差）
+python3 scripts/check_admin_authz.py              # 管理端写接口必须权限注解/二次确认/展厅拒绝清单
 ```
 
-本地一条命令跑三栈自检（Java 单测 · Python 单测 · 双前端 vitest · 运行时自测与进程独立性检查）：
+本地三栈自检（Java 单测 · 双前端 vitest · 运行时自测与进程独立性检查）：
 
 ```bash
 ./scripts/dev.sh check
@@ -233,36 +213,45 @@ python3 scripts/coverage_gate.py                  # 行覆盖率对比 backend/j
 
 ```bash
 ./scripts/dev.sh infra-check    # 中间件健康 + 权限隔离（app/flyway 只能碰自己的库）
-./scripts/dev.sh apps-check     # 12 个进程健康 + Nacos 注册数
-python3 scripts/xxljob_setup.py # 幂等登记 16 个调度任务（只加注解不会执行）
+./scripts/dev.sh apps-check     # 应用进程健康 + Nacos 注册数
+python3 scripts/xxljob_setup.py # 幂等登记调度任务（只加注解不会执行）
 ```
 
-公开评测（导购 / 客服两条线，各自的分母与指标，不合成总分）的题库与判分器在 `evals/`，运行入口 `scripts/eval_quality_v2.py`、`scripts/eval_support_eval.py`；原始证据按日期归档在 `eval/verification/`。
+**故障演练**（可复跑，产物可直接归档）：
+
+```bash
+python3 scripts/drills/fault_drills.py all
+```
+
+覆盖：并发同幂等键下单（幂等账本 + 条件扣减）、停 RocketMQ（下单仍成立、消息滞留 Outbox、恢复后自动投递）、停 Redis（鉴权 fail-closed、商品详情回源 DB、恢复后会话仍有效）。
+
+**压测方法与证据**：`scripts/loadtest/README.md` 记录了发压器、预热、业务错误统计、拐点口径和踩过的坑；浏览链路与订单链路的原始 JSON 在 `eval/verification/`。注意低并发/预热/发压机差异，不要把本地数字当生产容量。
 
 ---
 
 ## 指标与观测
 
-每个服务都暴露 `/actuator/prometheus`（health/info/prometheus 三件套，只从内网抓；nginx 不反代 `/actuator`）。业务指标走 `com.smartlect.metrics.SmartlectMetrics` 单一出口，命名约定 `smartlect_<域>_<事件>_total`，标签只放有限基数的维度：
+每个服务都暴露 `/actuator/prometheus`（health/info/prometheus 三件套，只从内网抓；nginx 不反代 `/actuator`）。业务指标走 `com.smartlect.metrics.SmartlectMetrics` 单一出口，命名约定 `smartlect_<域>_<事件>_total`，标签只放有限基数维度：
 
 | 指标 | 类型 | 含义 |
 |---|---|---|
-| `smartlect_product_cache_total{layer,result}` | Counter | 商品详情缓存：`layer=l1/l2/db`，`result=hit/miss/error/load`（L1 另有 Caffeine 的 `cache_*` 系列：命中率、加载耗时） |
+| `smartlect_product_cache_total{layer,result}` | Counter | 商品详情缓存：`layer=l1/l2/db`，`result=hit/miss/error/load`；L1 另有 Caffeine `cache_*` |
 | `smartlect_order_created_total` | Counter | 下单成功（按子单数累加，Phase 3 短事务提交即计） |
 | `smartlect_idempotent_replay_total{command}` | Counter | 幂等重放命中（同键重复请求返回既有结果） |
-| `smartlect_idempotent_conflict_total{command,reason}` | Counter | 幂等冲突，`reason=in_flight/stale_processing/inconclusive/manual_review/fingerprint_mismatch` |
-| `smartlect_idempotent_stuck_total{status}` | Counter | 幂等账本"待核对/待人工"积压（>0 用 `scripts/reconcile_idempotency.py` 带业务参数驱动出口） |
+| `smartlect_idempotent_conflict_total{command,reason}` | Counter | 幂等冲突：`in_flight/stale_processing/inconclusive/manual_review/fingerprint_mismatch` |
+| `smartlect_idempotent_stuck_total{status}` | Counter | 幂等账本“待核对/待人工/陈旧 PROCESSING”积压 |
 | `smartlect_stock_insufficient_total` | Counter | 库存不足（条件更新 0 行，防超卖的正常拒绝） |
 | `smartlect_outbox_dispatch_total{result}` | Counter | Outbox 投递：`sent/failed/parked`（`parked` = 撞 broker 时间轮上限，驻留待重投） |
 | `smartlect_mq_compensation_replayed_total` | Counter | 补偿日志自动重放成功条数 |
-| `smartlect_sql_slow_total{mapper}` | Counter | 慢 SQL（默认阈值 200ms，`smartlect.sql.slow-threshold-ms`）；只记 mapperId 与 SQL 骨架，不记参数值 |
-| `smartlect_knowledge_mirror_failures_total` | Counter | 知识发布后向 ES/Qdrant 双写失败次数（发布不阻塞，但检索侧可能缺该文档；>0 要查索引后端） |
-| `smartlect_idempotent_stuck_total{status}` | Counter | 幂等账本"待核对/待人工/陈旧 PROCESSING"计数（旧 PROCESSING = 进程崩溃或收口失败的遗留行） |
-| `smartlect_mq_outbox_exhausted` | Gauge | 重试耗尽、需人工重放的消息数（**长期 >0 要处置**） |
+| `smartlect_sql_slow_total{mapper}` | Counter | 慢 SQL（默认 200ms）；只记 mapperId 与 SQL 骨架，不记参数 |
+| `smartlect_mq_outbox_exhausted` | Gauge | 重试耗尽、需人工重放的消息数（长期 >0 要处置） |
+| `smartlect_pay_reconcile_diff_total{type}` | Counter | 支付日对账差异（本地支付单/退款/渠道账本），不自动改账 |
+| `smartlect_stock_hot_reserve_total{result}` | Counter | 热点库存原型：`reserved/insufficient/fallback`（Redis 故障时回退 DB；默认关） |
+| `smartlect_stock_hot_reconcile_diff_total` | Counter | 热点库存桶总和与 DB 不一致的次数（只在无活跃预占时按 DB 重建） |
 | `executor_*{name=smartlect.mq.async / smartlect.coupon.cache.rebuild}` | Gauge/Counter | 自定义线程池：活跃线程、队列深度、完成数、拒绝数 |
 | `hikaricp_*` · `tomcat_threads_*` · `jvm_*` | Boot 默认 | 连接池、容器线程、JVM（GC / 内存） |
 
-Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预算耗尽原因等）；日志带 `traceId`（网关入口裁决 → MDC → 跨 MQ / 线程池传播），手机号/邮箱等字段在落盘前脱敏。
+日志带 `traceId`（网关入口 → MDC → 跨 MQ/Dubbo/线程池传播），手机号/邮箱等字段在落盘前脱敏。
 
 ---
 
@@ -272,79 +261,65 @@ Agent 侧另有 FastAPI `/metrics`（`assistant_*`：准入拒绝、反馈、预
 |---|---|---|
 | 站点 | `http://127.0.0.1/` | nginx 反代网关，`/actuator` 与业务端口不对公网开放 |
 | 网关健康 | `:18080/actuator/health` | 依赖 Redis / Nacos 的存活探针 |
-| 调度中心 | `:18090/xxl-job-admin` | 16 个任务的执行记录、手动触发、失败重试；**判断"任务在跑"看 handle_code=200**，只看触发会漏掉"调度成功但执行器不可达"；集群必须用 `SMARTLECT_XXLJOB_BIND=node1 内网 IP`（只绑回环时三节点执行器全部失联） |
-| 展厅账号策略 | `TrialAdminAccess` + `TrialAdminGuardInterceptor` | 公开口令的 gallery 账号：**读默认允许（隐私清单除外）、写默认拒绝**（退款复核显式放行）。清单是展厅的第二道防线，**不是 RBAC**：管理端写接口必须自带 `@SaCheckPermission`，由 `scripts/check_admin_authz.py` 强制（不再接受"在拒绝清单里"作为保护证明） |
+| 调度中心 | `:18090/xxl-job-admin` | 任务执行记录、手动触发、失败重试；判断“任务在跑”看 `handle_code=200`，只看触发会漏掉“调度成功但执行器不可达” |
+| 展厅账号策略 | `TrialAdminAccess` + `TrialAdminGuardInterceptor` | 公开口令的 gallery 账号：读默认允许（隐私清单除外）、写默认拒绝（退款复核显式放行）；写接口必须自带 `@SaCheckPermission` |
 | 配置中心 | `:18848` Nacos 控制台 | `SMARTLECT_GROUP` 下的配置；改完用 `scripts/nacos_config_push.py` 推送 |
 | 指标 | 各服务 `/actuator/prometheus` | JVM / Hikari / 线程池 / 业务指标；只从内网抓 |
 | 应用日志 | `run/logs/<服务>.log` | 启动失败先看这里；`run/logs/<服务>/nacos/` 是注册与配置客户端日志 |
-| MQ 补偿 | 各库 `mq_compensation_log` | **发送失败/远程补偿**由 `mqCompensationReplay` 自动重放；**消费失败**默认留人工，仅 coupon（退款还券，幂等）打开自动重放（`mq.compensation.auto-replay-consume=true`） |
+| MQ 补偿 | 各库 `mq_compensation_log` | 发送失败/远程补偿由 `mqCompensationReplay` 自动重放；消费失败默认留人工，coupon 的退款还券幂等，可开自动重放 |
 | Outbox 水位 | 各库 `local_message_outbox` | 积压说明投递侧异常；`EXHAUSTED` 需人工介入 |
-| 副本节点版本 | node2/node3（见 `deploy/cluster/nodes.env`） | 副本应用 JAR 用 `deploy/cluster/scripts/sync-app-node.sh` 从 node1 同步（含重启与健康门禁）；**`deploy` 动词只更新 node1** |
-| 部署后核对 | `scripts/probes/post_deploy_check.sh https://smartlect.cn` | 展厅矩阵 ×8 + 多节点交替检测：同一路径若在期望码与其它码之间交替，说明有副本节点未更新 |
+| 付款对账 | `payDailyReconcile` | 对比支付单/退款/渠道账本，只出差异报告，不自动改账 |
+| 订单状态历史 | `GET /admin-api/order/{orderId}/statusLog` | CAS 成功后同事务追加；创建、支付、发货、退款、关单可串成一条时间线 |
+| 部署后核对 | `scripts/probes/post_deploy_check.sh https://smartlect.cn` | 展厅矩阵 + 多节点交替检测：同一路径在期望码与其它码之间交替，说明有副本节点未更新 |
 
 服务起不来时的顺序：`run/logs/<服务>.log` 找首个异常 → `infra-check` 确认中间件 → `apps-check` 确认注册数 → 调度类问题看 xxl-job 控制台。
-
-**部署覆盖面（三节点集群）**：CI 的 `deploy` 动词只做 node1（它所在的本机）——node1 单实例服务（admin/coupon/pay/stock）随部署更新；node2/node3 的副本服务（gateway/user/product/order/cart）要在 **node1** 上执行：
-
-```bash
-cd /opt/cluster/scripts   # 若缺脚本：cp -a /opt/smartlect/deploy/cluster/scripts/*.sh .
-bash sync-app-node.sh node2 "gateway,product,order,user,cart"
-bash sync-app-node.sh node3 "gateway,product,order,user,cart"
-```
-
-脚本从 node1 已构建产物取 JAR（副本节点不装 Maven）、渲染节点定制 env、重启 unit 并等健康。2026-10-16 实测教训：副本节点未更新时，同一接口会因负载均衡命中不同版本而"时拦时不拦"（403 与 200/600 交替）——上面核对脚本已把这个现象做成检测项。
 
 ---
 
 ## 关键决策
 
-这些都是"选择 A 不选 B"的判断，取舍与代价写在一起（历史 ADR 已随文档面清理下线，结论仍以代码与测试为准）：
+这些都是“选择 A 不选 B”的判断，取舍、代价和重审条件写在 ADR 里：
 
-| 决策 | 选择 | 理由与代价 |
-|---|---|---|
-| 一致性 | **不用分布式事务框架**，统一本地事务 + Outbox | 双轨（框架 + 手工补偿）会让回滚边界不可推理；代价是要自建幂等、补偿与对账四件事，且接受短暂不一致 |
-| 服务调用 | **OpenFeign → Dubbo 3** | 内网高 QPS 下的长连接与治理能力；代价是契约模块与注册中心耦合更重，门面类统一为 `*RpcSupport` |
-| 消息 | **RabbitMQ → RocketMQ 5** | 需要任意精度定时消息（15min/1h/7d 四档延迟）；代价是本地运维组件变多，且长延迟要处理 broker 24h 时间轮上限（驻留机制） |
-| 限流鉴权 | 自研三件套 → **Sa-Token** | 少维护一套会话实现；网关只校验会话键存在性，权限判定留在服务端注解 |
-| Agent 形态 | **一个领域 Agent + 按需并行子智能体** | 检索/记账是确定性服务，不包装成 Agent；子智能体只做只读检索，且预算与主循环共享 |
-| 成交边界 | **模型可以建议，不能成交** | 提案落库 + 人点确认 + version 乐观锁 + 幂等执行；代价是交互多一步，换来"重复确认 / 重放 / 超时"三件事都有确定答案 |
-| 检索 | 混检 **ES BM25 + Qdrant → RRF(k=60) → gte-rerank** | 词法管专名型号、向量管近义表达；重排失败回退融合序，未配置时回退内存 BM25 |
-| 价格库存 | **不进向量**，每次回问交易服务 | 向量是近似的，事实必须实时；代价是每轮多一次 RPC |
+| 决策 | 选择 | 理由与代价 | ADR |
+|---|---|---|---|
+| 一致性 | **不用分布式事务框架**，本地事务 + Outbox | 双轨回滚边界不可推理；代价是自建幂等、补偿、对账，并接受短暂不一致 | [0001](docs/adr/0001-transaction-consistency.md) |
+| 下单 | **五阶段 + 短本地事务** | 远程调用不占数据库连接；代价是 P4 失败要补偿、订单会真实存在 | [0002](docs/adr/0002-order-write-path.md) |
+| 库存 | **条件更新 + 变更账本** | 单条 UPDATE 原子判断 + 扣减；代价是热点 SKU 行锁瓶颈 | [0003](docs/adr/0003-stock-conditional-update.md) |
+| 消息 | **Outbox + RocketMQ + 消费幂等** | 业务与消息同生共死；代价是 at-least-once 与 DB 扫描 | [0004](docs/adr/0004-reliable-messaging.md) |
+| 订单状态 | **CAS + 支付生命周期锁** | 非法迁移拒绝、并发竞争可解释；0 行需要调用方解释 | [0005](docs/adr/0005-order-state-machine.md) |
+| 退款 | **持久化 Saga + 人工复核** | 可恢复、可审计；中间态会存在，部分退款不退券 | [0006](docs/adr/0006-refund-saga.md) |
+| 数据边界 | **每服务 schema，缓存/ES 是读模型** | 服务边界清晰；单 MySQL 仍是单点，CDC 有延迟 | [0007](docs/adr/0007-data-boundaries.md) |
+| 鉴权 | **双 realm + 网关只验会话键** | 权限能表达数据归属；内部令牌是共享令牌（已知风险） | [0008](docs/adr/0008-auth-and-internal-calls.md) |
+| 观测/安全 | **Trace/指标/脱敏/慢 SQL/限流** | 能定位、成本低；没有完整 APM/SLO/混沌 | [0009](docs/adr/0009-observability-and-security.md) |
+| 热点库存 | **原型默认关闭，DB 是事实源** | 为 Redis/Lua/分桶留演进路径；复杂度高，只在特定 SKU 开启 | [0010](docs/adr/0010-hot-stock-evolution.md) |
 
 ---
 
 ## 已知边界与遗留
 
-- **演示规模**：单机 MySQL、演示目录（47 个商品 / 20 SKU 场景 + 8.7 万条索引）、压测注入的并发（集群峰值 832 req/s @1600 并发，p95 4655ms；可持续档 811 req/s @600 并发，p95 ≈200ms；压测工具自身有已知偏高口径），不是生产流量。
-- **MQ 是单点**：DLedger 三副本编排已就绪但线上未启用，如实记录。
-- **Outbox 兜底按库注册**：`outboxDispatch` 在 order/user/product/cart/pay/admin 六个库各登记一份（各扫本库）；其余域没有 `local_message_outbox`，不适用。没有"一个任务扫所有库"的全局兜底。
-- **幂等账本无业务参数**：账本不存下游业务 id，因此 `INCONCLUSIVE / MANUAL_REVIEW` 不能自动改判，只能由运维带业务参数驱动核对（`scripts/reconcile_idempotency.py` + `orderIdempotencyReconcile` 上报）；要让它自动闭环，需要在业务行上冗余幂等键（列变更 + 回填，未做）。
+- **演示规模**：单机 MySQL、演示目录（47 个商品 / 20 SKU 场景 + 8.7 万条索引）。浏览链路压测：集群峰值 832 req/s @1600 并发，p95 4655ms；可持续档 811 req/s @600 并发，p95 ≈200ms；发压工具自身有已知偏高口径。不是生产流量。
+- **订单链路压测**：本地单机 10/20 VU、30 秒、加购→下单→支付全链，0 业务错误；p95 分别为 67.6/57.3 ms（热点库存默认关）。热点库存开时 60.9/61.9 ms，差异在噪声内；这是低并发回归信号，不是容量结论。方法、库存守恒核对与原始 JSON 见 [订单链路压测](docs/verification/order-load.md)。
+- **MQ 是单点**：DLedger 三副本编排已就绪但线上未启用。
+- **Outbox 兜底按库注册**：`outboxDispatch` 在 order/user/product/cart/pay/admin 六个库各登记一份；其余域没有 `local_message_outbox`。
+- **幂等账本无业务参数**：`INCONCLUSIVE / MANUAL_REVIEW` 不能自动改判，需运维带业务参数核对；要自动闭环需要在业务行冗余幂等键（未做）。
 - **Sentinel 规则热更**（Nacos 数据源）已完成代码侧，线上演练未做。
-- **xxl-job 的地址链**：应用在宿主机、调度中心在容器，两端都要能被对方访问——
-  执行器要自报"容器能回拨"的地址（单机 `host.docker.internal:<port>`，由 `SMARTLECT_XXLJOB_EXECUTOR_HOST` 注入；
-  副本节点用本机内网 IP），调度中心自身要绑"三节点都能访问"的地址（`SMARTLECT_XXLJOB_BIND`，
-  集群=node1 内网 IP，单机默认回环）。任一环节错，表现为"触发成功但任务不执行 / 执行器地址列表为空"，
-  且没有显式报错——2026-10-16（执行器地址）与 10-17（调度中心绑回环 + 容器缺 host 映射）各踩过一次。
-- **`deploy/seata/` 残留**：历史容器卷挂载留下的 root 属主空目录，未纳入版本控制，本地删除需 sudo。
-- **`smartlect_growth`**：助手库与账号沿用历史命名（环境变量已统一为 `SMARTLECT_ASSISTANT_*`），改名需数据迁移，暂不动。
-- **集成档进 CI 前的老问题**：`OutboxLeaseSqlIT` 曾因 MySQL 秒级 DATETIME 的四舍五入而抖动（创建时刻落在"未来 1 秒"），已回拨 create_time 修复。
-- **`/internal/**` 是"共享令牌=上帝模式"**（接受风险）：内部面只校验一枚共享令牌 + 可选委托身份头，
-  改成 per-service 令牌或签名 actor 需要重做全部服务与助手的调用约定；当前无已知利用链
-  （模型可影响的助手侧只暴露字面量路径且以 `/internal/` 开头），故明确列为接受风险。
-- **资源 id 用非 CSPRNG**（`StringTools.getRandomNumber`，ThreadLocalRandom）：不可从外部预测，
-  文件/订单/地址 id 的不可猜性不受影响；仅安全码（邮件验证码）已切 SecureRandom。
+- **xxl-job 地址链**：应用在宿主机、调度中心在容器，两端都要能被对方访问；任一环节错会表现为“触发成功但任务不执行”。
+- **`/internal/**` 是共享令牌**（接受风险）：内部面只校验一枚 `X-Internal-Token`；改成 per-service 令牌/签名 actor 需要重做全部调用约定。
+- **mock 支付**：有支付单、事件、迟到退款、HMAC 签名、nonce 防重放和日对账；但没有真实渠道、清算/结算和资金账本，不能当生产支付用。mock 模式下生产环境未设置 `SMARTLECT_MOCK_PAY_SECRET` 时启动会失败，而不是静默退回开发密钥；pay、assistant 与脚本必须使用同一密钥。
+- **`coupon_scope` 未在结算校验**：订单 DTO 没有 scope 字段，`coupon_scope` 目前只服务商品推荐侧的估算；锁券/核销只校验模板状态、有效期和门槛。
+- **热点库存原型默认关闭**：`smartlect.stock.hot-path.enabled=false`；只对配置的 SKU 生效，DB 仍是事实源。不是生产级高并发库存。
+- **资源 id 用非 CSPRNG**（`StringTools.getRandomNumber`，ThreadLocalRandom）：不可从外部预测；邮件验证码已切 SecureRandom。
 
 ## 这个仓库里没有的东西
 
 - **没有真实资金。** 支付是本地模拟：不接第三方、不跳转、不会扣款。
 - **没有公开超管密码。** 演示账号权限在服务端裁剪；仓库里的超管凭证只对本地环境有效。
 - **没有分布式事务框架。** 一致性靠本地事务 + Outbox + 幂等键 + 补偿 + 对账，不是两阶段提交。
-- **没有第二个 Agent。** 检索、记账、发货都是确定性服务，不包装成 Agent 增加不确定性。
-- **没有把模型当事实源。** 价格、库存、订单状态一律以交易服务为准，模型只负责组织语言与提案。
-- **经营助手 / 广告投放 / 评价分析 / 增长报告已退役**，管理端只留菜单占位说明，代码里没有。
+- **没有分库分表/单元化/多活。** 单 MySQL + 8 个业务 schema；规模上来后的演进路径写在 ADR-0010 与各 ADR 的“何时重审”。
+- **没有真实流量/生产容量结论。** 压测是本地三节点/低并发证据，口径写在 `scripts/loadtest/README.md` 与 `eval/verification/`。
 
 ---
 
 ## 许可
 
-仓库根目录**没有** `LICENSE` 文件。`backend/`、`web/user/`、`web/admin/` 以及 `assistant/licenses/` 下的子模块各自为 **MIT**。
+仓库根目录**没有** `LICENSE` 文件。`backend/`、`web/user/`、`web/admin/` 下的子模块各自为 **MIT**。

@@ -4,6 +4,7 @@ import com.smartlect.entity.enums.ProductSortKey;
 import com.smartlect.entity.enums.SortDirection;
 import com.smartlect.entity.query.ProductInfoQuery;
 import com.smartlect.entity.query.SysCategoryQuery;
+import com.smartlect.entity.vo.PaginationResultVO;
 import com.smartlect.entity.vo.Product4VO;
 import com.smartlect.entity.vo.ResponseVO;
 import com.smartlect.biz.ProductInfoService;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @RestController
@@ -79,6 +81,13 @@ public class ProductController extends ABaseController {
                     trimmed, query.getExcludeProductIdList(),
                     com.smartlect.search.ProductIndexService.SEARCH_ID_CAP);
             if (indexIds != null) {
+                if (indexIds.isEmpty()) {
+                    // 索引明确返回“没有命中”时不能把空 ID 列表交给 Mapper：
+                    // <if size>0> 会让 product_id in (...) 整段消失，退化成返回全部在售商品。
+                    return getSuccessResponseVO(new PaginationResultVO<>(
+                            0, com.smartlect.entity.enums.PageSize.SIZE15.getSize(), pageNo, 0,
+                            Collections.emptyList()));
+                }
                 query.setProductIdList(indexIds);
             } else {
                 query.setProductNameFuzzy(trimmed);
@@ -131,7 +140,7 @@ public class ProductController extends ABaseController {
 
     @PostMapping("/getProduct")
     public ResponseVO getProduct(@NotNull String productId) {
-        Product4VO product = productInfoService.getProduct4VOByProductId(productId);
+        Product4VO product = productInfoService.getProduct4VOByProductId(productId, true);
         return getSuccessResponseVO(product);
     }
 }

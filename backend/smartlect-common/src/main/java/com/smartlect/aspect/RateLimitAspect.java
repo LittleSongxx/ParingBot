@@ -67,8 +67,8 @@ public class RateLimitAspect {
 
         // 获取当前 HTTP 请求对象
         HttpServletRequest request = currentRequest();
-        // 根据限流类型构建 Redis 限流键
-        String key = buildKey(request, limit);
+        // 根据限流类型构建 Redis 限流键；键里必须带方法，避免不同接口共享同一个桶。
+        String key = buildKey(request, limit, methodKey(signature));
 
         // 调用限流服务检查是否允许访问
         // 参数：限流键、时间窗口（秒）、最大请求数
@@ -88,7 +88,12 @@ public class RateLimitAspect {
         return attrs.getRequest();
     }
 
-    private String buildKey(HttpServletRequest request, RateLimit limit) {
+    static String methodKey(MethodSignature signature) {
+        return signature.getDeclaringType().getSimpleName() + "#" + signature.getName()
+                + "#" + signature.getParameterTypes().length;
+    }
+
+    String buildKey(HttpServletRequest request, RateLimit limit, String methodKey) {
         // 限流键前缀
         String prefix = Constants.REDIS_RATE_LIMIT;
 
@@ -96,8 +101,8 @@ public class RateLimitAspect {
         if (limit.limitType() == RateLimit.LimitType.IP) {
             // 获取客户端真实 IP
             String ip = getClientIp(request);
-            // 构建键：rate:limit:ip:{IP地址}
-            return prefix + "ip:" + ip;
+            // 构建键：rate:limit:ip:{IP地址}:{Controller#method}
+            return prefix + "ip:" + ip + ":" + methodKey;
         } else {
             // 如果是按用户限流，从请求头获取 token
             String token = authCookieHelper.resolveWebToken(request);
@@ -107,8 +112,11 @@ public class RateLimitAspect {
             }
             // 根据token查userId
             String userId = redisComponent.getUserIdByToken(token);
-            // 构建键：rate:limit:user:{token}
-            return prefix + "user:" + userId;
+            if (StringTools.isEmpty(userId)) {
+                throw new BusinessException(ResponseCodeEnum.CODE_901);
+            }
+            // 构建键：rate:limit:user:{userId}:{Controller#method}
+            return prefix + "user:" + userId + ":" + methodKey;
         }
     }
 

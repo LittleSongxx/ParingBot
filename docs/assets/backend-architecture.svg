@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 660" role="img" aria-label="Smartlect Java 后端架构：Vue 双端 → 网关 → 9 个 Java 服务 → MySQL/Redis/RocketMQ/Nacos/ES/Canal/xxl-job">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0.8 L9.4 5 L0 9.2 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0.8 L9.4 5 L0 9.2 z" fill="#2563eb"/>
+    </marker>
+    <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0.8 L9.4 5 L0 9.2 z" fill="#059669"/>
+    </marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0 0.8 L9.4 5 L0 9.2 z" fill="#d97706"/>
+    </marker>
+  </defs>
+  <rect width="1180" height="660" fill="#ffffff"/>
+
+  <rect x="24" y="20" width="1132" height="86" rx="12" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="44" y="44" fill="#94a3b8" font-size="12.5" font-weight="700" letter-spacing="1">浏览器端（Vue 3 · 只负责把状态画出来）</text>
+  <rect x="44" y="54" width="220" height="40" rx="9" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.4"/>
+  <text x="60" y="79" fill="#5b21b6" font-size="13.5" font-weight="700">用户端 :18180</text>
+  <rect x="284" y="54" width="220" height="40" rx="9" fill="#f5f3ff" stroke="#7c3aed" stroke-width="1.4"/>
+  <text x="300" y="79" fill="#5b21b6" font-size="13.5" font-weight="700">管理端 :18181</text>
+  <text x="532" y="79" fill="#64748b" font-size="12.5">静态资源 + /api 与 /admin-api 反代 · 权限由服务端拒绝</text>
+
+  <path d="M144 106 V 140" stroke="#94a3b8" stroke-width="1.4" fill="none" marker-end="url(#a)"/>
+  <path d="M394 106 V 140" stroke="#94a3b8" stroke-width="1.4" fill="none" marker-end="url(#a)"/>
+
+  <rect x="44" y="142" width="460" height="48" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="60" y="163" fill="#1e293b" font-size="13.5" font-weight="700">nginx（本地/线上）</text>
+  <text x="60" y="181" fill="#64748b" font-size="12">TLS · 静态站 · /api 与 /admin-api 反代 · 不暴露 actuator</text>
+
+  <path d="M274 190 V 224" stroke="#94a3b8" stroke-width="1.4" fill="none" marker-end="url(#a)"/>
+  <rect x="44" y="226" width="760" height="64" rx="10" fill="#ecfdf5" stroke="#059669" stroke-width="1.8"/>
+  <text x="60" y="249" fill="#047857" font-size="14" font-weight="700">网关 :18080（Spring Cloud Gateway · Sa-Token 会话键）</text>
+  <text x="60" y="269" fill="#334155" font-size="12">Trace → 会话键检查 → 路由；剥掉伪造身份头，不注入身份；权限判定在服务端注解</text>
+
+  <path d="M424 290 V 322" stroke="#2563eb" stroke-width="1.6" fill="none" marker-end="url(#ab)"/>
+  <text x="432" y="311" fill="#64748b" font-size="12">lb:// 按路径转发（/api/** 与 /admin-api/**）</text>
+
+  <rect x="44" y="324" width="760" height="206" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="1.6"/>
+  <text x="60" y="348" fill="#1d4ed8" font-size="13" font-weight="700">交易权威：9 个 Java 服务 · 每服务独立 schema（唯一写口）</text>
+
+  <rect x="60" y="360" width="170" height="70" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="72" y="381" fill="#1e293b" font-size="12.5" font-weight="700">user :18082</text>
+  <text x="72" y="398" fill="#64748b" font-size="11">账号 / 地址 / RBAC</text>
+  <text x="72" y="414" fill="#94a3b8" font-size="10.5">登录锁 · 验证码 · 审核</text>
+
+  <rect x="250" y="360" width="170" height="70" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="262" y="381" fill="#1e293b" font-size="12.5" font-weight="700">product :18083</text>
+  <text x="262" y="398" fill="#64748b" font-size="11">目录 / SKU / 属性</text>
+  <text x="262" y="414" fill="#94a3b8" font-size="10.5">详情缓存 · ES 读模型</text>
+
+  <rect x="440" y="360" width="170" height="70" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="452" y="381" fill="#1e293b" font-size="12.5" font-weight="700">stock :18084</text>
+  <text x="452" y="398" fill="#64748b" font-size="11">条件更新 + 变更账本</text>
+  <text x="452" y="414" fill="#94a3b8" font-size="10.5">热点库存原型（默认关）</text>
+
+  <rect x="630" y="360" width="170" height="70" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="642" y="381" fill="#1e293b" font-size="12.5" font-weight="700">cart :18085</text>
+  <text x="642" y="398" fill="#64748b" font-size="11">加购 / 合并 / 删除</text>
+  <text x="642" y="414" fill="#94a3b8" font-size="10.5">待结算清单，不锁库存</text>
+
+  <rect x="60" y="442" width="170" height="70" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="72" y="463" fill="#1e293b" font-size="12.5" font-weight="700">order :18086</text>
+  <text x="72" y="480" fill="#64748b" font-size="11">五阶段 / 幂等 / 状态机</text>
+  <text x="72" y="496" fill="#94a3b8" font-size="10.5">退款 Saga · Outbox</text>
+
+  <rect x="250" y="442" width="170" height="70" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="262" y="463" fill="#1e293b" font-size="12.5" font-weight="700">pay :18087</text>
+  <text x="262" y="480" fill="#64748b" font-size="11">支付单 / mock 渠道</text>
+  <text x="262" y="496" fill="#94a3b8" font-size="10.5">HMAC · 回调幂等 · 对账</text>
+
+  <rect x="440" y="442" width="170" height="70" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="452" y="463" fill="#1e293b" font-size="12.5" font-weight="700">coupon :18088</text>
+  <text x="452" y="480" fill="#64748b" font-size="11">券模板 / 用户券</text>
+  <text x="452" y="496" fill="#94a3b8" font-size="10.5">锁券 · 核销 · 秒杀</text>
+
+  <rect x="630" y="442" width="170" height="70" rx="8" fill="#ffffff" stroke="#93c5fd"/>
+  <text x="642" y="463" fill="#1e293b" font-size="12.5" font-weight="700">admin :18081</text>
+  <text x="642" y="480" fill="#64748b" font-size="11">管理端 BFF</text>
+  <text x="642" y="496" fill="#94a3b8" font-size="10.5">Dubbo 聚合 · 统计 · 运维</text>
+
+  <text x="60" y="424" fill="#475569" font-size="11.5" opacity="0"> </text>
+
+  <path d="M804 416 H 828" stroke="#d97706" stroke-width="1.4" fill="none" stroke-dasharray="4 3" marker-end="url(#ao)"/>
+  <path d="M804 466 H 828" stroke="#0284c7" stroke-width="1.4" fill="none" stroke-dasharray="4 3" marker-end="url(#a)"/>
+
+  <rect x="828" y="324" width="328" height="122" rx="12" fill="#fffbeb" stroke="#d97706" stroke-width="1.6"/>
+  <text x="844" y="348" fill="#b45309" font-size="13" font-weight="700">交易一致性（没有全局事务）</text>
+  <text x="844" y="370" fill="#334155" font-size="12">本地事务只写本库 + Outbox 同事务</text>
+  <text x="844" y="390" fill="#334155" font-size="12">幂等账本挡重复 · 条件更新防超卖</text>
+  <text x="844" y="410" fill="#334155" font-size="12">补偿 + 对账收敛中间态；不用 Seata/2PC</text>
+  <text x="844" y="432" fill="#92400e" font-size="11.5">证据：故障演练 duplicate-order / mq-down / redis-down</text>
+
+  <rect x="828" y="454" width="328" height="76" rx="12" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.6"/>
+  <text x="844" y="478" fill="#0369a1" font-size="13" font-weight="700">两条读链路</text>
+  <text x="844" y="498" fill="#334155" font-size="12">详情：Caffeine → Redis → DB；库存实时 RPC 回补</text>
+  <text x="844" y="518" fill="#334155" font-size="12">搜索：ES 文本过滤 → MySQL 分页；Canal 同步索引</text>
+
+  <rect x="44" y="544" width="1112" height="96" rx="12" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="64" y="568" fill="#94a3b8" font-size="12.5" font-weight="700" letter-spacing="1">数据面（Docker Compose）</text>
+
+  <rect x="60" y="578" width="140" height="48" rx="7" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="70" y="597" fill="#1e293b" font-size="11.5" font-weight="700">MySQL 8.4</text>
+  <text x="70" y="613" fill="#64748b" font-size="10.5">8 个业务 schema</text>
+
+  <rect x="212" y="578" width="140" height="48" rx="7" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="222" y="597" fill="#1e293b" font-size="11.5" font-weight="700">Redis 7.4</text>
+  <text x="222" y="613" fill="#64748b" font-size="10.5">会话 / 缓存 / 幂等</text>
+
+  <rect x="364" y="578" width="140" height="48" rx="7" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="374" y="597" fill="#1e293b" font-size="11.5" font-weight="700">RocketMQ 5.3</text>
+  <text x="374" y="613" fill="#64748b" font-size="10.5">事件 / 延迟消息</text>
+
+  <rect x="516" y="578" width="140" height="48" rx="7" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="526" y="597" fill="#1e293b" font-size="11.5" font-weight="700">Nacos 2.5</text>
+  <text x="526" y="613" fill="#64748b" font-size="10.5">注册 / 配置</text>
+
+  <rect x="668" y="578" width="140" height="48" rx="7" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="678" y="597" fill="#1e293b" font-size="11.5" font-weight="700">Elasticsearch 8.19</text>
+  <text x="678" y="613" fill="#64748b" font-size="10.5">商品搜索读模型</text>
+
+  <rect x="820" y="578" width="140" height="48" rx="7" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="830" y="597" fill="#1e293b" font-size="11.5" font-weight="700">Canal 1.1</text>
+  <text x="830" y="613" fill="#64748b" font-size="10.5">binlog → MQ</text>
+
+  <rect x="972" y="578" width="140" height="48" rx="7" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="982" y="597" fill="#1e293b" font-size="11.5" font-weight="700">xxl-job 2.5</text>
+  <text x="982" y="613" fill="#64748b" font-size="10.5">定时 / 对账</text>
+
+  <text x="64" y="636" fill="#64748b" font-size="11">服务间只走 Dubbo（X-Internal-Token）或 /internal/**；端口为 application.yml 默认值，本地 runtime 会覆盖。</text>
+</svg>

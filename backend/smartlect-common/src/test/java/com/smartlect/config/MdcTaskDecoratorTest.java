@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-/** MDC 异步传播（ADR-0021）：提交线程的 traceId 在异步任务内可见，结束后清理。 */
+/** MDC 异步传播（ADR-0009）：提交线程的 traceId 在异步任务内可见，结束后清理。 */
 class MdcTaskDecoratorTest {
 
     @Test

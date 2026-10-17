@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 支付轮询对账（ADR-0018）：兜底支付成功 MQ 事件丢失/进程崩溃后的状态收敛。
+ * 支付轮询对账（ADR-0004）：兜底支付成功 MQ 事件丢失/进程崩溃后的状态收敛。
  * 旧实现依赖 isPayTradeInitiated 的 Redis 标记过滤，但该标记从无生产写入方，
  * 轮询永远空转（死路径）；现改为按"创建超过 N 分钟仍待付款"直接对账查渠道。
  */

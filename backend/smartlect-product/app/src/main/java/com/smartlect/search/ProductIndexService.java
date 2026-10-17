@@ -16,7 +16,6 @@ import co.elastic.clients.elasticsearch.indices.ExistsRequest;
 import com.smartlect.entity.po.ProductInfo;
 import com.smartlect.mappers.ProductInfoMapper;
 import com.smartlect.entity.query.ProductInfoQuery;
-import com.smartlect.utils.PageUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -191,11 +190,14 @@ public class ProductIndexService {
         if (!ensureIndex()) {
             return -1;
         }
+        int effectiveSize = Math.max(1, pageSize);
         int total = 0;
-        int pageNo = 1;
+        int batchNo = 1;
+        String lastId = null;
         while (true) {
-            List<ProductInfo> page = PageUtils.pageInfo(pageNo, pageSize,
-                    () -> productInfoMapper.selectList(new ProductInfoQuery())).getList();
+            // keyset 翻页：不能复用 PageUtils，否则单页会被压到 100，
+            // 且总页数被 500 页上限截断，历史商品永远重建不到。
+            List<ProductInfo> page = productInfoMapper.selectForIndex(lastId, effectiveSize);
             if (page == null || page.isEmpty()) {
                 break;
             }
@@ -208,16 +210,17 @@ public class ProductIndexService {
             try {
                 BulkResponse response = client.bulk(bulk.build());
                 if (response.errors()) {
-                    log.warn("全量索引第 {} 页存在失败项", pageNo);
+                    log.warn("全量索引第 {} 批存在失败项", batchNo);
                 }
             } catch (IOException e) {
-                log.warn("全量索引第 {} 页失败：{}", pageNo, e.getMessage());
+                log.warn("全量索引第 {} 批失败：{}", batchNo, e.getMessage());
             }
             total += page.size();
-            if (page.size() < pageSize) {
+            lastId = page.get(page.size() - 1).getProductId();
+            if (lastId == null || page.size() < effectiveSize) {
                 break;
             }
-            pageNo++;
+            batchNo++;
         }
         log.info("商品索引全量重建完成：{} 条", total);
         return total;

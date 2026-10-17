@@ -198,7 +198,7 @@ smartlect:
     token: ${SMARTLECT_INTERNAL_TOKEN:}
     auth-enabled: true
   sentinel:
-    # 可选：网关流控规则上 Nacos 动态数据源（ADR-0023）。仓库默认关；
+    # 可选：网关流控规则上 Nacos 动态数据源（ADR-0009）。仓库默认关；
     # 生产经 runtime.env 的 SMARTLECT_SENTINEL_GATEWAY_RULES_DATA_ID 启用，
     # dataId 内容见 backend/deploy/sentinel/smartlect-sentinel-gateway-rules.json（组 SMARTLECT_GROUP）
     gateway-rules-data-id: ${SMARTLECT_SENTINEL_GATEWAY_RULES_DATA_ID:}
@@ -216,7 +216,11 @@ smartlect:
         - /api/account/getEmailCode
         - /api/account/forgetPassword
         - /api/captcha/**
-        - /api/product/**
+        # 只放行商品读接口；不要再写整前缀，否则未来新增的写接口会静默免鉴权。
+        - /api/product/loadCategory
+        - /api/product/loadCommendProduct
+        - /api/product/loadProduct
+        - /api/product/getProduct
         - /api/discountCoupon/getDiscountCouponDetail
         - /api/discountCoupon/loadDiscountCoupon
         - /api/file/getResource

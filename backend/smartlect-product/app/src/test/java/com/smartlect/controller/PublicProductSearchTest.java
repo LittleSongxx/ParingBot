@@ -4,6 +4,7 @@ import com.smartlect.api.enums.ProductStatusEnum;
 import com.smartlect.biz.ProductInfoService;
 import com.smartlect.entity.query.ProductInfoQuery;
 import com.smartlect.entity.vo.PaginationResultVO;
+import com.smartlect.entity.vo.ResponseVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -14,8 +15,11 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,6 +55,23 @@ class PublicProductSearchTest {
         ProductInfoQuery query = capture();
         assertNull(query.getProductNameFuzzy());
         assertEquals(List.of("P1", "P2"), query.getProductIdList());
+    }
+
+    @Test
+    void emptyEsHitsYieldEmptyPageWithoutFallingBackToAllProducts() {
+        com.smartlect.search.ProductIndexService index = mock(com.smartlect.search.ProductIndexService.class);
+        when(index.searchIdsByKeyword(any(), any(), org.mockito.ArgumentMatchers.anyInt()))
+                .thenReturn(java.util.List.of());
+        ReflectionTestUtils.setField(controller, "productIndexService", index);
+
+        ResponseVO response = controller.loadProduct(1, null, "不存在的关键词", null, null, null, null, null);
+
+        assertNotNull(response.getData());
+        PaginationResultVO<?> page = (PaginationResultVO<?>) response.getData();
+        assertEquals(0, page.getTotalCount());
+        assertTrue(page.getList().isEmpty());
+        // 空 ID 集不能交给 Mapper；否则 <if size>0> 会退化成返回全部在售商品。
+        verify(service, never()).findListByPage(any());
     }
 
     @Test

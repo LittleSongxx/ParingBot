@@ -301,12 +301,19 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 
 	@Override
 	public Product4VO getProduct4VOByProductId(String productId) {
+		// 内部/管理端默认允许预览下架商品；公开入口显式传 true。
+		return getProduct4VOByProductId(productId, false);
+	}
+
+	@Override
+	public Product4VO getProduct4VOByProductId(String productId, boolean requireOnSale) {
 		if (!productBloomFilterComponent.mightExist(productId)) {
 			throw new BusinessException(ResponseCodeEnum.CODE_600);
 		}
 		// Cache-Aside 读：L1（进程内）→ L2（Redis）→ DB，命中后实时补库存（库存不进缓存）
 		Product4VO cached = productCacheService.get(productId);
 		if (cached != null) {
+			assertOnSale(cached.getProductInfo(), requireOnSale);
 			return replenishRealtimeStock(cached);
 		}
 		// 根据productId查询productInfo,productPropertyList,skuList
@@ -314,6 +321,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 		if (productInfo == null) {
 			throw new BusinessException(ResponseCodeEnum.CODE_600);
 		}
+		assertOnSale(productInfo, requireOnSale);
 		productBloomFilterComponent.add(productId);
 		// 获取productPropertyList
 		// 创建Map<String,ProductPropertyValue>其中的String为productPropertyId
@@ -381,6 +389,13 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 		return product4VO;
 	}
 
+	private void assertOnSale(ProductInfo productInfo, boolean requireOnSale) {
+		if (requireOnSale && (productInfo == null
+				|| !ProductStatusEnum.ON_SALE.getStatus().equals(productInfo.getStatus()))) {
+			throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "商品已下架");
+		}
+	}
+
 	/** 缓存里的快照库存已清零，这里实时补库存（RPC 查 stock，与 miss 路径同源）。 */
 	private Product4VO replenishRealtimeStock(Product4VO cached) {
 		if (cached.getSkuList() == null || cached.getSkuList().isEmpty()) {
@@ -403,7 +418,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 	}
 
 	/**
-	 * 服务端权威重算 SKU 指纹（ADR-0022）：此前 hash 由管理端前端计算后直接提交，
+	 * 服务端权威重算 SKU 指纹（ADR-0007）：此前 hash 由管理端前端计算后直接提交，
 	 * 后端从不校验——异常客户端可用同一组属性值配不同 hash 制造重复 SKU。
 	 * 现以 md5(propertyValueIds) 重算覆写，并拒绝同商品内重复指纹。
 	 */
@@ -447,7 +462,7 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 				throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "请先取消推荐后再下架");
 			}
 		}
-		// ADR-0022：check-then-update 改条件更新（CAS），两个管理员并发操作不再越权覆盖
+		// ADR-0007：check-then-update 改条件更新（CAS），两个管理员并发操作不再越权覆盖
 		ProductInfo existing = productInfoMapper.selectByProductId(productId);
 		if (existing == null) {
 			throw new BusinessException(ResponseCodeEnum.CODE_600);
@@ -460,6 +475,8 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 		if (productInfoMapper.updateByParam(productInfo, casQuery) != 1) {
 			throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "商品状态已变化，请刷新后重试");
 		}
+		// 状态变化后必须失效详情缓存，否则下架商品仍可能从旧快照被公开读取。
+		productCacheService.invalidate(productId);
 	}
 
 	@Override
@@ -477,13 +494,19 @@ public class ProductInfoServiceImpl implements ProductInfoService {
 		}
 		ProductInfo productInfo = new ProductInfo();
 		productInfo.setStatus(ProductStatusEnum.DELETE.getStatus());
-		// ADR-0022：删除也走条件更新——仅下架态可删，并发窗口内被重新上架则失败重试
+		// ADR-0007：删除也走条件更新——仅下架态可删，并发窗口内被重新上架则失败重试
 		ProductInfoQuery casQuery = new ProductInfoQuery();
 		casQuery.setProductId(productId);
 		casQuery.setStatus(ProductStatusEnum.OFF_SALE.getStatus());
 		if (productInfoMapper.updateByParam(productInfo, casQuery) != 1) {
 			throw new BusinessException(ResponseCodeEnum.CODE_600.getCode(), "商品状态已变化，请刷新后重试");
 		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				productCacheService.invalidate(productId);
+			}
+		});
 	}
 
 	@Override

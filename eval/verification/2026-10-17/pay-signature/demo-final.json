@@ -1,0 +1,31 @@
+{
+  "run_id": "smartlect-50c26dc994b34026b3b4c93c",
+  "scenario": "purchase_stockout",
+  "seed": 42,
+  "checks": [
+    "Internal fixture API requires Smartlect token",
+    "Java fixtures and authoritative catalogue/SKU lookup",
+    "Checkout drops unverified attribution, charges Java price and deducts stock once",
+    "Changed purchase rejected under same idempotency key",
+    "Persisted item payments reconcile and duplicate settlement does not deduct stock",
+    "Confirmed refund equals item cash paid; repeated refund restores stock once",
+    "Sold-out SKU rejects another purchase",
+    "Cancelled payment intent rejects settlement",
+    "Cancellation and replay restore stock exactly once",
+    "Repeated fixture initialization never refills consumed inventory"
+  ],
+  "pay_order_id": "654025591890660219242889607448",
+  "paid_cents": 3475,
+  "refunded_cents": 1000,
+  "initial_stock": [
+    20,
+    20,
+    20
+  ],
+  "final_stock": [
+    20,
+    19,
+    19
+  ],
+  "model_mode": "mock"
+}

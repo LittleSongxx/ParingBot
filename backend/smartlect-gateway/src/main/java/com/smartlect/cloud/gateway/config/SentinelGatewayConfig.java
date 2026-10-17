@@ -34,7 +34,7 @@ public class SentinelGatewayConfig {
     private static final org.slf4j.Logger log =
             org.slf4j.LoggerFactory.getLogger(SentinelGatewayConfig.class);
 
-    // ADR-0023：可选 Nacos 动态数据源——配置 smartlect.sentinel.gateway-rules-data-id 后，
+    // ADR-0009：可选 Nacos 动态数据源——配置 smartlect.sentinel.gateway-rules-data-id 后，
     // 网关流控规则由配置中心热更（JSON 数组，字段同 GatewayFlowRule），代码注册的规则仅作兜底。
     @org.springframework.beans.factory.annotation.Value("${smartlect.sentinel.gateway-rules-data-id:}")
     private String gatewayRulesDataId;

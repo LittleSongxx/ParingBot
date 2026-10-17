@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * 退款 Saga 的全额还券步（ADR-0020）：消费 order 侧收尾发出的还券事件，
+ * 退款 Saga 的全额还券步（ADR-0006）：消费 order 侧收尾发出的还券事件，
  * USED→NOUSE 条件更新幂等；券过期/状态不符按终态跳过。TTL 7 天（资金相关）。
  */
 @Slf4j

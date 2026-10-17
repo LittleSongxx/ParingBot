@@ -356,6 +356,12 @@
       <artifactId>testcontainers</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit-junit5</artifactId>
+      <version>1.3.0</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -374,6 +380,38 @@
             <exclude>**/*IT.java</exclude>
           </excludes>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.5.0</version>
+        <executions>
+          <execution>
+            <id>no-app-to-app-dependencies</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <!-- 服务之间只能依赖 *-api 契约或 common；直接依赖另一个服务的实现包会绕过边界。 -->
+                  <excludes>
+                    <exclude>com.smartlect:smartlect-gateway</exclude>
+                    <exclude>com.smartlect:smartlect-admin</exclude>
+                    <exclude>com.smartlect:smartlect-user</exclude>
+                    <exclude>com.smartlect:smartlect-product</exclude>
+                    <exclude>com.smartlect:smartlect-stock</exclude>
+                    <exclude>com.smartlect:smartlect-cart</exclude>
+                    <exclude>com.smartlect:smartlect-order</exclude>
+                    <exclude>com.smartlect:smartlect-pay</exclude>
+                    <exclude>com.smartlect:smartlect-coupon</exclude>
+                  </excludes>
+                  <message>服务实现包不能互相依赖：请依赖 *-api 或 smartlect-common。</message>
+                </bannedDependencies>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.jacoco</groupId>

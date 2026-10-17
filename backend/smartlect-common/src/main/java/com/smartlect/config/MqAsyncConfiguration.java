@@ -10,7 +10,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import java.util.concurrent.Executor;
 
 /**
- * Outbox afterCommit 异步投递线程池（ADR-0021 调整）：
+ * Outbox afterCommit 异步投递线程池（ADR-0009 调整）：
  * 旧参数 queue=2000 压制 max=16（Java 线程池先填满队列再扩容，max 基本永不生效，
  * 高峰实际只有 4 个投递线程）；队列缩到 200 让 max 生效，参数全部可配；
  * 新增 MDC 传播装饰器与停机 drain（等待队列内任务完成，配合 outbox 兜底扫描双保险）。

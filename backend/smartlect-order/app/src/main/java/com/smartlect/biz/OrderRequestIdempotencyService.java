@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 @Service
 public class OrderRequestIdempotencyService {
 
-    // 台账事务语义（ADR-0018）：
+    // 台账事务语义（ADR-0002）：
     // - PROCESSING 插入与 FAILED 收口走 REQUIRES_NEW 独立提交——即使调用方（如秒杀入口）
     //   的外层事务回滚，"请求已受理 / 已失败"仍留痕，同键重放能得到确定性结果而不是凭空重来；
     //   旧实现用默认 REQUIRED 传播，"独立事务"的注释承诺在 @Transactional 调用方下并不成立。
@@ -91,7 +91,7 @@ public class OrderRequestIdempotencyService {
         } catch (DuplicateKeyException duplicate) {
             // 让唯一约束显式报告一次重放，而不是把插入异常吞成零行影响。
             // （历史注：Seata 时代 ignored-insert 会破坏 after-image 生成；Seata
-            // 已随 ADR-0006 移除，此处保留显式重放语义不变。）
+            // 已随 ADR-0001 移除，此处保留显式重放语义不变。）
             acquired = false;
         }
         if (!acquired) {

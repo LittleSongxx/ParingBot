@@ -26,6 +26,9 @@ public interface ProductInfoMapper<T,P> extends BaseMapper<T,P> {
 
 	List<String> selectAllProductIds();
 
+	/** 索引全量重建专用：keyset 翻页，不受对外分页 100/500 上限影响。 */
+	List<ProductInfo> selectForIndex(@Param("lastId") String lastId, @Param("limit") int limit);
+
 	Integer selectCountByCategoryUnion(@Param("query") ProductInfoQuery query);
 
 	List<ProductInfo> selectListByCategoryUnion(@Param("query") ProductInfoQuery query);

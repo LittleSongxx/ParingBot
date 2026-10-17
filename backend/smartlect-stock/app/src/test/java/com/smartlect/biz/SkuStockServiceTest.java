@@ -3,8 +3,10 @@ package com.smartlect.biz;
 import com.smartlect.api.dto.OrderStockRestoreDTO;
 import com.smartlect.api.dto.RefundStockRestoreDTO;
 import com.smartlect.api.dto.SkuStockChangeDTO;
+import com.smartlect.component.HotSkuStockGate;
 import com.smartlect.mappers.SkuStockMapper;
 import com.smartlect.mappers.StockChangeRecordMapper;
+import com.smartlect.metrics.SmartlectMetrics;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -28,6 +30,10 @@ class SkuStockServiceTest {
     private SkuStockMapper skuStockMapper;
     @Mock
     private StockChangeRecordMapper stockChangeRecordMapper;
+    @Mock
+    private HotSkuStockGate hotSkuStockGate;
+    @Mock
+    private SmartlectMetrics metrics;
     @InjectMocks
     private SkuStockService service;
 
@@ -65,6 +71,8 @@ class SkuStockServiceTest {
 
         assertEquals(1, service.restoreOrderStock(dto));
         verify(skuStockMapper).changeStock("p1", "sku1", 5);
+        verify(hotSkuStockGate).restoreOrder(eq("pay-1"),
+                argThat(changes -> changes.get("p1\0sku1") == 5));
     }
 
     @Test
@@ -135,11 +143,35 @@ class SkuStockServiceTest {
 
         assertEquals(1, service.changeStockBatch(batch));
         verify(skuStockMapper).changeStock("p1", "sku1", -2);
+        verify(hotSkuStockGate).reserve(eq("order-deduct:pay-2"),
+                argThat(changes -> changes.get("p1\0sku1") == -2));
+        verify(hotSkuStockGate).commit(eq("order-deduct:pay-2"),
+                argThat(changes -> changes.get("p1\0sku1") == -2));
+    }
+
+    @Test
+    void deductDbFailureReleasesRedisReservation() {
+        com.smartlect.api.dto.SkuStockBatchChangeDTO batch = new com.smartlect.api.dto.SkuStockBatchChangeDTO();
+        SkuStockChangeDTO item = new SkuStockChangeDTO();
+        item.setProductId("p1");
+        item.setPropertyValueIdHash("sku1");
+        item.setChangeAmount(-2);
+        batch.setItems(List.of(item));
+        batch.setBusinessKey("order-deduct:pay-db-fail");
+        when(stockChangeRecordMapper.insertIgnore(
+                "order-deduct:pay-db-fail", "ORDER_DEDUCT", "p1", "sku1", 2))
+                .thenReturn(1);
+        when(skuStockMapper.changeStock("p1", "sku1", -2)).thenReturn(0);
+
+        org.junit.jupiter.api.Assertions.assertThrows(com.smartlect.exception.BusinessException.class,
+                () -> service.changeStockBatch(batch));
+        verify(hotSkuStockGate).release(eq("order-deduct:pay-db-fail"),
+                argThat(changes -> changes.get("p1\0sku1") == -2));
     }
 
     @Test
     void orderRestoreSkipsWhenDeductRecordMissing() {
-        // ADR-0018 防库存虚增：扣减失败留下的待付款单被关闭时，deduct 账本无记录，
+        // ADR-0003 防库存虚增：扣减失败留下的待付款单被关闭时，deduct 账本无记录，
         // 恢复必须整体跳过——既不加库存，也不写 order-close 恢复记录。
         OrderStockRestoreDTO dto = orderRestore("pay-orphan", 2);
         when(stockChangeRecordMapper.exists("order-deduct:pay-orphan")).thenReturn(0);
@@ -154,7 +186,7 @@ class SkuStockServiceTest {
 
     @Test
     void orderRestoreKeepsDeductRecordAsAuditTrail() {
-        // ADR-0018：正常"扣过再关"的恢复照常执行；deduct 账本记录保留作审计链
+        // ADR-0003：正常"扣过再关"的恢复照常执行；deduct 账本记录保留作审计链
         // （deleteByBusinessKey 已移除，账本只增不删）。
         OrderStockRestoreDTO dto = orderRestore("pay-release", 2);
         when(stockChangeRecordMapper.exists("order-deduct:pay-release")).thenReturn(1);

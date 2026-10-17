@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 取消/关单领域服务（ADR-0019，拆自 OrderInfoServiceImpl）。
+ * 取消/关单领域服务（ADR-0002，拆自 OrderInfoServiceImpl）。
  *
  * <p>事务模型（对齐 postOrder 三阶段纪律）：旧实现整个 cancelOrder 挂在 @Transactional 下，
  * markClosed/渠道关单/解券/库存回补等远程调用全程占连接。现改为每条路径都是

@@ -5,6 +5,7 @@ import com.smartlect.biz.impl.PayChannel4Mock;
 import com.smartlect.controller.AGlobalExceptionHandlerController;
 import com.smartlect.controller.internal.MockPaymentController;
 import com.smartlect.exception.HttpBusinessException;
+import com.smartlect.security.MockPaymentSignatureVerifier;
 import com.smartlect.web.InternalApiAuthFilter;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -40,7 +41,7 @@ class PayAttemptServiceTest {
     @Test
     void internalTokenAndDelegatedOwnerAreBothRequired() throws Exception {
         PayAttemptService attempts = mock(PayAttemptService.class);
-        var controller = new MockPaymentController(mock(PayChannel4Mock.class));
+        var controller = new MockPaymentController(mock(PayChannel4Mock.class), mock(MockPaymentSignatureVerifier.class));
         ReflectionTestUtils.setField(controller, "attempts", attempts);
         InternalApiAuthFilter filter = new InternalApiAuthFilter();
         ReflectionTestUtils.setField(filter, "expectedToken", "synthetic-internal");

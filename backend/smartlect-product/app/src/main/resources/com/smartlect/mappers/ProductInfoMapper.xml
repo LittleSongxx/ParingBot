@@ -641,6 +641,19 @@
 		select <include refid="base_column_list" /> from product_info p where product_id=#{productId}
 	</select>
 
+	<select id="selectForIndex" resultMap="base_result_map">
+		select
+		<include refid="base_column_list"/>
+		from product_info p
+		<where>
+			<if test="lastId != null and lastId != ''">
+				and p.product_id &gt; #{lastId}
+			</if>
+		</where>
+		order by p.product_id asc
+		limit #{limit}
+	</select>
+
 	<select id="selectAllProductIds" resultType="java.lang.String">
 		select product_id from product_info
 	</select>

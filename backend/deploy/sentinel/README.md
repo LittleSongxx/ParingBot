@@ -1,4 +1,4 @@
-# Sentinel 动态规则（ADR-0023）
+# Sentinel 动态规则（ADR-0009）
 
 代码注册的规则仅是兜底默认；配置以下 data-id 后由 Nacos 热更（`scripts/nacos_config_push.py` 推送）：
 

@@ -96,14 +96,14 @@ public class Constants {
 
     public static final String REDIS_KEY_ADMIN_LOGIN_FAIL = REDIS_KEY_PREFIX + "admin:login:fail:";
 
-    // 用户端登录失败锁定（ADR-0022）：邮箱+IP 维度，键式 .../fail 与 .../locked 由组件拼装
+    // 用户端登录失败锁定（ADR-0009）：邮箱+IP 维度，键式 .../fail 与 .../locked 由组件拼装
     public static final String REDIS_KEY_USER_LOGIN_FAIL = REDIS_KEY_PREFIX + "user:login:";
 
     public static final String REDIS_KEY_ADMIN_LOGIN_LOCK = REDIS_KEY_PREFIX + "admin:login:lock:";
 
     public static final String REDIS_KEY_CHECK_CODE = REDIS_KEY_PREFIX + "checkcode:";
 
-    // Sa-Token 用户端会话键（ADR-0011 Step 1）。1.39 的 token-name=token 同时是键前缀：
+    // Sa-Token 用户端会话键（ADR-0008 Step 1）。1.39 的 token-name=token 同时是键前缀：
     // token:login:token:{token} -> loginId（裸字符串）；token:login:session:{loginId} -> Account-Session JSON。
     public static final String REDIS_KEY_TOKEN_WEB = "token:login:token:";
 

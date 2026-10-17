@@ -306,11 +306,14 @@ public class ProductCartServiceImpl implements ProductCartService {
 
 	private BigDecimal resolveSkuPrice(String productId, String propertyValueIds) {
 		ProductSnapshotBatchVO snapshot = productRpcSupport.snapshotBatch(Collections.singletonList(productId));
-		ProductSkuSnapshotVO productSku = null;
+		ProductSkuSnapshotVO productSku;
 		if (!StringTools.isEmpty(propertyValueIds)) {
 			productSku = productRpcSupport.toSkuMapByPropertyValueIds(snapshot).get(productId + propertyValueIds);
-		}
-		if (productSku == null) {
+			if (productSku == null) {
+				// 非空规格必须命中真实 SKU；不能回退默认 SKU，否则非法组合会被按默认价保存。
+				throw new BusinessException("规格组合不存在，请重新选择");
+			}
+		} else {
 			productSku = productRpcSupport.toDefaultSkuByProductId(snapshot).get(productId);
 		}
 		if (productSku == null || productSku.getPrice() == null) {

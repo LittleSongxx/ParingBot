@@ -30,7 +30,7 @@ public class PayOrderRedisComponent {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
-    // 已移除（ADR-0018）：markPayTradeInitiated / isPayTradeInitiated 曾用于支付轮询的过滤闸，
+    // 已移除（ADR-0002）：markPayTradeInitiated / isPayTradeInitiated 曾用于支付轮询的过滤闸，
     // 但标记从无生产写入方（死代码），轮询因此永远空转。轮询对账已改为按
     // "创建超过 N 分钟仍待付款"直接查渠道（见 PayOrderTask），不再依赖 Redis 标记。
 

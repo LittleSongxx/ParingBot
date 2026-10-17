@@ -1,8 +1,11 @@
 package com.smartlect.api.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 
-public class PayInfoDTO implements IdempotencyReplayAware {
+public class PayInfoDTO implements IdempotencyReplayAware, Serializable {
+
+    private static final long serialVersionUID = 1L;
     private String payInfo;
     private String payOrderId;
 

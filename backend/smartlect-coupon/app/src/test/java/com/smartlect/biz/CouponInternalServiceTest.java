@@ -137,6 +137,48 @@ class CouponInternalServiceTest {
         assertThrows(BusinessException.class, () -> service.preview(request));
     }
 
+    @Test
+    void stoppedTemplateRejectsPreviewAndLock() {
+        UserCoupon owned = new UserCoupon();
+        owned.setUserId("u1");
+        owned.setCouponId("c1");
+        owned.setStatus(com.smartlect.api.enums.UserCouponStatusEnum.NOUSE.getStatus());
+        when(userCouponMapper.selectByUserCouponId("uc1")).thenReturn(owned);
+        DiscountCoupon coupon = coupon();
+        coupon.setStatus(CouponStatusEnum.STOP.getStatus());
+        when(discountCouponMapper.selectByCouponId("c1")).thenReturn(coupon);
+
+        com.smartlect.api.dto.CouponValidateAndLockDTO request = new com.smartlect.api.dto.CouponValidateAndLockDTO();
+        request.setUserId("u1");
+        request.setUserCouponId("uc1");
+        request.setOrderAmount(new java.math.BigDecimal("10.00"));
+
+        assertThrows(BusinessException.class, () -> service.preview(request));
+        assertThrows(BusinessException.class, () -> service.validateAndLock(request));
+        verify(userCouponMapper, never()).updateByParam(any(), any());
+    }
+
+    @Test
+    void finishedTemplateStillAllowsAlreadyIssuedCoupon() {
+        UserCoupon owned = new UserCoupon();
+        owned.setUserId("u1");
+        owned.setCouponId("c1");
+        owned.setStatus(com.smartlect.api.enums.UserCouponStatusEnum.NOUSE.getStatus());
+        when(userCouponMapper.selectByUserCouponId("uc1")).thenReturn(owned);
+        DiscountCoupon coupon = coupon();
+        coupon.setStatus(CouponStatusEnum.FINISH.getStatus());
+        coupon.setCouponType(com.smartlect.api.enums.CouponTypeEnum.NOTHRESHOLD.getStatus());
+        coupon.setDiscountAmount(new java.math.BigDecimal("2.00"));
+        when(discountCouponMapper.selectByCouponId("c1")).thenReturn(coupon);
+
+        com.smartlect.api.dto.CouponValidateAndLockDTO request = new com.smartlect.api.dto.CouponValidateAndLockDTO();
+        request.setUserId("u1");
+        request.setUserCouponId("uc1");
+        request.setOrderAmount(new java.math.BigDecimal("10.00"));
+
+        assertDoesNotThrow(() -> service.preview(request));
+    }
+
     private static DiscountCoupon coupon() {
         DiscountCoupon coupon = new DiscountCoupon();
         coupon.setCouponId("c1");

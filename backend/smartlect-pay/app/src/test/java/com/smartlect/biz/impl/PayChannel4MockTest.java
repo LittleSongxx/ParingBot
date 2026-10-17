@@ -4,10 +4,12 @@ import com.smartlect.api.dto.PayOrderNotifyDTO;
 import com.smartlect.api.dto.PayUrlRequestDTO;
 import com.smartlect.api.enums.PayChannelEnum;
 import com.smartlect.biz.PayInternalService;
+import com.smartlect.biz.PayMockChannelLedgerService;
 import com.smartlect.biz.PayTradeRecordService;
 import com.smartlect.mq.RocketMqTopics;
 import com.smartlect.constants.TransactionalMqSender;
 import com.smartlect.controller.internal.MockPaymentController;
+import com.smartlect.security.MockPaymentSignatureVerifier;
 import com.smartlect.entity.enums.MessageReliabilityLevelEnum;
 import com.smartlect.entity.po.PayTradeRecord;
 import com.smartlect.exception.BusinessException;
@@ -36,11 +38,13 @@ class PayChannel4MockTest {
     @Mock PayTradeRecordService trades;
     @Mock TransactionalMqSender transactionalMqSender;
     @Mock JdbcTemplate jdbc;
+    @Mock PayMockChannelLedgerService ledger;
+    @Mock MockPaymentSignatureVerifier signatureVerifier;
     PayChannel4Mock channel;
 
     @BeforeEach
     void setUp() {
-        channel = new PayChannel4Mock(trades, transactionalMqSender, jdbc);
+        channel = new PayChannel4Mock(trades, transactionalMqSender, jdbc, ledger);
     }
 
     @Test
@@ -68,6 +72,7 @@ class PayChannel4MockTest {
         assertEquals("owner-1", first.userId());
         assertEquals(new BigDecimal("90.00"), first.amount());
         verify(trades, times(1)).markSuccess(anyString(), anyString());
+        verify(ledger, times(2)).recordComplete("pay-1", new BigDecimal("90.00"));
         // 事件取代同步回调：每次 complete 都发（幂等键=payOrderId，order 侧 CAS 去重）。
         verify(transactionalMqSender, times(2)).sendAfterCommit(
                 eq(RocketMqTopics.TOPIC_PAY),
@@ -105,7 +110,7 @@ class PayChannel4MockTest {
         InternalApiAuthFilter filter = new InternalApiAuthFilter();
         ReflectionTestUtils.setField(filter, "expectedToken", "smartlect-test-internal");
         ReflectionTestUtils.setField(filter, "authEnabled", true);
-        var mvc = MockMvcBuilders.standaloneSetup(new MockPaymentController(channel))
+        var mvc = MockMvcBuilders.standaloneSetup(new MockPaymentController(channel, signatureVerifier))
                 .setControllerAdvice(new com.smartlect.controller.AGlobalExceptionHandlerController())
                 .addFilters(new org.springframework.web.filter.RequestContextFilter(), filter).build();
         mvc.perform(post("/internal/pay/mock/complete").contentType(MediaType.APPLICATION_JSON)

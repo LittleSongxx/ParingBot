@@ -5,6 +5,7 @@ package com.smartlect.state;
  * 调用方不得自行计算目标状态。
  */
 public enum OrderStateEvent {
+    CREATE("创建订单"),
     PAY_SUCCESS("支付成功"),
     COUPON_RUSH_PAY_SUCCESS("秒杀券支付成功"),
     USER_CANCEL("用户取消"),

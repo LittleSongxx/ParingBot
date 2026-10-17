@@ -19,6 +19,8 @@ import com.smartlect.mappers.OrderCouponRelMapper;
 import com.smartlect.mappers.OrderInfoMapper;
 import com.smartlect.mappers.OrderItemMapper;
 import com.smartlect.mappers.OrderLogisticsInfoMapper;
+import com.smartlect.mappers.OrderStatusLogMapper;
+import com.smartlect.state.OrderStateEvent;
 import com.smartlect.support.MqIdempotencyKeys;
 import com.smartlect.utils.OrderListPayAmountHelper;
 import com.smartlect.utils.OrderPayAmountUtil;
@@ -33,7 +35,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 下单领域服务（ADR-0019，拆自 OrderInfoServiceImpl）：
+ * 下单领域服务（ADR-0002，拆自 OrderInfoServiceImpl）：
  * 报价（quote）、普通下单（postOrder）与 V2 报价确认（createConfirmed）三阶段编排——
  * 读准备 → 远程锁资源 → 短本地事务（订单 + Outbox 关单消息原子落库）→ 事务外幂等远程写 → 失败补偿。
  * 构造器注入；不持有任何 HTTP/查询职责。
@@ -59,6 +61,7 @@ public class OrderCreationService {
     private final OrderRequestIdempotencyService orderRequestIdempotencyService;
     private final OrderQuoteService orderQuoteService;
     private final SmartlectMetrics metrics;
+    private final OrderStatusLogMapper orderStatusLogMapper;
 
     public OrderCreationService(
             OrderInfoMapper<OrderInfo, OrderInfoQuery> orderInfoMapper,
@@ -77,7 +80,8 @@ public class OrderCreationService {
             RemoteCompensateRecorder remoteCompensateRecorder,
             OrderRequestIdempotencyService orderRequestIdempotencyService,
             OrderQuoteService orderQuoteService,
-            SmartlectMetrics metrics) {
+            SmartlectMetrics metrics,
+            OrderStatusLogMapper orderStatusLogMapper) {
         this.orderInfoMapper = orderInfoMapper;
         this.orderItemMapper = orderItemMapper;
         this.orderLogisticsInfoMapper = orderLogisticsInfoMapper;
@@ -95,6 +99,7 @@ public class OrderCreationService {
         this.orderRequestIdempotencyService = orderRequestIdempotencyService;
         this.orderQuoteService = orderQuoteService;
         this.metrics = metrics;
+        this.orderStatusLogMapper = orderStatusLogMapper;
     }
 
     // 不标 @Transactional：createOrder 拆为三阶段（读准备 → 远程锁资源 → 短本地事务写入），
@@ -136,7 +141,7 @@ public class OrderCreationService {
                 OrderRequestIdempotencyService.COMMAND_POST_ORDER_V2, idempotencyKey,
                 Map.of("quoteId", quoteId, "confirmedAmountCents", confirmedAmountCents,
                         "order", OrderQuoteService.input(request)), PayInfoDTO.class, () -> {
-            // claim-first：先在短事务内占用报价，再执行建单副作用（ADR-0018）。
+            // claim-first：先在短事务内占用报价，再执行建单副作用（ADR-0002）。
             // 并发重复请求在占用处即被 409 挡下，不再先落单后才发现冲突留下孤儿订单。
             String claimedPayOrderId = StringTools.createPayOrderId();
             OrderQuoteService.Quote quote =
@@ -208,7 +213,7 @@ public class OrderCreationService {
             }
 
             // Phase 3: 短本地事务（仅 DB 写入，毫秒级，不包含任何远程调用）。
-            // 超时关单消息同事务写入 Outbox（ADR-0018）：订单落库与关单收敛消息同生共死——
+            // 超时关单消息同事务写入 Outbox（ADR-0004）：订单落库与关单收敛消息同生共死——
             // 即使 Phase 4 扣库存/建支付意图失败，留下的待付款单也一定会在 15 分钟后被关闭，
             // 不再产生既无支付意图又无关单消息的永久孤儿订单。sendAfterCommit 在活跃事务内
             // 的语义：outbox 落库参与本事务，提交后异步投递不占本连接。
@@ -223,6 +228,11 @@ public class OrderCreationService {
                 orderInfoMapper.insertBatch(orderInfoList);
                 orderItemMapper.insertBatch(orderItemList);
                 orderLogisticsInfoMapper.insertBatch(orderLogisticsInfoList);
+                if (orderStatusLogMapper != null) {
+                    for (OrderInfo orderInfo : orderInfoList) {
+                        recordCreateLog(orderInfo);
+                    }
+                }
                 for (OrderInfo orderInfo : orderInfoList) {
                     PayOrderMessageDTO dto = new PayOrderMessageDTO();
                     dto.setOrderId(orderInfo.getOrderId());
@@ -507,7 +517,7 @@ public class OrderCreationService {
     }
 
     void distributeCouponDiscount(List<OrderInfo> orderInfoList, BigDecimal discount) {
-        // 分摊顺序确定化（ADR-0023）：按 orderId 排序，避免 HashMap 迭代序导致同输入不同分摊
+        // 分摊顺序确定化（ADR-0009）：按 orderId 排序，避免 HashMap 迭代序导致同输入不同分摊
         orderInfoList.sort(java.util.Comparator.comparing(OrderInfo::getOrderId));
         BigDecimal remaining = discount;
         for (OrderInfo order : orderInfoList) {
@@ -519,6 +529,20 @@ public class OrderCreationService {
             order.setAmount(amt.subtract(off).setScale(2, RoundingMode.HALF_UP));
             remaining = remaining.subtract(off);
         }
+    }
+
+    /** 下单创建与订单同事务落状态历史：null → 待付款，事件 CREATE。 */
+    private void recordCreateLog(OrderInfo orderInfo) {
+        OrderStatusLog log = new OrderStatusLog();
+        log.setOrderId(orderInfo.getOrderId());
+        log.setPayOrderId(orderInfo.getPayOrderId());
+        log.setFromStatus(null);
+        log.setToStatus(OrderStatusEnum.WAIT_PAYMENT.getStatus());
+        log.setEvent(OrderStateEvent.CREATE.name());
+        log.setOperatorType("USER");
+        log.setOperatorId(orderInfo.getUserId());
+        log.setRemark("order-create");
+        orderStatusLogMapper.insert(log);
     }
 
     private List<ProductItem> copyItemsWithSignedBuyCount(List<ProductItem> source, boolean negate) {

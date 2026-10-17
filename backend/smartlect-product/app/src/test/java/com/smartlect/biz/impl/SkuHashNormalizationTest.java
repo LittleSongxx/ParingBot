@@ -13,7 +13,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/** SKU 指纹服务端重算（ADR-0022）：不一致覆写为权威值，重复指纹拒绝。 */
+/** SKU 指纹服务端重算（ADR-0007）：不一致覆写为权威值，重复指纹拒绝。 */
 @ExtendWith(MockitoExtension.class)
 class SkuHashNormalizationTest {
 

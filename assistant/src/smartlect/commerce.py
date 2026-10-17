@@ -7,6 +7,8 @@ from urllib.request import Request, urlopen
 
 import httpx
 
+from smartlect.pay_signature import COMPLETE_PATH, complete_headers
+
 
 class CommerceError(RuntimeError):
     pass
@@ -41,6 +43,9 @@ class AsyncCommerceClient:
         if service not in {"user", "product", "stock", "order", "coupon", "pay"} or not path.startswith("/internal/"):
             raise ValueError("Unregistered commerce destination")
         headers = {"X-Internal-Token": self.config["SMARTLECT_INTERNAL_TOKEN"]}
+        if path == COMPLETE_PATH:
+            headers.update(complete_headers(self.config, (data or {}).get("payOrderId"),
+                                            (data or {}).get("expectedAmountCents")))
         if actor is not None and actor.subject_type == "user":
             headers["X-Smartlect-User-Id"] = actor.actor_id
         if key:
@@ -76,6 +81,9 @@ class CommerceClient:
         headers = {}
         if path.startswith("/internal/"):
             headers["X-Internal-Token"] = self.config["SMARTLECT_INTERNAL_TOKEN"]
+            if path == COMPLETE_PATH:
+                headers.update(complete_headers(self.config, (data or {}).get("payOrderId"),
+                                                (data or {}).get("expectedAmountCents")))
             if session:
                 headers["X-Smartlect-User-Id"] = session["userId"]
         elif session:

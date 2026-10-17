@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 网关独立日志配置（ADR-0021）：网关不依赖 smartlect-common（架构约定），
+<!-- 网关独立日志配置（ADR-0009）：网关不依赖 smartlect-common（架构约定），
      自带一份最小脱敏 converter（2026-10-16 审计前这里无脱敏，只有注释声称"不含 PII"）。 -->
 <configuration>
     <conversionRule conversionWord="maskingMsg"

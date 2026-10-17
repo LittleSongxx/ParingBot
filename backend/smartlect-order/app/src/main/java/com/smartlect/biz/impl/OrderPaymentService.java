@@ -46,9 +46,9 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 支付回调领域服务（ADR-0019，拆自 OrderInfoServiceImpl）。
+ * 支付回调领域服务（ADR-0002，拆自 OrderInfoServiceImpl）。
  *
- * <p>事务模型（对齐 postOrder 三阶段纪律，ADR-0019）：旧实现整个 paySuccess 挂在
+ * <p>事务模型（对齐 postOrder 三阶段纪律，ADR-0002）：旧实现整个 paySuccess 挂在
  * @Transactional 下，assertSettled/逐券核销/markSuccess 等远程调用全程占用数据库连接——
  * 与 2026-10-05 压测事故（连接池抽干）同型。现改为：
  * 远程读校验在事务外 → 物流补齐/状态机 CAS/LOGISTICS_STEP Outbox/实付分摊收进

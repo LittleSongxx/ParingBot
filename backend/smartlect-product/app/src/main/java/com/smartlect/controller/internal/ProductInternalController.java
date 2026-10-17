@@ -61,7 +61,12 @@ public class ProductInternalController extends ABaseController {
     }
 
     @PostMapping("/listOnSaleProductIds")
+    public ResponseVO<List<String>> listOnSaleProductIds(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String productIdPrefix) {
+        return getSuccessResponseVO(productInternalService.listOnSaleProductIds(productIdPrefix));
+    }
+
     public ResponseVO<List<String>> listOnSaleProductIds() {
-        return getSuccessResponseVO(productInternalService.listOnSaleProductIds());
+        return listOnSaleProductIds(null);
     }
 }
