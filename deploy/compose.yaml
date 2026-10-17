@@ -248,7 +248,10 @@ services:
       JAVA_OPTS: "-Xms256m -Xmx256m"
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${SMARTLECT_XXLJOB_PORT:-18090}:8080"
+      # 单机默认只绑回环；集群里执行器在三台宿主机上，调度中心必须绑定内网地址
+      # （cutover 会写 SMARTLECT_XXLJOB_BIND=<node1 内网 IP>）。绑 127.0.0.1 时
+      # node2/node3 的执行器连不上，只会在调度日志里表现为"地址列表为空"。
+      - "${SMARTLECT_XXLJOB_BIND:-127.0.0.1}:${SMARTLECT_XXLJOB_PORT:-18090}:8080"
     mem_limit: 512m
     healthcheck:
       # 镜像里既没有 curl 也没有 wget，原先的 curl 探活恒失败（容器永远 unhealthy）。

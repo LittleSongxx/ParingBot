@@ -56,6 +56,8 @@ updates = {
     # 18080-18108 只在内网可达的责任在安全组，见 deploy/cluster/README.md「安全组」。
     "SMARTLECT_ALLOW_WILDCARD_BIND": "true",
     "SMARTLECT_APP_REGISTER_IP": n1,
+    # 调度中心容器必须绑 node1 内网 IP：三节点执行器都用这个地址注册/心跳
+    "SMARTLECT_XXLJOB_BIND": n1,
     "SMARTLECT_PROJECT_FOLDER": "/opt/smartlect/run/uploads/",
     # assistant 仍单实例在 node1，但网关副本跑在三个节点上：base-url 必须指向 node1 的
     # 内网地址，否则副本节点上的网关会把 /api/assistant/** 转发到它本机不存在的 18000。
