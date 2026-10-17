@@ -1,0 +1,33 @@
+# 整机重启后恢复核对（2026-10-18 02:0x）
+
+## 现象
+- 重启后站点 502；node1 smartlect-apps 仍在启动，node2/node3 smartlect-apps 已是 failed。
+- node2/node3 启动失败：
+  Cluster middleware unreachable: Redis sentinel 172.19.34.202:26379 / 172.19.34.203:26379
+  ([Errno 111] Connection refused)
+- node2/node3 已安装的 unit 没有 ExecStartPre wait-cluster，TimeoutStopSec 仍是 180s。
+  服务器 /opt/cluster/app-node/smartlect-apps.service 是旧副本；sync-app-node.sh 安装了这个旧 unit。
+
+## 处置
+1. 等待 node1 启动完成；node1 12 进程健康、站点 200。
+2. 将仓库中的新副本 unit 写入 /opt/cluster/app-node/smartlect-apps.service；
+   安装到 node2/node3 并 daemon-reload：
+   - ExecStartPre=/usr/bin/python3 scripts/runtime.py wait-cluster --timeout 300
+   - TimeoutStopSec=600
+3. 顺序启动 node2/node3 的 smartlect-apps；两节点各 5 进程健康、5 个 Nacos 注册。
+4. post_deploy_check.sh 全部通过，站点 200。
+
+## 重启后配置核对
+- SMARTLECT_GATEWAY_RATELIMIT_DEFAULTQPS=200
+- SMARTLECT_JAVA_PROCESSORS 已设置（node1/node2/node3 均为 4）
+- SMARTLECT_MOCK_PAY_SECRET=SET
+- MySQL @@global.max_connections=300（SET PERSIST 生效）
+- rocketmq-proxy mem=805306368、restarts=2；namesrv mem=805306368、restarts=0
+- smartlect-apps TimeoutStopUSec=10min
+
+## Redis 拓扑
+Sentinel 在整机重启后把 node2 Redis 提升为 master，node1 Redis 成为 node2 的 slave；node3 为 replica。
+这是 Sentinel 的正常故障转移结果，应用通过 Sentinel 正常访问。
+- node2 redis-replica 容器当前 health=unhealthy：旧健康检查固定要求 role:slave，而它现在是 master。
+- 仓库 healthcheck 已改为只验证 PING（角色由 Sentinel 决定）；运行中的 node2 容器需要下次重建才会应用，
+  本轮没有在主库节点上重建 Redis，避免制造新的切换。节点1 Redis 仍为 node2 的 slave，未强制 failback。

@@ -51,3 +51,10 @@
 - **category 热路径**：公开 `loadCategory` 去掉每请求二次分类查询 + Redis 写后，三节点已部署 `a2bfb19` 并预热复测 400 VU：543.6 req/s、p95 176.5ms、p99 563.1ms；不是严格 A/B，但未退化。node3 实例本身仍明显慢于 node2，作为后续替换/迁移项保留。
 - **CI 部署异常与复测**：第二次 deploy run `39049599672` 因 namesrv OOM 失败；修复 namesrv 内存后手动恢复。随后 `835d6a8` 的 run `39053891614` 部署成功，三节点健康、部署后探针全过，proxy/namesrv 重启计数保持 10/13。
 - 证据：`eval/verification/2026-10-18/ecs-loadtest/{node3-diagnosis,rocketmq-proxy-oom,rocketmq-namesrv-oom,loadgen-bootstrap-fix,reconcile-corrected,admin-restart-timeout,post-catfix-warm-400}.*`。
+## 整机重启复核（2026-10-18 02:0x）
+
+- node1 正常恢复，站点 200；node2/node3 应用 unit 因安装的是旧副本 unit（缺少 `ExecStartPre wait-cluster`、`TimeoutStopSec=180`）在 Sentinel 未就绪时失败。
+- 已将新 replica unit 写入 `/opt/cluster/app-node` 并安装到 node2/node3，顺序重启后两节点各 5 进程健康；`post_deploy_check.sh` 全部通过。
+- Sentinel 在整机重启后将 node2 Redis 提升为 master、node1 成为 slave；这是正常故障转移，应用通过 Sentinel 正常访问。node2 容器旧健康检查固定要求 `role:slave`，因此显示 unhealthy；仓库已改为 PING 检查，运行中容器待下次重建应用，本轮未在 master 节点重建 Redis。
+- 重启后核对：限流 200、JVM 4、HMAC 密钥、MySQL 300、proxy/namesrv 768MB、systemd 停止宽限 600s 均保留；未发现新的 OOM。
+- 证据：`eval/verification/2026-10-18/ecs-loadtest/reboot-recovery.txt`。

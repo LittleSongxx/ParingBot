@@ -23,7 +23,9 @@ services:
     mem_limit: 384m
     restart: unless-stopped
     healthcheck:
-      test: [CMD-SHELL, 'redis-cli -h 127.0.0.1 -p 6379 -a "$$REDIS_PASSWORD" --no-auth-warning info replication | grep -q "role:slave"']
+      # 只验证 Redis 可服务；角色由 Sentinel 决定。整机重启后 Sentinel 可能把本节点提升为
+      # master（2026-10-18 实测 node2 被提升），固定要求 role:slave 会误报 unhealthy。
+      test: [CMD-SHELL, 'redis-cli -h 127.0.0.1 -p 6379 -a "$$REDIS_PASSWORD" --no-auth-warning ping | grep -q PONG']
       interval: 10s
       timeout: 5s
       retries: 30
