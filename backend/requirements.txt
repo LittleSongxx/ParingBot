@@ -1,0 +1,47 @@
+# =============================================================
+# AI Co-living Roommate Match Platform - backend requirements
+#
+# All versions are pinned on purpose. Do not use ~= or >=.
+# LangChain moves fast between minor releases, the tutorial code
+# is written against exactly the versions listed below.
+#
+# Install (run inside the fastapi-app directory):
+#   python -m venv .venv
+#   .venv\Scripts\activate
+#   pip install -r requirements.txt
+#
+# NOTE: keep this file ASCII-only. Old pip on Chinese Windows
+# decodes requirements.txt with the GBK locale codec and crashes
+# on UTF-8 comments (UnicodeDecodeError: 'gbk' codec ...).
+# =============================================================
+
+# ---------- Web framework / runtime ----------
+fastapi==0.141.1
+uvicorn==0.53.0
+starlette==1.7.0
+python-multipart==0.0.32
+pydantic==2.13.5
+
+# ---------- Database / ORM ----------
+# All business data lives in MySQL, no second database.
+tortoise==0.0.3
+tortoise-orm==1.1.8
+tzdata==2026.4
+aiomysql==0.3.2
+
+# ---------- Auth ----------
+PyJWT==2.13.0
+cryptography==50.0.1
+
+# ---------- LangChain / LangGraph ----------
+# ChatOpenAI talks to the model provider through its
+# OpenAI-compatible API. The supervisor / sub-agent orchestration
+# is built by hand on StateGraph, langgraph-supervisor is NOT used.
+langchain==1.4.2
+langchain-core==1.6.4
+langchain-openai==1.6.5
+langgraph==1.2.12
+
+# ---------- Testing ----------
+pytest==8.3.4
+pytest-asyncio==0.25.0
