@@ -1,9 +1,0 @@
-[02:58:06] current master: 172.21.131.151 6379 
-[02:58:06] KILLING redis master container smartlect-redis-1...
-[02:58:08] t+1s master=172.21.131.151
-[02:58:10] t+2s master=172.21.131.151
-[02:58:11] t+3s master=172.21.131.151
-[02:58:12] t+4s master=172.21.131.151
-[02:58:14] t+5s master=172.19.34.203
-[02:58:14] failover: 172.21.131.151 -> 172.19.34.203
-[02:58:14] sentinel timeline:

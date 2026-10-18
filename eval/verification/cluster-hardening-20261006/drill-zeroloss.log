@@ -1,5 +1,0 @@
-[02:56:34] publish error (StreamLostError), reconnecting...
-[02:56:34] reconnected -> 172.19.34.202
-TOTAL_SENT=2430
-TOTAL_RECEIVED=2430
-ZERO_LOSS=PASS

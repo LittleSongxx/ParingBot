@@ -1,8 +1,0 @@
-{
-  "generated_at": "2026-10-07T23:20:00+08:00",
-  "note": "assistant-unittest-full.log 为自查修复后复测覆盖版（首轮含 TypeError×38 失败，见改动记录自查第 12 项）",
-  "files": {
-    "assistant-unittest-full.log": "4230e7383ac2b2640b26a17cef79e4a7c6281e8cb5b0056b2b2b88fd72bf248f",
-    "scripts-contract-tests.log": "a34e454e726527fcd19c2f37644ae8b889eb5e4b57326ae1a8504717bc3c0579"
-  }
-}

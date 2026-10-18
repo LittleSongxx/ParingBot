@@ -1,9 +1,0 @@
-[
-  {
-    "resource": "auth-sensitive",
-    "resourceMode": 1,
-    "grade": 1,
-    "count": 30,
-    "intervalSec": 1
-  }
-]

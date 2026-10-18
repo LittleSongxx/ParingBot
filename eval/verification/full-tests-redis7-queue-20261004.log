@@ -1,4 +1,0 @@
-........F.......                                                         [100%]
-=========================== short test summary info ============================
-FAILED tests/test_queue_reliability.py::test_api_session_lease_and_worker_share_exclusion
-1 failed, 15 passed in 10.80s

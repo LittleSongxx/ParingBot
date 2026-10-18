@@ -1,6 +1,0 @@
-分词器          chunks  Recall@5     MRR
-ik_max_word      47    0.9855  0.8780
-cjk(旧)           47    0.9783  0.8809
-
-Recall@5 翻转题 1 个（下降最多的前 8）:
-  r-061: recall 0.00->0.50  mrr 0.00->0.50

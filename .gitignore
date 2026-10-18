@@ -1,59 +1,28 @@
-# 环境与凭据：只入 .env.example 模板
+# 本地配置与密钥
 .env
-.env.*
+.env.local
+.env.*.local
 !.env.example
 
-# Python 本地环境与缓存
-**/.venv/
-**/.venv-*/
-**/venv/
-**/__pycache__/
-**/.pytest_cache/
-**/.ruff_cache/
-**/.cache/
-**/*.egg-info/
-**/.coverage
-*.pyc
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
 
-# 构建与依赖产物
-**/target/
-**/node_modules/
-**/dist/
-**/build/
-*.tsbuildinfo
-**/.evaluate.lock
+# Node / 前端构建
+node_modules/
+frontend/dist/
 
-# 运行态数据与本地产物：不入库
-run/
-artifacts/
-output/
+# 上传文件与运行产物
+backend/files/
+files/
 
-# IDE 与会话工具
-.vscode/
+# 编辑器与系统
+.DS_Store
 .idea/
-.zcode/
-.zcodeignore
-.research/
+.vscode/
 
-# 日志（eval/verification/ 的证据 log 例外：按 AGENTS.md 证据政策入库）
-*.log
-!eval/verification/**/*.log
-
-# 运行态数据仍忽略；评测基准商品集必须随代码版本化
-data/*
-!data/catalog-v1.jsonl
-!data/catalog-v2.jsonl
-!data/catalog-v3.jsonl
-
-# 评测报告是跑测产物不入库；标注集（eval/*.jsonl）与 eval/verification/ 证据库照常入库
-eval/report-*.md
-eval/recall-report-*.md
-eval/category-recall-report-*.md
-
-# 证据重物：向量快照与本地索引库可由评测命令再生，不随证据入库；
-# 逐文件 sha256 manifest 属可再生重物（同目录 .md 报告照常入库）——20260930 批次先例
-eval/verification/**/vectors.json
-eval/verification/**/index/
-eval/verification/agent-release-gate-20261004/agent-release-report-*.manifest.json
-eval/verification/agent-release-gate-20261004-error-rerun/agent-release-report-*.manifest.json
-eval/verification/retrieval-dev-calibration-20261004/recall-dev-report-*.manifest.json
+# 临时文件
+.cache/
+*.bundle
