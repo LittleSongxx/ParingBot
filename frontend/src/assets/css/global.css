@@ -1,0 +1,113 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    color: #333;
+    font-size: 14px;
+}
+
+a {
+    text-decoration: none;
+}
+
+.card {
+    background-color: #fff;
+    border-radius: 5px;
+    padding: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,.1);
+}
+
+
+.line1 {
+    word-break: break-all;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1; /* 超出几行省略 */
+    overflow: hidden;
+}
+ .line2 {
+     word-break: break-all;
+     text-overflow: ellipsis;
+     display: -webkit-box;
+     -webkit-box-orient: vertical;
+     -webkit-line-clamp: 2; /* 超出几行省略 */
+     overflow: hidden;
+ }
+.line3 {
+    word-break: break-all;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3; /* 超出几行省略 */
+    overflow: hidden;
+}
+
+.line4 {
+    word-break: break-all;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4; /* 超出几行省略 */
+    overflow: hidden;
+}
+
+
+.dark1{
+    width: 20%;
+    text-align: center;
+}
+
+/* 表格列开启 show-overflow-tooltip 后的提示框，宽度上限取视口 30%，超出折行。
+   提示框挂在 body 上渲染，写在页面的 scoped 样式里不生效，必须放全局样式。
+   用 max-width 而不是 width：内容短时按实际宽度显示，不强行拉宽。 */
+.el-popper.is-dark {
+    max-width: 30vw;
+    word-break: break-all;
+    white-space: normal;
+    line-height: 20px;
+}
+
+/* 页头：所有页面统一的标题区，标题一行、说明一行，说明是给第一次进来的人看的，不做装饰 */
+.page-head {
+    margin-bottom: 16px;
+}
+
+.page-head h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #303133;
+}
+
+/* 说明文字用灰色小字，和标题拉开层次；行高放宽一点，两行也不挤 */
+.page-head .page-tip {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: #909399;
+    line-height: 20px;
+}
+
+/* 页面有主操作（生成、发起、选对象）时，标题说明靠左、操作靠右，窄屏时操作换到下一行 */
+.page-head.with-action {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+}
+
+.page-head .page-head-main {
+    flex: 1;
+    min-width: 320px;
+}
+
+.page-head .page-head-action {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
