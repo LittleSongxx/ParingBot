@@ -1,0 +1,129 @@
+<template>
+  <div style="width: 50%" class="card">
+    <div class="section-title">个人资料</div>
+    <el-form ref="formRef" :rules="data.rules" :model="data.user" label-width="70px" style="padding: 10px 20px 20px">
+      <el-form-item prop="avatar" label="头像">
+        <el-upload
+            :action="baseUrl + '/files/upload'"
+            :before-upload="beforeUpload"
+            :on-success="handleUploadSuccess"
+            :on-error="handleUploadError"
+            :show-file-list="false"
+            class="avatar-uploader"
+        >
+          <NameAvatar :name="data.user.name" :src="data.user.avatar" :size="120" />
+        </el-upload>
+      </el-form-item>
+      <el-form-item prop="username" label="账号">
+        <el-input disabled v-model="data.user.username" placeholder="请输入账号"></el-input>
+      </el-form-item>
+      <el-form-item prop="name" label="姓名">
+        <el-input v-model="data.user.name" placeholder="请输入姓名"></el-input>
+      </el-form-item>
+      <el-form-item prop="phone" label="电话">
+        <el-input v-model="data.user.phone" placeholder="请输入 11 位手机号"></el-input>
+      </el-form-item>
+      <el-form-item prop="email" label="邮箱">
+        <el-input v-model="data.user.email" placeholder="请输入邮箱"></el-input>
+      </el-form-item>
+      <div style="text-align: center">
+        <el-button type="primary" @click="update">保 存</el-button>
+      </div>
+    </el-form>
+  </div>
+</template>
+
+<script setup>
+import { reactive, ref } from "vue";
+import request from "@/utils/request.js";
+import { ElMessage } from "element-plus";
+import NameAvatar from "@/components/NameAvatar.vue";
+
+// 头像上传组件自己发请求，不走 request.js，action 要写完整地址
+const baseUrl = import.meta.env.VITE_BASE_URL
+const formRef = ref()
+
+const data = reactive({
+  // 登录时把账号信息写进了浏览器缓存，这里直接拿来当表单初始值
+  user: JSON.parse(localStorage.getItem('xm-user') || '{}'),
+  rules: {
+    name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+    // 电话和邮箱可以不填，填了才判格式，规则与后端保持一致
+    phone: [{ pattern: /^1[3-9]\d{9}$/, message: '电话请填写 11 位手机号', trigger: 'blur' }],
+    email: [{ type: 'email', message: '邮箱格式不正确', trigger: ['blur', 'change'] }]
+  }
+})
+
+// 只收图片且不超过 2MB。上传组件自己发请求，所以校验放在上传之前拦
+const beforeUpload = (file) => {
+  if (!file.type.startsWith('image/')) {
+    ElMessage.error('头像只能是图片文件')
+    return false
+  }
+  if (file.size / 1024 / 1024 > 2) {
+    ElMessage.error('头像大小不能超过 2MB')
+    return false
+  }
+  return true
+}
+
+const handleUploadSuccess = (res) => {
+  // 上传接口返回的 data 是文件下载地址，写进表单后页面立刻显示新头像，
+  // 点保存才真正写进数据库
+  if (res.code !== '200') {
+    ElMessage.error(res.msg)
+    return
+  }
+  data.user.avatar = res.data
+  ElMessage.success('头像已上传，点保存后生效')
+}
+
+const handleUploadError = () => {
+  ElMessage.error('头像上传失败，请稍后重试')
+}
+
+// 保存成功后要通知外层布局刷新右上角的头像和姓名，
+// 外层 Manager.vue 在 RouterView 上监听了这个事件
+const emit = defineEmits(['updateUser'])
+
+const update = () => {
+  formRef.value.validate(valid => {
+    if (!valid) {
+      return
+    }
+    // user 里带着 id，后端按 id 更新这条账号；账号和密码不在这里改
+    request.put('/user/update', data.user).then(res => {
+      if (res.code === '200') {
+        ElMessage.success('保存成功')
+        // 数据库改完了本地缓存也要同步，否则刷新页面又变回旧值
+        localStorage.setItem('xm-user', JSON.stringify(data.user))
+        emit('updateUser')
+      } else {
+        ElMessage.error(res.msg)
+      }
+    })
+  })
+}
+</script>
+
+<style scoped>
+.section-title {
+  font-weight: bold;
+  font-size: 18px;
+  padding: 16px 0 10px 20px;
+}
+.avatar-uploader {
+  height: 120px;
+}
+.avatar-uploader .el-upload {
+  border: 1px dashed var(--el-border-color);
+  border-radius: 50%;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: var(--el-transition-duration-fast);
+}
+.avatar-uploader .el-upload:hover {
+  border-color: var(--el-color-primary);
+}
+</style>
