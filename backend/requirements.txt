@@ -5,7 +5,7 @@
 # LangChain moves fast between minor releases, the tutorial code
 # is written against exactly the versions listed below.
 #
-# Install (run inside the fastapi-app directory):
+# Install (run inside the backend directory):
 #   python -m venv .venv
 #   .venv\Scripts\activate
 #   pip install -r requirements.txt

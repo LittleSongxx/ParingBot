@@ -7,8 +7,8 @@ TORTOISE_ORM = {
             "credentials": {
                 "host": "localhost",
                 "port": 3306,
-                # 数据库名称，和 ai_coliving.sql 里建的库同名
-                "database": "ai_coliving",
+                # 数据库名称，和 smartlect.sql 里建的库同名
+                "database": "smartlect",
                 "user": "root",
                 # 数据库密码，按本机 MySQL 实际密码改
                 "password": "123456",

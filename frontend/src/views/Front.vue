@@ -3,7 +3,7 @@
     <div class="front-header">
       <div class="front-header-left">
         <img src="@/assets/imgs/logo.png" alt="">
-        <div class="title" @click="router.push('/front/home')">多Agent长租公寓智能合租匹配平台</div>
+        <div class="title" @click="router.push('/front/home')">SmartLect 智能合租匹配平台</div>
       </div>
       <div class="front-header-center">
         <el-menu :default-active="router.currentRoute.value.path" router mode="horizontal">

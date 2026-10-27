@@ -2,8 +2,8 @@
 
 登录一次拿到管理员 token，后面各轮的功能测试都靠它调受保护接口。
 
-运行前提：MySQL 已启动，且已执行过 ai_coliving.sql。
-运行方式（在 fastapi-app 目录下）：pytest
+运行前提：MySQL 已启动，且已执行过 smartlect.sql。
+运行方式（在 backend 目录下）：pytest
 """
 
 import asyncio
@@ -44,7 +44,7 @@ def admin_headers(client):
     """用初始化数据里的管理员账号登录，返回带 token 的请求头。"""
     response = client.post("/login", json={"username": "admin", "password": "admin"})
     body = response.json()
-    assert body["code"] == "200", "管理员登录失败，请确认已执行 ai_coliving.sql 且密码未被改过"
+    assert body["code"] == "200", "管理员登录失败，请确认已执行 smartlect.sql 且密码未被改过"
     return {"token": body["data"]["token"]}
 
 
@@ -53,7 +53,7 @@ def user_headers(client):
     """用初始化数据里的租客账号登录，返回带 token 的请求头。"""
     response = client.post("/login", json={"username": "member01", "password": "123456"})
     body = response.json()
-    assert body["code"] == "200", "租客登录失败，请确认已执行 ai_coliving.sql 且密码未被改过"
+    assert body["code"] == "200", "租客登录失败，请确认已执行 smartlect.sql 且密码未被改过"
     return {"token": body["data"]["token"]}
 
 

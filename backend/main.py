@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
         yield
 
 
-app = FastAPI(title="长租公寓智能合租匹配平台", lifespan=lifespan)
+app = FastAPI(title="SmartLect 智能合租匹配平台", lifespan=lifespan)
 
 # 跨域配置 CORS。前端跑在 5173 端口、后端在 9090，属于跨域请求，
 # 不配的话浏览器会拦掉所有接口调用。

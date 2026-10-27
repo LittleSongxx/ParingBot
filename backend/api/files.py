@@ -22,7 +22,7 @@ async def download_file(filename: str):
     """按文件名下载文件。"""
     # 文件名写在路径上，浏览器 img 标签的 src 可以直接指向这个地址
     return FileResponse(
-        # resolve 把文件名拼成 fastapi-app/files 目录下的路径，
+        # resolve 把文件名拼成 backend/files 目录下的路径，
         # 文件不存在时由它抛出人话提示
         path=file_service.resolve(filename),
         filename=filename,

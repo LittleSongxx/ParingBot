@@ -7,7 +7,7 @@ from fastapi import UploadFile
 
 from common.exception_handler import CustomException
 
-# 上传的文件统一放在 fastapi-app/files 目录下
+# 上传的文件统一放在 backend/files 目录下
 UPLOAD_DIR = "files"
 # 下载地址前缀，和后端启动端口保持一致；
 # 上传成功后拼上文件名返回给前端，前端把这个地址存进数据库

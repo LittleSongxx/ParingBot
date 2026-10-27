@@ -2,10 +2,10 @@
   <div class="footer-wrap">
     <div class="footer-brand">
       <img src="@/assets/imgs/logo.png" alt="">
-      <span>长租公寓智能合租匹配平台</span>
+      <span>SmartLect 智能合租匹配平台</span>
     </div>
     <div class="footer-tip">站内租客档案、头像与动态均为虚构，仅用于功能演示</div>
-    <div class="footer-copyright">CopyRight 2026©长租公寓智能合租匹配平台</div>
+    <div class="footer-copyright">CopyRight 2026©SmartLect 智能合租匹配平台</div>
   </div>
 </template>
 
