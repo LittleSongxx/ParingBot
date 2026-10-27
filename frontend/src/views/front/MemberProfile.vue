@@ -143,6 +143,7 @@
           <div v-if="!data.fileList.length" class="empty-photo-tip">暂未上传，照片为选填项，可以稍后补充。</div>
           <el-upload
               :action="baseUrl + '/files/upload'"
+              :headers="uploadHeaders"
               list-type="picture-card"
               :limit="9"
               v-model:file-list="data.fileList"
@@ -169,8 +170,9 @@ import { ElMessage } from "element-plus";
 import { Plus } from "@element-plus/icons-vue";
 import request from "@/utils/request.js";
 
-// 上传组件自己发请求，不走 request.js，action 要写完整地址
+// 上传组件自己发请求，不走 request.js，action 要写完整地址，token 也要在这里手动带上
 const baseUrl = import.meta.env.VITE_BASE_URL
+const uploadHeaders = { token: JSON.parse(localStorage.getItem('xm-user') || '{}').token || '' }
 const formRef = ref()
 
 const data = reactive({

@@ -14,7 +14,7 @@ from api import api_router
 from common.exception_handler import setup_exceptions
 from common.result import Result
 from service import match_service
-from settings import TORTOISE_ORM
+from settings import CORS_ORIGIN_LIST, HOST, PORT, TORTOISE_ORM
 
 
 @asynccontextmanager
@@ -39,8 +39,9 @@ app = FastAPI(title="SmartLect 智能合租匹配平台", lifespan=lifespan)
 # 不配的话浏览器会拦掉所有接口调用。
 app.add_middleware(
     CORSMiddleware,
-    # 允许所有源
-    allow_origins=["*"],
+    # 允许的来源从环境变量 CORS_ORIGINS 读，默认值就是本机前端的两个地址。
+    # 这里不写 "*"：允许任意来源等于让任何网站都能带着用户凭据调用后端
+    allow_origins=CORS_ORIGIN_LIST,
     # 允许所有 HTTP 方法
     allow_methods=["*"],
     # 允许所有请求头，前端要带自定义的 token 头
@@ -65,4 +66,5 @@ async def root():
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="localhost", reload=True, port=9090)
+    # 监听地址和端口同样走配置，部署时不需要改代码
+    uvicorn.run("main:app", host=HOST, reload=True, port=PORT)

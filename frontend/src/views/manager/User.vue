@@ -69,7 +69,7 @@
           <el-input v-model="data.form.password" show-password placeholder="不填写时默认密码为 123456"></el-input>
         </el-form-item>
         <el-form-item prop="avatar" label="头像">
-          <el-upload :action="baseUrl + '/files/upload'" :on-success="handleFileUpload" list-type="picture">
+          <el-upload :action="baseUrl + '/files/upload'" :headers="uploadHeaders" :on-success="handleFileUpload" list-type="picture">
             <el-button type="primary">点击上传</el-button>
           </el-upload>
         </el-form-item>
@@ -111,6 +111,8 @@ import request from '@/utils/request.js'
 import NameAvatar from '@/components/NameAvatar.vue'
 
 const baseUrl = import.meta.env.VITE_BASE_URL
+// 上传组件自己发请求，不走 request.js 的拦截器，token 请求头要在这里单独带上
+const uploadHeaders = { token: JSON.parse(localStorage.getItem('xm-user') || '{}').token || '' }
 const formRef = ref()
 
 const data = reactive({

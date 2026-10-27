@@ -95,6 +95,7 @@
         <el-form-item label="配图">
           <el-upload
               :action="baseUrl + '/files/upload'"
+              :headers="uploadHeaders"
               list-type="picture-card"
               :limit="9"
               v-model:file-list="data.fileList"
@@ -127,8 +128,9 @@ import { Plus, ChatLineSquare, ChatDotRound, View, Lock } from "@element-plus/ic
 import router from "@/router/index.js";
 import request from "@/utils/request.js";
 
-// 上传组件自己发请求，不走 request.js，action 要写完整地址
+// 上传组件自己发请求，不走 request.js，action 要写完整地址，token 也要在这里手动带上
 const baseUrl = import.meta.env.VITE_BASE_URL
+const uploadHeaders = { token: JSON.parse(localStorage.getItem('xm-user') || '{}').token || '' }
 const formRef = ref()
 
 // 写动态的几条建议，说的都是这一页自己的事

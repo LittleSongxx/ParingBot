@@ -103,6 +103,11 @@ router.beforeEach((to) => {
       return '/front/home'
     }
   }
+  // 路由上声明了 requiresAdmin 的页面只对管理员开放：上面按 /manager 前缀先拦了一道，
+  // 这里再按 meta 声明兜一层，以后管理页面换个前缀挂载也不会漏掉角色校验
+  if (to.meta.requiresAdmin && user.role !== 'ADMIN') {
+    return '/front/home'
+  }
   // 用户端里标了 requiresUser 的页面同样要求先登录
   if (to.meta.requiresUser && !user.id) {
     return '/login'

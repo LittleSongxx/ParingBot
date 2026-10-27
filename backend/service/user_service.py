@@ -10,6 +10,7 @@ from typing import List
 
 from common.exception_handler import CustomException
 from common.result import PageInfo
+from common.security import hash_password
 from common.times import format_datetime
 from models import (
     MatchCandidate,
@@ -91,7 +92,8 @@ async def add(payload: dict) -> None:
         raise CustomException("账号状态参数错误")
     await User.create(
         username=username,
-        password=password,
+        # 库里只存哈希，明文密码不落库
+        password=hash_password(password),
         # 姓名不填就用账号顶上，保证列表页姓名列不为空
         name=payload.get("name") or username,
         avatar=payload.get("avatar"),

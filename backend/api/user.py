@@ -66,7 +66,7 @@ async def select_one(user_id: int, current_user: User = Depends(get_current_user
 
 
 @router.get("/selectAll")
-async def select_all(name: str = "", _: User = Depends(get_current_user)):
+async def select_all(name: str = "", _: User = Depends(require_admin)):
     return Result.success(await user_service.select_all(name))
 
 

@@ -5,6 +5,7 @@
       <el-form-item prop="avatar" label="头像">
         <el-upload
             :action="baseUrl + '/files/upload'"
+            :headers="uploadHeaders"
             :before-upload="beforeUpload"
             :on-success="handleUploadSuccess"
             :on-error="handleUploadError"
@@ -39,8 +40,9 @@ import request from "@/utils/request.js";
 import { ElMessage } from "element-plus";
 import NameAvatar from "@/components/NameAvatar.vue";
 
-// 头像上传组件自己发请求，不走 request.js，action 要写完整地址
+// 头像上传组件自己发请求，不走 request.js，action 要写完整地址，token 也要在这里手动带上
 const baseUrl = import.meta.env.VITE_BASE_URL
+const uploadHeaders = { token: JSON.parse(localStorage.getItem('xm-user') || '{}').token || '' }
 const formRef = ref()
 
 const data = reactive({

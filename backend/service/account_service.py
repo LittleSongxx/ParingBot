@@ -2,6 +2,7 @@
 
 from common.auth import create_token
 from common.exception_handler import CustomException
+from common.security import hash_password, needs_rehash, verify_password
 from models import User
 
 # 系统只有两种用户角色：管理端 ADMIN、用户端 USER
@@ -39,6 +40,7 @@ def check_password(password: str | None) -> str:
     """密码格式校验，返回原密码。注册和修改密码共用同一套规则。"""
     if not password:
         raise CustomException("请输入密码")
+    # 这里校验的是明文密码的长度；落库前会先转成哈希，哈希串本身长度固定
     if len(password) < PASSWORD_MIN_LENGTH or len(password) > PASSWORD_MAX_LENGTH:
         raise CustomException(f"密码长度需要在 {PASSWORD_MIN_LENGTH} 到 {PASSWORD_MAX_LENGTH} 个字符之间")
     return password
@@ -69,12 +71,18 @@ async def login(username: str | None, password: str | None) -> dict:
     # 老账号的口径可能和新规则不同，这里统一报「账号或密码错误」比报长度不对更合适，
     # 也不会把账号的命名规则透露出去
     user = await User.get_or_none(username=(username or "").strip())
-    # 账号不存在和密码错误合并成同一句提示，不告诉对方是哪一步错了
-    if user is None or user.password != password:
+    # 账号不存在和密码错误合并成同一句提示，不告诉对方是哪一步错了。
+    # 用 verify_password 校验：库里存的可能是新哈希，也可能是历史数据里的明文，
+    # 两种都认，老账号不用改密码就能继续登录
+    if user is None or not verify_password(password, user.password):
         raise CustomException("账号或密码错误")
     # 密码对了还要看状态，管理员在用户管理里停用的账号不允许登录
     if user.status != "NORMAL":
         raise CustomException("账号已被停用")
+    # 旧明文密码（或迭代次数过时的哈希）在这里顺手升级成当前格式，
+    # 用户无感，库里的口令也不会一直明文躺着
+    if needs_rehash(user.password):
+        await User.filter(id=user.id).update(password=hash_password(password))
     # 校验全通过，签发 token 并连同用户信息一起返回
     return account_dict(user, create_token(user))
 
@@ -89,10 +97,11 @@ async def register(username: str | None, password: str | None, confirm_password:
     # 账号重复校验，命中就中断，不进入插入逻辑
     if await User.get_or_none(username=username):
         raise CustomException("账号已存在，请换一个账号")
-    # 注册入口只能创建普通用户，管理员账号由管理端在用户管理里添加
+    # 注册入口只能创建普通用户，管理员账号由管理端在用户管理里添加。
+    # 库里只存哈希，明文密码不落库
     await User.create(
         username=username,
-        password=password,
+        password=hash_password(password),
         # 姓名默认填成账号，用户可以在个人资料页再改
         name=username,
         role="USER",
@@ -107,15 +116,17 @@ async def update_password(
 ) -> None:
     if not password:
         raise CustomException("请输入原密码")
-    # 原密码必须对得上，防止别人趁着页面没锁屏直接改密码
-    if current_user.password != password:
+    # 原密码必须对得上，防止别人趁着页面没锁屏直接改密码。
+    # 老数据里的明文密码同样能用 verify_password 校验通过
+    if not verify_password(password, current_user.password):
         raise CustomException("原密码错误")
     if not new_password:
         raise CustomException("请输入新密码")
     # 新密码同样要过格式校验，不能通过改密码这一步绕开注册时的长度要求
     new_password = check_password(new_password)
-    # 新旧密码一样等于没改，直接拦下来
-    if current_user.password == new_password:
+    # 新旧密码一样等于没改，直接拦下来。
+    # 用 verify_password 判断，哈希过的密码也能认出「新密码其实就是原密码」
+    if verify_password(new_password, current_user.password):
         raise CustomException("新密码不能与原密码相同")
-    # 按当前登录用户的 id 更新，改不到别人头上
-    await User.filter(id=current_user.id).update(password=new_password)
+    # 按当前登录用户的 id 更新，改不到别人头上；新密码同样只存哈希
+    await User.filter(id=current_user.id).update(password=hash_password(new_password))
