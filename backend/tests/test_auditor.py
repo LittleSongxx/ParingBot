@@ -420,10 +420,10 @@ async def test_candidates_with_a_conclusion_are_not_audited_again(db, monkeypatc
     assert row.audit_round == 1 and row.reject_code is None
 
 
-async def test_code_recheck_flags_a_passed_candidate(db, monkeypatch):
-    """模型判通过的候选，代码按候选方的必须项复核对不上时，结论里要点出来。"""
+async def test_code_recheck_turns_a_passed_candidate_into_a_reject(db, monkeypatch):
+    """模型判通过的候选，代码按候选方的必须项复核对不上时当场改判否决，不留在通过里。"""
     member = await _make_applicant()
-    # 候选方把预算标成必须，且要求 160-170；申请方 178，这一项代码验不过
+    # 候选方把预算标成必须，且要求 3000-3500；申请方 3900，这一项代码验不过
     candidate = await _make_candidate()
     await _make_preference(candidate, budget_min=3000, budget_max=3500,
                            budget_required="必须")
@@ -435,10 +435,43 @@ async def test_code_recheck_flags_a_passed_candidate(db, monkeypatch):
 
     result = await auditor_service.build_audit(member.id, task.id, run.id)
 
-    assert result.passed == 1
-    assert "代码复核发现判通过的候选里有不满足必须项的" in result.batches[0].conclusion
+    assert result.passed == 0 and result.rejected == 1
+    assert "代码复核改判 1 人" in result.batches[0].conclusion
     assert "预算" in result.batches[0].conclusion
+    row = await MatchCandidate.get(task_id=task.id, candidate_member_id=candidate.id)
+    assert row.audit_status == auditor_service.AUDIT_REJECT
+    assert row.reject_code == "MISMATCH_HARD"
+    assert "预算" in row.reject_reason
     assert "模型报的和库里的对不上的地方" in result.conclusion
+
+
+async def test_code_recheck_turns_an_opposite_gender_pass_into_a_reject(db, monkeypatch):
+    """合租只找同性：历史数据里已经判通过的异性候选，代码复核时改判否决。"""
+    member = await _make_applicant()  # 男
+    legacy = await _make_candidate(gender="女")
+    await _make_preference(legacy)
+    fresh = await _make_candidate()
+    await _make_preference(fresh)
+    task = await _open_task(member)
+    # 这一条是性别复核补上之前留下的「已通过」，和这一批同批再审一次
+    legacy_row = await _put(task, legacy, audit_status=auditor_service.AUDIT_PASS,
+                            audit_round=1)
+    fresh_row = await _put(task, fresh)
+    run = await _open_run(task)
+    _use_fake_model(monkeypatch, _audit_script([
+        (fresh.id, auditor_service.AUDIT_PASS, None)]))
+
+    result = await auditor_service.audit_batch(
+        member, task, run.id, batch_no=1, pending=1,
+        rows=[(legacy_row, legacy), (fresh_row, fresh)], round_no=2)
+
+    assert result.passed == 1 and result.rejected == 1
+    stored = await MatchCandidate.get(id=legacy_row.id)
+    assert stored.audit_status == auditor_service.AUDIT_REJECT
+    assert stored.reject_code == "MISMATCH_HARD"
+    assert "合租只找同性" in stored.reject_reason
+    assert stored.audit_round == 2
+    assert "代码复核改判 1 人" in result.batches[0].conclusion
 
 
 async def test_disabled_role_is_refused_before_anything_is_written(db, monkeypatch):
@@ -710,6 +743,26 @@ async def test_save_result_of_candidate_outside_the_pool_is_refused(db):
     assert "不在本次任务的候选池里" in error.value.message
 
 
+async def test_pass_of_another_gender_is_refused(db):
+    """合租只找同性：给异性候选判通过时工具层直接拒绝，候选池里那条不动。"""
+    member = await _make_applicant()  # 男
+    candidate = await _make_candidate(gender="女")
+    task = await _open_task(member)
+    row = await _put(task, candidate)
+    context = await _context(member, task)
+    with pytest.raises(CustomException) as error:
+        await tool_box.save_audit_result(
+            context, candidate.id, auditor_service.AUDIT_PASS)
+    assert "合租只找同性" in error.value.message
+    assert "不能判通过" in error.value.message
+    assert (await MatchCandidate.get(id=row.id)).audit_status == auditor_service.AUDIT_WAIT
+    # 判否决不受这条限制：性别不同本来就该否决
+    saved = await tool_box.save_audit_result(
+        context, candidate.id, auditor_service.AUDIT_REJECT,
+        "MISMATCH_HARD", "性别不同，合租只找同性")
+    assert saved["audit_status"] == auditor_service.AUDIT_REJECT
+
+
 async def test_pass_does_not_write_a_reject_code(db):
     """通过就不带否决分类和理由：上一次留下的否决痕迹要一起清掉。"""
     member = await _make_applicant()
@@ -728,6 +781,13 @@ async def test_pass_does_not_write_a_reject_code(db):
 
 
 # ---------------------------------------------------------------- 纯函数
+
+
+def test_summarize_accepts_a_single_audited_object():
+    """模型只审一位时可能把 audited 写成单个对象，计数要按 1 条算。"""
+    text = auditor_service._summarize({"audited": {
+        "candidate_member_id": 1, "audit_status": auditor_service.AUDIT_PASS}})
+    assert "1 条" in text and "通过 1 人、否决 0 人" in text
 
 
 async def test_batch_size_follows_the_role_limit(db):

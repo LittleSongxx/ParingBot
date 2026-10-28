@@ -12,6 +12,8 @@
 角色之间也不靠提示词传话——候选池、画像、审核结论各自落在表里，
 主管每一轮从库里现查进展，下一个角色再从库里取自己要的那一份，
 所以上一个角色的输出原文不需要塞进下一个角色的提示词。
+角色干完活返回之后，调用方会按数据库对账的结论补写一条「对账结论」步骤，
+主管看到的上一轮「已经发生的事」以这一条为准，不采信模型自报的摘要。
 
 状态刻意做得很薄：只放任务号、运行号、轮次，和这一轮派谁、给它的交代。
 画像全文、候选清单这些留在库里不进状态，上下文就不会随轮数线性膨胀。
@@ -174,15 +176,21 @@ async def _role_lines() -> list:
 
 
 async def _history_lines(run_id: int) -> list:
-    """已经发生过的事：每一个角色报过的一句话结论，按轮次排。
+    """已经发生过的事：每一个角色按数据库对账后写下的结论，按轮次排。
 
-    取的是角色结论那一条步骤，不是主管的调度步骤——主管要看的是
-    「上一轮那件事最后做成了什么样」，再据此决定下一步。
+    优先取「对账结论」那一条步骤：它是服务返回之后按数据库现查结果写下来的，
+    和候选池、审核结论是同一份数，主管据此做路由决定。老运行没有这种步骤时，
+    回退读执行器写的角色结论——那是模型自报的摘要，只作历史数据兼容。
     """
     steps = await AgentStep.filter(
-        run_id=run_id, step_type=agents.STEP_CONCLUSION).order_by("round_no", "step_index")
+        run_id=run_id,
+        step_type=agents.STEP_RECONCILED).order_by("round_no", "step_index")
     if not steps:
-        return ["还没有派过角色，这是第一轮调度"]
+        steps = await AgentStep.filter(
+            run_id=run_id,
+            step_type=agents.STEP_CONCLUSION).order_by("round_no", "step_index")
+        if not steps:
+            return ["还没有派过角色，这是第一轮调度"]
     names = {role.agent_code: role.agent_name for role in await AgentDefinition.all()}
     lines: list = []
     for step in steps[-HISTORY_LIMIT:]:
@@ -248,6 +256,9 @@ def _decision_problem(data, allowed: list) -> str | None:
 
 async def ask_supervisor(progress: str, context: tool_box.ToolContext) -> dict:
     """把当前进展交给主管，要它给出下一步派谁。
+
+    context 目前没有用到，保留它是为了让主管和子角色共用同一套调用形状，
+    调度层的调用处不需要因为主管不落步骤而写特殊分支。
 
     主管不调工具，它只做一件事：读一遍进展，输出一个 JSON 决定。
     输出不合规再问一次，第二次还不合规就把这次运行判失败。
@@ -363,6 +374,8 @@ async def portrait_node(state: MatchState) -> dict:
     result = await portrait_service.build_portrait(
         member.id, state["run_id"], round_no=round_no,
         focus_hint=(state.get("instruction") or "").strip() or None)
+    await agents.write_reconciled_step(
+        context, round_no, result.conclusion, step_name="画像师对账结论")
     return {"last_summary": result.conclusion}
 
 
@@ -377,10 +390,13 @@ async def screener_node(state: MatchState) -> dict:
     if member is None:
         raise CustomException("这次匹配的租客档案已经查不到了，请重新发起匹配")
     round_no = state["round_no"]
+    context = _context(state, agents.AGENT_SCREENER, member.id, round_no)
     result = await screener_service.screen_round(
         member, task.id, state["run_id"], round_no=round_no,
         history=await _relax_history(task.id), deliver_count=task.deliver_count,
         custom_instruction=(state.get("instruction") or "").strip() or None)
+    await agents.write_reconciled_step(
+        context, round_no, result.conclusion, step_name="筛选官对账结论")
     return {"last_summary": result.conclusion}
 
 
@@ -394,9 +410,13 @@ async def auditor_node(state: MatchState) -> dict:
     member = await MemberProfile.get_or_none(id=task.member_id) if task else None
     if member is None:
         raise CustomException("这次匹配的租客档案已经查不到了，请重新发起匹配")
+    round_no = state["round_no"]
+    context = _context(state, agents.AGENT_AUDITOR, member.id, round_no)
     result = await auditor_service.build_audit(
-        member.id, task.id, state["run_id"], round_no=state["round_no"],
+        member.id, task.id, state["run_id"], round_no=round_no,
         custom_instruction=(state.get("instruction") or "").strip() or None)
+    await agents.write_reconciled_step(
+        context, round_no, result.conclusion, step_name="审核官对账结论")
     return {"last_summary": result.conclusion}
 
 

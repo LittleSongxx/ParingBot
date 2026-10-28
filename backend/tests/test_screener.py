@@ -548,10 +548,13 @@ async def test_relax_over_accumulated_limit_is_refused(db):
     task = await _open_task(member)
     run = await _open_run(task)
     context = await _context(member, task, run)
+    # 真实运行里第几轮由调度轮次决定，这里每次调用把上下文轮次跟着推进
     for index in range(3):
+        context.round_no = index + 1
         await tool_box.invoke("save_candidates", {
             "candidates": [{"candidate_member_id": people[index].id, "screen_score": 70}],
             "found_round": index + 1, "relax_note": "年龄上限+2"}, context)
+    context.round_no = 4
     with pytest.raises(CustomException) as error:
         await tool_box.invoke("save_candidates", {
             "candidates": [{"candidate_member_id": people[3].id, "screen_score": 70}],
@@ -571,12 +574,15 @@ async def test_relax_round_limit_is_refused(db):
     context = await _context(member, task, run)
     try:
         await SysConfig.filter(id=config.id).update(config_value="2")
+        context.round_no = 1
         await tool_box.invoke("save_candidates", {
             "candidates": [{"candidate_member_id": people[0].id, "screen_score": 70}],
             "found_round": 1, "relax_note": "年龄上限+2"}, context)
+        context.round_no = 2
         await tool_box.invoke("save_candidates", {
             "candidates": [{"candidate_member_id": people[1].id, "screen_score": 70}],
             "found_round": 2, "relax_note": "预算下限-200"}, context)
+        context.round_no = 3
         with pytest.raises(CustomException) as error:
             await tool_box.invoke("save_candidates", {
                 "candidates": [{"candidate_member_id": people[2].id, "screen_score": 70}],
@@ -617,6 +623,31 @@ async def test_one_round_can_only_relax_one_dimension(db):
             "candidates": [{"candidate_member_id": people[1].id, "screen_score": 70}],
             "found_round": 1, "relax_note": "预算下限-200"}, context)
     assert "一轮最多放宽一个维度" in error.value.message
+
+
+async def test_found_round_follows_the_schedule_round(db):
+    """第几轮筛出来的以运行上下文里的调度轮次为准：模型传的 found_round 不作数。"""
+    member = await _make_applicant()
+    first, second = await _make_candidate(), await _make_candidate()
+    task = await _open_task(member)
+    run = await _open_run(task)
+    context = await _context(member, task, run, round_no=3)
+    await tool_box.invoke("save_candidates", {
+        "candidates": [{"candidate_member_id": first.id, "screen_score": 70}],
+        "found_round": 9, "relax_note": ""}, context)
+    stored = await MatchCandidate.get(task_id=task.id, candidate_member_id=first.id)
+    assert stored.found_round == 3
+
+    # 放宽轮次也按上下文轮次记：第 4 轮先放宽预算，同一轮再放宽年龄会被拒绝，
+    # 提示里说的是第 4 轮，而不是模型传的 9
+    context.round_no = 4
+    await tool_box.invoke("save_candidates", {
+        "candidates": [{"candidate_member_id": second.id, "screen_score": 70}],
+        "found_round": 9, "relax_note": "预算下限-200"}, context)
+    with pytest.raises(CustomException) as error:
+        await tool_box.invoke("save_candidates", {
+            "candidates": [], "found_round": 9, "relax_note": "年龄上限+2"}, context)
+    assert "第 4 轮已经放宽过「预算」" in error.value.message
 
 
 async def test_relax_note_must_be_readable(db):

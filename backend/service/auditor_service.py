@@ -23,7 +23,8 @@
 2. 每一批审了几位、通过几位、否决几位，全部从数据库里现查，不采信模型结论里报的数；
    两边对不上时以库里的为准，并把这件事写进这一批的结论。
 3. 模型判「通过」的候选，代码会拿候选方标为必须的条件再复核一遍申请方，
-   复核不过的把维度名写进结论——判断依据要验得上，不能只看模型那一句通过。
+   并把「合租只找同性」也复核一遍；复核不过的当场改判为否决，理由里写清
+   是哪一项维度或性别不同——判断依据要验得上，不能只看模型那一句通过。
 
 一次审核留下两类记录：agent_run / agent_step 记过程，match_candidate 上回填结论。
 租客端页面读的是候选池的现查结果，页面上的数字全部来自数据库。
@@ -82,6 +83,8 @@ REJECT_LABELS = {
     "PREFERENCE_CONFLICT": "双方合住习惯直接冲突",
     "PORTRAIT_INSUFFICIENT": "申请方画像缺候选方在意的维度，判断不了",
 }
+# 代码复核改判时用的否决分类：必须项验不过、或者性别不同，都只能换人
+RECHECK_CODE = "MISMATCH_HARD"
 REJECT_SOLUTIONS = {
     "MISMATCH_HARD": "本候选不匹配",
     "PREFERENCE_CONFLICT": "本候选不匹配",
@@ -120,6 +123,36 @@ class AuditResult:
     codes: dict = field(default_factory=dict)
     conclusion: str = ""
     gate: str | None = None
+
+
+@dataclass
+class Recheck:
+    """代码复核发现的一位「模型判通过、但数据上过不去」的候选。
+
+    违规维度与性别分开记：改判理由里要写清是哪一条把这一位挡下来的，
+    主管和页面都从这里知道下一步该换人还是该补材料。
+    """
+
+    row: MatchCandidate
+    candidate: MemberProfile
+    violations: list[str] = field(default_factory=list)
+    gender_conflict: bool = False
+
+    def _detail(self) -> str:
+        parts: list[str] = []
+        if self.gender_conflict:
+            parts.append("合租只找同性：申请方与候选方性别不同")
+        if self.violations:
+            parts.append(f"候选方标为必须的「{'、'.join(self.violations)}」项申请方不满足")
+        return "；".join(parts) or "代码复核不通过"
+
+    def rejected_because(self) -> str:
+        """写进候选行 reject_reason 的改判理由：含具体维度或「合租只找同性」。"""
+        return "代码复核改判：" + self._detail()
+
+    def describe(self) -> str:
+        """写进批次结论的一小句：候选是谁、为什么改判。"""
+        return f"「{self.candidate.nickname}」{self._detail()}"
 
 
 def reject_label(code: str | None) -> str | None:
@@ -241,10 +274,21 @@ def instruction(rows: list, pending: int, batch_no: int) -> str:
     ])
 
 
+def _audited(data: dict) -> list:
+    """模型结论里「audited」的条目。
+
+    正常是一批一个列表；一批只审一位时，模型有时直接给一个对象。
+    两种都收下来，单对象且带 audit_status 时按 1 条算。
+    """
+    rows = data.get("audited")
+    if isinstance(rows, dict):
+        return [rows] if rows.get("audit_status") else []
+    return rows if isinstance(rows, list) else []
+
+
 def _summarize(data: dict) -> str:
     """把模型的结论收敛成一句话写进步骤记录。"""
-    rows = data.get("audited")
-    rows = rows if isinstance(rows, list) else []
+    rows = _audited(data)
     passed = len([one for one in rows
                   if isinstance(one, dict) and one.get("audit_status") == AUDIT_PASS])
     return f"模型给出结论 {len(rows)} 条，其中通过 {passed} 人、否决 {len(rows) - passed} 人"
@@ -328,6 +372,16 @@ def hard_violations(applicant: MemberProfile, candidate: MemberProfile,
     return names
 
 
+def gender_conflict(applicant: MemberProfile, candidate: MemberProfile) -> bool:
+    """合租只找同性：双方性别都填了而且不一样，就是硬冲突。
+
+    性别不在合住偏好的七个维度里，模型从偏好文本上看不到它；
+    这一条只能由代码在复核时兜住，历史候选池里混进异性时也要能拦住。
+    """
+    return bool(applicant.gender and candidate.gender
+                and applicant.gender != candidate.gender)
+
+
 def must_need(preference: RoommatePreference) -> list[dict]:
     """候选方标为必须、而且确实有约束的条件，连带它要求的内容。
 
@@ -369,24 +423,27 @@ def _step_params(step: AgentStep) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-async def _recheck(applicant: MemberProfile, rows: list) -> list[str]:
+async def _recheck(applicant: MemberProfile, rows: list) -> list[Recheck]:
     """代码复核：模型判通过的候选，申请方是不是真的满足候选方标为必须的项。
 
     模型判「通过」是一句话，验不验得上要看数据。这里按候选方标为必须的条件，
-    拿申请方的档案逐项对一遍，对不上的把候选和维度一起列出来。
+    拿申请方的档案逐项对一遍；「合租只找同性」也在这里一并复核。返回的是
+    结构化明细：哪一行、违规了哪些维度、是不是性别冲突，调用方据此直接改判。
     """
-    notes: list[str] = []
+    records: list[Recheck] = []
     for row in rows:
         candidate = await MemberProfile.get_or_none(id=row.candidate_member_id)
         if candidate is None:
             continue
         preference = await RoommatePreference.get_or_none(member_id=candidate.id)
-        if preference is None:
-            continue
-        bad = hard_violations(applicant, candidate, preference)
-        if bad:
-            notes.append(f"「{candidate.nickname}」的必须项里有申请方不满足的：{'、'.join(bad)}")
-    return notes
+        violations = []
+        if preference is not None:
+            violations = hard_violations(applicant, candidate, preference)
+        conflict = gender_conflict(applicant, candidate)
+        if violations or conflict:
+            records.append(Recheck(row=row, candidate=candidate,
+                                   violations=violations, gender_conflict=conflict))
+    return records
 
 
 async def _prompt_values(member: MemberProfile, rows: list) -> dict:
@@ -396,6 +453,18 @@ async def _prompt_values(member: MemberProfile, rows: list) -> dict:
     preference = await RoommatePreference.get_or_none(member_id=member.id)
     return {"applicant_info": applicant_text(member, portrait, preference),
             "candidate_info": candidate_text(rows)}
+
+
+def _decided_counts(pool: list) -> tuple[list, list, list, dict]:
+    """一批候选里已经有结论的那些，以及其中的通过与否决分布。"""
+    decided = [row for row in pool if row.audit_status != AUDIT_WAIT]
+    passed = [row for row in decided if row.audit_status == AUDIT_PASS]
+    rejected = [row for row in decided if row.audit_status == AUDIT_REJECT]
+    codes: dict = {}
+    for row in rejected:
+        code = row.reject_code or "未分类"
+        codes[code] = codes.get(code, 0) + 1
+    return decided, passed, rejected, codes
 
 
 async def audit_batch(member: MemberProfile, task: MatchTask, run_id: int, *,
@@ -425,22 +494,25 @@ async def audit_batch(member: MemberProfile, task: MatchTask, run_id: int, *,
         return AuditBatch(batch_no=batch_no, gate=outcome.gate,
                           conclusion=outcome.conclusion, tool_calls=outcome.tool_calls)
     data = outcome.data or {}
-    claimed = data.get("audited")
-    claimed = claimed if isinstance(claimed, list) else []
+    claimed = _audited(data)
     pool = await MatchCandidate.filter(task_id=task.id, candidate_member_id__in=ids)
-    decided = [row for row in pool if row.audit_status != AUDIT_WAIT]
-    passed = [row for row in decided if row.audit_status == AUDIT_PASS]
-    rejected = [row for row in decided if row.audit_status == AUDIT_REJECT]
-    codes: dict = {}
-    for row in rejected:
-        code = row.reject_code or "未分类"
-        codes[code] = codes.get(code, 0) + 1
+    decided, passed, rejected, codes = _decided_counts(pool)
     notes: list[str] = []
     if len(claimed) != len(decided):
         notes.append(f"模型说审了 {len(claimed)} 位，候选池里这一批回填了 {len(decided)} 位")
-    bad = await _recheck(member, passed)
-    if bad:
-        notes.append("代码复核发现判通过的候选里有不满足必须项的：" + "；".join(bad))
+    records = await _recheck(member, passed)
+    if records:
+        # 模型判通过但代码验不过：直接改判否决，再按库里的现查结果重算这一批的数
+        for item in records:
+            await MatchCandidate.filter(id=item.row.id).update(
+                audit_status=AUDIT_REJECT,
+                reject_code=RECHECK_CODE,
+                reject_reason=item.rejected_because()[:500],
+                audit_round=round_no or batch_no)
+        pool = await MatchCandidate.filter(task_id=task.id, candidate_member_id__in=ids)
+        decided, passed, rejected, codes = _decided_counts(pool)
+        notes.append(f"代码复核改判 {len(records)} 人："
+                     + "；".join(item.describe() for item in records))
     detail = "、".join(f"{reject_label(code) or code} {count} 人"
                        for code, count in codes.items()) or "没有否决"
     conclusion = (f"第 {batch_no} 批审了 {len(decided)} 人，通过 {len(passed)} 人，"

@@ -14,7 +14,7 @@
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from typing import Any, Callable
 
@@ -163,6 +163,17 @@ def _check_int(raw, low: int, high: int, label: str) -> int:
     return value
 
 
+def _effective_round(context: ToolContext, found_round) -> int:
+    """这一轮是第几轮筛出来的：真实运行以调度轮次为准，模型传的只在没有上下文时兜底。
+
+    模型自己填 found_round 时，一次执行里可以连填 1、2、3 把放宽轮次一次吃光，
+    统计口径也会和调度轮次脱钩；运行上下文里带了轮次就不再采信模型的值。
+    """
+    if context.round_no:
+        return int(context.round_no)
+    return _check_int(found_round, 1, 999, "第几轮筛出来的")
+
+
 def _member_target(context: ToolContext, member_id: int | None) -> int:
     """确定这次要读哪个租客：参数里带了就用参数，没带就用运行上下文里的申请方。"""
     target = member_id or context.member_id
@@ -273,6 +284,8 @@ async def invoke(tool_code: str, params: dict | None = None,
 
     所有工具调用都从这里进，一处管住三件事：停用的工具调不到、
     每次调用都留痕、失败原因一定被翻译成人话再往上抛。
+    注册表里这条工具的单次返回行数上限也在这一层塞进上下文，
+    读取类工具按各自的上限截断返回，模型换个工具调用时上限跟着换。
     """
     context = context or ToolContext()
     tool = await FunctionTool.get_or_none(tool_code=tool_code)
@@ -282,6 +295,9 @@ async def invoke(tool_code: str, params: dict | None = None,
         raise CustomException(
             f"工具「{tool.tool_name}」已经被停用，模型用不了它；"
             f"要恢复请到工具中心把它启用")
+    # 注册表里这条工具的单次返回行数上限作为本次调用的上下文；
+    # 注册表没填时保留调用方传进来的值，不同工具的上限不会互相串
+    context = replace(context, max_return_rows=tool.max_return_rows or context.max_return_rows)
     implementation = IMPLEMENTATIONS.get(tool_code)
     if implementation is None:
         raise CustomException(
@@ -643,7 +659,9 @@ async def _relax_used(context: ToolContext) -> dict:
             run_id=context.run_id, tool_code="save_candidates").order_by("step_index")
         for step in steps:
             params = _load_json(step.request_params)
-            found = params.get("found_round")
+            # 轮次以步骤记录上的轮次为准：真实运行里它就是调度轮次，
+            # 模型在入参里自己填的 found_round 已经不再作为判断依据
+            found = step.round_no or params.get("found_round")
             note = str(params.get("relax_note") or "").strip()
             if not note or found in parsed_rounds:
                 continue
@@ -654,8 +672,11 @@ async def _relax_used(context: ToolContext) -> dict:
     return parsed_rounds
 
 
-async def _check_relax(context: ToolContext, note: str, found_round: int) -> None:
+async def _check_relax(context: ToolContext, note: str, round_no: int) -> None:
     """校验这一轮的放宽说明：能不能放宽、放宽多少、一共放宽了几轮。
+
+    round_no 是这次调用归属的调度轮次，由 save_candidates 算好后传进来，
+    放宽轮次的去重与累计都按它记，不按模型自己填的 found_round。
 
     边界全部写死在这里，选择权留给模型：由它决定这一轮动哪一个维度，
     越界的一律拒绝，并把原因原样回到它手上让它改。
@@ -681,17 +702,17 @@ async def _check_relax(context: ToolContext, note: str, found_round: int) -> Non
         raise CustomException(
             f"{rule['name']}现在填的是不限或最宽的取值，放宽它等于没放宽，请换一个真的有约束的维度")
     relaxed = await _relax_used(context)
-    before = relaxed.get(found_round)
+    before = relaxed.get(round_no)
     if before and before["name"] != rule["name"]:
         raise CustomException(
-            f"第 {found_round} 轮已经放宽过「{before['name']}」了，一轮最多放宽一个维度")
+            f"第 {round_no} 轮已经放宽过「{before['name']}」了，一轮最多放宽一个维度")
     used = sum(item["amount"] for item in relaxed.values() if item["name"] == rule["name"])
     if used + parsed["amount"] > rule["total"]:
         raise CustomException(
             f"{rule['name']}累计最多放宽 {rule['total']}{rule['unit']}，现在算上这一轮已经放到 "
             f"{used + parsed['amount']}{rule['unit']} 了，请换一个维度，或者让租客到【合住偏好】把条件放宽")
     limit = await relax_limit()
-    if found_round not in relaxed and len(relaxed) + 1 > limit:
+    if round_no not in relaxed and len(relaxed) + 1 > limit:
         raise CustomException(
             f"一次运行最多放宽 {limit} 轮，现在放宽轮次已经用满；"
             f"候选还是不够的话，请让租客到【合住偏好】调整条件")
@@ -704,6 +725,8 @@ async def save_candidates(context: ToolContext, candidates: list | None,
     同一个候选在一套任务里只占一行：重复筛到的不再写入，只把跳过数报回去。
     本轮一条都没筛到时也要调用一次（传空列表），把放宽说明带回来——
     否则主管只看得到「这一轮什么都没发生」，不知道是没放宽还是放宽了也没用。
+    第几轮筛出来的以运行上下文里的调度轮次为准，模型入参里的 found_round
+    只在没有上下文的调用里兜底，真实运行不再采信。
 
     放宽说明要写成「维度+幅度」，校验通过才写库：维度只能是标「加分」的那些，
     幅度和累计都在放宽规则之内，一轮只放宽一个维度，整次运行的放宽轮次也不超上限。
@@ -721,8 +744,10 @@ async def save_candidates(context: ToolContext, candidates: list | None,
     note = str(relax_note or "").strip()
     if len(note) > 255:
         raise CustomException("放宽说明最长 255 个字，请只说清放宽了哪个维度、放宽了多少")
+    # 真实运行里第几轮筛出来的由调度轮次决定，模型的 found_round 不作数
+    round_no = _effective_round(context, found_round)
     if note:
-        await _check_relax(context, note, _check_int(found_round, 1, 999, "第几轮筛出来的"))
+        await _check_relax(context, note, round_no)
     # 申请方档案，写入时按它核对候选的性别
     applicant = await MemberProfile.get_or_none(id=context.member_id) if context.member_id else None
     written = 0
@@ -762,7 +787,7 @@ async def save_candidates(context: ToolContext, candidates: list | None,
         await MatchCandidate.create(
             task_id=context.task_id,
             candidate_member_id=candidate_id,
-            found_round=_check_int(found_round, 1, 999, "第几轮筛出来的"),
+            found_round=round_no,
             screen_score=score,
             # 放宽说明挂在这一轮的每一条上，页面上按候选看就能看出它是哪一轮、放宽了什么进来的
             relax_note=note or None,
@@ -843,6 +868,9 @@ async def save_audit_result(context: ToolContext, candidate_member_id: int,
                             reject_reason: str | None = None) -> dict:
     """把一个候选的审核结论回填到候选池。
 
+    合租只找同性：申请方与候选方性别都已知且不同的，判通过会被直接拒绝——
+    性别不在合住偏好的七个维度里，模型从偏好文本上看不出这一条，只能由代码兜住。
+
     否决必须分类：分不清是「人不合适」还是「画像不够、判断不了」，主管就只剩
     「再筛一轮」一条路；分开之后它才能先派画像师补画像，再重新筛选和审核。
     所以判 PORTRAIT_INSUFFICIENT 时要求理由里点名缺哪个维度，这个维度会被主管
@@ -865,6 +893,15 @@ async def save_audit_result(context: ToolContext, candidate_member_id: int,
     if row is None:
         raise CustomException(
             "这位租客不在本次任务的候选池里，请先让筛选官把他筛出来，再来回填结论")
+    if status == AUDIT_PASS and context.member_id:
+        applicant = await MemberProfile.get_or_none(id=context.member_id)
+        candidate = await MemberProfile.get_or_none(id=row.candidate_member_id)
+        if (applicant is not None and candidate is not None
+                and applicant.gender and candidate.gender
+                and applicant.gender != candidate.gender):
+            raise CustomException(
+                f"合租只找同性：申请方是{applicant.gender}，候选方是{candidate.gender}，"
+                f"不能判通过；这位候选只能判否决，请重新给结论")
     code = None
     reason = None
     if status == AUDIT_REJECT:

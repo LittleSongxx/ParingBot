@@ -17,6 +17,8 @@
 既不静默继续，也不抛异常把整次运行带崩——接下来是换角色还是收尾，是调度层的决定。
 
 每一步都落库：一次工具调用写一条 agent_step，角色收尾再写一条结论 step。
+服务返回之后，调用方还会用按数据库对账的结论补写一条「对账结论」step——
+执行器写的那条是模型自报的摘要，主管看进展时只认对账结论这一条。
 执行器只做这些通用的事，业务产出（画像、候选池）由调用方拿到结论之后自己写。
 
 写步骤记录和写模型调用记录这两件事收在本文件里做成公共函数：主管派单也落 agent_step
@@ -57,6 +59,8 @@ ROLE_PURPOSE = {
 # 步骤类型与步骤状态，取值和 agent_step 两列的口径一致
 STEP_TOOL = "工具调用"
 STEP_CONCLUSION = "角色结论"
+# 服务返回后按数据库现查结果写的那一条。主管看进展只认它，不采信模型自报的结论
+STEP_RECONCILED = "对账结论"
 # 主管派单写的那一条。子角色不写这种，它只写工具调用和角色结论
 STEP_SCHEDULE = "调度"
 STEP_DONE = "已完成"
@@ -79,6 +83,8 @@ EXTRA_ROUNDS = 3
 TEXT_LIMIT = 20000
 # 失败原因写库前的截断长度，和 agent_step.error_message 的列长一致
 ERROR_LIMIT = 500
+# 对账结论固定写在同轮最后一步：步序号用 999，保证排在该轮所有工具步骤之后
+RECONCILED_STEP_INDEX = 999
 
 
 @dataclass
@@ -231,6 +237,25 @@ async def write_step(context: tool_box.ToolContext, round_no: int, step_index: i
         end_time=now(),
         cost_millis=cost_millis(started) if started else None,
     )
+
+
+async def write_reconciled_step(context: tool_box.ToolContext, round_no: int,
+                                conclusion: str, *, step_name: str | None = None,
+                                agent_name: str | None = None) -> None:
+    """写一条「对账结论」步骤：这一轮的产出以数据库现查的结果为准。
+
+    执行器写的那条角色结论是模型自报的摘要，主管不能拿它当数；服务返回之后、
+    结果已经落库，调用方用这里把对账后的结论补成一条独立步骤。step_index 固定
+    用 999，保证排在同一轮所有工具步骤之后；没有运行编号时（页面试跑）直接跳过。
+    """
+    if not context.run_id:
+        return
+    await write_step(
+        context, round_no, RECONCILED_STEP_INDEX, STEP_RECONCILED,
+        step_name=step_name or f"{agent_name or context.agent_code or '角色'}对账结论",
+        response_result=conclusion,
+        step_status=STEP_DONE,
+        started=precise_now())
 
 
 def _default_summary(data: dict) -> str:
