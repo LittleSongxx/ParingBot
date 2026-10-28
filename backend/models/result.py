@@ -56,6 +56,9 @@ class MatchCandidate(Model):
 
     class Meta:
         table = "match_candidate"
+        # 同一个任务里一位候选只占一行，重复筛到只算一次；
+        # 并发写入时由数据库唯一键兜底
+        unique_together = (("task_id", "candidate_member_id"),)
 
 
 class MemberPortrait(Model):
@@ -84,3 +87,5 @@ class MemberPortrait(Model):
 
     class Meta:
         table = "member_portrait"
+        # 同一位租客的版本号不能重复，并发补画像时由这个唯一键兜底
+        unique_together = (("member_id", "version"),)

@@ -21,6 +21,9 @@ import re
 from dataclasses import dataclass, field
 from uuid import uuid4
 
+from tortoise.exceptions import IntegrityError
+from tortoise.transactions import in_transaction
+
 from ai import agents, model_factory
 from ai import tools as tool_box
 from common.exception_handler import CustomException
@@ -270,24 +273,38 @@ async def _prompt_values(member: MemberProfile, hint: str | None) -> tuple[dict,
 
 async def _save(member: MemberProfile, values: dict, evidence: dict,
                 hint: str | None, run_id: int) -> MemberPortrait:
-    """写入一个新版本，再按租客编号和版本号反查一次确认真的落库了。"""
-    latest = await MemberPortrait.filter(member_id=member.id).order_by("-version").first()
-    version = latest.version + 1 if latest else 1
-    await MemberPortrait.create(
-        member_id=member.id,
-        version=version,
-        personality_tags=values.get("personality_tags"),
-        lifestyle_tags=values.get("lifestyle_tags"),
-        cohabit_need_tags=values.get("cohabit_need_tags"),
-        summary=(values.get("summary") or "").strip() or None,
-        evidence=json.dumps(evidence, ensure_ascii=False),
-        focus_hint=hint,
-        run_id=run_id,
-    )
-    saved = await MemberPortrait.get_or_none(member_id=member.id, version=version)
-    if saved is None:
-        raise CustomException("画像写进库里之后没有查回来，请重试")
-    return saved
+    """写入一个新版本，再按租客编号和版本号反查一次确认真的落库了。
+
+    「读最新版本 → 写新版本 → 反查」三步放在同一条事务里：两个请求同时补画像时，
+    后一个不会读到前一个提交前的旧版本、算出同一个版本号。版本号有唯一键兜底，
+    真撞上就重新读版本重试一次；第二次还撞就明确报错，不把半条画像留在库里。
+    """
+    for _attempt in range(2):
+        try:
+            async with in_transaction():
+                latest = await MemberPortrait.filter(
+                    member_id=member.id).order_by("-version").first()
+                version = latest.version + 1 if latest else 1
+                await MemberPortrait.create(
+                    member_id=member.id,
+                    version=version,
+                    personality_tags=values.get("personality_tags"),
+                    lifestyle_tags=values.get("lifestyle_tags"),
+                    cohabit_need_tags=values.get("cohabit_need_tags"),
+                    summary=(values.get("summary") or "").strip() or None,
+                    evidence=json.dumps(evidence, ensure_ascii=False),
+                    focus_hint=hint,
+                    run_id=run_id,
+                )
+                saved = await MemberPortrait.get_or_none(
+                    member_id=member.id, version=version)
+                if saved is None:
+                    raise CustomException("画像写进库里之后没有查回来，请重试")
+                return saved
+        except IntegrityError:
+            # 版本唯一键冲突：另一个请求先写了同一版，重新读版本号再试一次
+            continue
+    raise CustomException("画像版本号冲突，已经重试一次仍然写不进去，请稍后重试")
 
 
 def _conclusion(portrait: MemberPortrait, outcome: agents.AgentOutcome,

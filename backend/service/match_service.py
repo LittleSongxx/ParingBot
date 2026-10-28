@@ -19,8 +19,11 @@
 以及把一次运行的过程和结果摊平成页面要的结构。
 """
 
+import asyncio
 import json
 from uuid import uuid4
+
+from tortoise.transactions import in_transaction
 
 from ai import agents, graph, model_factory
 from ai import tools as tool_box
@@ -31,6 +34,7 @@ from models import (AgentDefinition, AgentRun, AgentStep, AiModelConfig, Functio
                     PromptTemplate, RoommatePreference, User)
 from service import (agent_service, auditor_service, config_service, member_service,
                      preference_service, screener_service)
+from settings import MATCH_TIMEOUT_SECONDS
 
 # 运行类型，一次匹配编排对应一条运行记录
 RUN_TYPE = "匹配编排"
@@ -214,20 +218,25 @@ async def _count_rounds(run_id: int) -> int:
 
 async def _close(run: AgentRun, task: MatchTask, started, ok: bool, summary: str,
                  rounds: int, delivered: int = 0) -> None:
-    """收尾：运行记录和匹配任务一次写全。"""
-    await AgentRun.filter(id=run.id).update(
-        run_status=RUN_DONE if ok else RUN_FAILED,
-        current_round=rounds,
-        total_round=rounds,
-        output_summary=summary[:SUMMARY_LIMIT],
-        error_message=None if ok else summary[:ERROR_LIMIT],
-        end_time=now(),
-        cost_millis=cost_millis(started))
-    await MatchTask.filter(id=task.id).update(
-        status=TASK_DONE if ok else TASK_FAILED,
-        total_round=rounds,
-        delivered_count=delivered,
-        error_message=None if ok else summary[:ERROR_LIMIT])
+    """收尾：运行记录和匹配任务在同一条事务里一次写全。
+
+    两张表的状态必须一起变：只写了一张就中途崩掉，会出现「运行已失败、
+    任务还挂在执行中」的半截状态，页面上的状态机就对不上了。
+    """
+    async with in_transaction():
+        await AgentRun.filter(id=run.id).update(
+            run_status=RUN_DONE if ok else RUN_FAILED,
+            current_round=rounds,
+            total_round=rounds,
+            output_summary=summary[:SUMMARY_LIMIT],
+            error_message=None if ok else summary[:ERROR_LIMIT],
+            end_time=now(),
+            cost_millis=cost_millis(started))
+        await MatchTask.filter(id=task.id).update(
+            status=TASK_DONE if ok else TASK_FAILED,
+            total_round=rounds,
+            delivered_count=delivered,
+            error_message=None if ok else summary[:ERROR_LIMIT])
 
 
 async def deliverable(task_id: int) -> tuple[list, str | None]:
@@ -268,6 +277,8 @@ async def execute_task(task_id: int, run_id: int) -> None:
 
     收尾不采信主管和审核官说了什么：可以交付的候选从候选池里现数，
     一个都没有就判失败——页面显示「匹配成功」而库里是空的，是返工过的错法。
+    整次运行有总时限（settings.MATCH_TIMEOUT_SECONDS），超过就中断并按失败收尾，
+    不让页面一直挂着一个转不完的圈。
     """
     started = precise_now()
     task = await MatchTask.get_or_none(id=task_id)
@@ -275,7 +286,14 @@ async def execute_task(task_id: int, run_id: int) -> None:
     if task is None or run is None:
         return
     try:
-        final = await graph.run_graph(task.id, run.id)
+        final = await asyncio.wait_for(
+            graph.run_graph(task.id, run.id), timeout=MATCH_TIMEOUT_SECONDS)
+    except asyncio.TimeoutError:
+        # 整次运行超过系统参数里的时限：中断并按失败收尾，给租客一句能照做的下一步
+        message = (f"本次匹配运行超时（超过 {MATCH_TIMEOUT_SECONDS} 秒）已中断，"
+                   f"请稍后重新发起")
+        await _close(run, task, started, False, message, await _count_rounds(run.id))
+        return
     except CustomException as exc:
         await _close(run, task, started, False, exc.message, await _count_rounds(run.id))
         return
@@ -308,34 +326,41 @@ async def rerun(current_user: User) -> dict:
     state = await readiness(member)
     if not state["can_run"]:
         raise CustomException(state["blocker"]["message"])
-    running = await AgentRun.filter(
-        user_id=current_user.id, run_type=RUN_TYPE, run_status=RUN_RUNNING
-    ).order_by("-id").first()
-    if running is not None:
-        running_task = await MatchTask.get_or_none(id=running.task_id)
+    deliver = await screener_service.deliver_count()
+    # 从「查有没有在跑」到「建任务、建运行、把任务改成执行中」放在同一条事务里：
+    # 同一账号连点两次时只有一笔能落下来，不会出现两个后台任务并行跑
+    async with in_transaction():
+        user = await User.filter(id=current_user.id).select_for_update().first()
+        if user is None:
+            raise CustomException("当前账号已经不存在，请重新登录后再试")
+        running = await AgentRun.filter(
+            user_id=user.id, run_type=RUN_TYPE, run_status=RUN_RUNNING
+        ).order_by("-id").first()
+        if running is not None:
+            running_task = await MatchTask.get_or_none(id=running.task_id)
+            return {
+                "task_id": running.task_id,
+                "task_no": running_task.task_no if running_task else None,
+                "run_id": running.id,
+                "run_no": running.run_no,
+                "already_running": True,
+                "message": "智能匹配正在后台执行，请稍后查看实时进度",
+            }
+        # 每次用当前档案、偏好和动态开一条新的 MATCH-* 任务。
+        # 三个子 Agent 页面按最新任务展示；旧任务仍留库用于运行记录追溯。
+        task = await _open_task(member, deliver)
+        run = await _open_run(member, user.id, task)
+        await MatchTask.filter(id=task.id).update(
+            run_id=run.id, status=TASK_RUNNING, delivered_count=0,
+            total_round=0, error_message=None)
         return {
-            "task_id": running.task_id,
-            "task_no": running_task.task_no if running_task else None,
-            "run_id": running.id,
-            "run_no": running.run_no,
-            "already_running": True,
-            "message": "智能匹配正在后台执行，请稍后查看实时进度",
+            "task_id": task.id,
+            "task_no": task.task_no,
+            "run_id": run.id,
+            "run_no": run.run_no,
+            "already_running": False,
+            "message": "智能匹配已转入后台执行，可以离开页面，回来后会继续显示进度",
         }
-    # 每次用当前档案、偏好和动态开一条新的 MATCH-* 任务。
-    # 三个子 Agent 页面按最新任务展示；旧任务仍留库用于运行记录追溯。
-    task = await _open_task(member, await screener_service.deliver_count())
-    run = await _open_run(member, current_user.id, task)
-    await MatchTask.filter(id=task.id).update(
-        run_id=run.id, status=TASK_RUNNING, delivered_count=0,
-        total_round=0, error_message=None)
-    return {
-        "task_id": task.id,
-        "task_no": task.task_no,
-        "run_id": run.id,
-        "run_no": run.run_no,
-        "already_running": False,
-        "message": "智能匹配已转入后台执行，可以离开页面，回来后会继续显示进度",
-    }
 
 
 async def round_rows(run_id: int | None) -> list[dict]:
