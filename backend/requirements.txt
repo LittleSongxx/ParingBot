@@ -1,9 +1,9 @@
 # =============================================================
-# AI Co-living Roommate Match Platform - backend requirements
+# SmartLect backend requirements
 #
 # All versions are pinned on purpose. Do not use ~= or >=.
-# LangChain moves fast between minor releases, the tutorial code
-# is written against exactly the versions listed below.
+# FastAPI / Starlette / Pydantic / LangChain move fast between minor
+# releases; the tutorial code is written against exactly these versions.
 #
 # Install (run inside the backend directory):
 #   python -m venv .venv
@@ -24,7 +24,7 @@ pydantic==2.13.5
 
 # ---------- Database / ORM ----------
 # All business data lives in MySQL, no second database.
-tortoise==0.0.3
+# (The unrelated PyPI package "tortoise" is intentionally NOT installed.)
 tortoise-orm==1.1.8
 tzdata==2026.4
 aiomysql==0.3.2
@@ -45,3 +45,4 @@ langgraph==1.2.12
 # ---------- Testing ----------
 pytest==8.3.4
 pytest-asyncio==0.25.0
+httpx==0.28.1
