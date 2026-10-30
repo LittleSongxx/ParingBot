@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/MySQL-8-4479A1?style=flat-square&logo=mysql&logoColor=white" />
   <img src="https://img.shields.io/badge/Vue-3.4-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white" />
   <img src="https://img.shields.io/badge/Docker%20Compose-3%20services-2496ED?style=flat-square&logo=docker&logoColor=white" />
-  <img src="https://img.shields.io/badge/tests-339%20passed-2ea44f?style=flat-square" />
+  <img src="https://img.shields.io/badge/tests-348%20passed-2ea44f?style=flat-square" />
 </p>
 
 <p align="center">
@@ -90,7 +90,7 @@
 | **代码复核会翻案** | 模型判「通过」后，代码按候选方标为必须的条件复核申请方；验不过（含同性硬规则）的候选当场改判否决，而不是只写一条备注。 |
 | **每一步可复盘** | `agent_run` / `agent_step` / `tool_call_log` 三张账本；调度时间线 + 候选漏斗；异常一律翻译成「去哪个页面改哪一项」。 |
 | **配置中台** | 模型、Prompt、角色、工具、7 项闸门参数全部入库，运行时现查、改完下一步生效；停用一个工具，模型手里真的没有它。 |
-| **可部署、可测试** | Docker Compose 三服务（MySQL + FastAPI + Nginx/Vue）；266 条原有用例 + 新增回归共 **339 条**，AI 流程用 FakeModel 回放，不需要真实 API Key。 |
+| **可部署、可测试** | Docker Compose 三服务（MySQL + FastAPI + Nginx/Vue）；266 条原有用例 + 新增回归共 **348 条**，AI 流程用 FakeModel 回放，不需要真实 API Key。 |
 
 ## 架构
 
@@ -168,13 +168,16 @@ python scripts/smoke_check.py --base http://127.0.0.1:8080
 
 # 后端全量测试：真实 MySQL + FakeModel，不需要模型 API Key
 docker compose exec -T backend pytest -q
-# -> 339 passed
+# -> 348 passed
+
+# AI 能力评测（Phase 0）：40 条 golden case + 坏输出自检，不需要模型 Key
+python eval/run_eval.py --fixtures --bad eval/fixtures/bad
 
 # 前端构建（镜像构建阶段已执行 npm ci + vite build）
 docker compose build web
 ```
 
-当前基线：**339 项后端测试，0 失败**（2026-10-30，本机 Docker Compose 栈内实测）。测试数量来自 `pytest -q` 尾行统计；AI 相关用例用 FakeModel 按脚本回放，不依赖真实模型。
+当前基线：**348 项后端测试，0 失败**（2026-10-30，本机 Docker Compose 栈内实测）。测试数量来自 `pytest -q` 尾行统计；AI 相关用例用 FakeModel 按脚本回放，不依赖真实模型。
 
 ## 实测与边界
 
@@ -183,13 +186,13 @@ docker compose build web
 - **两条演示运行记录（种子库内置，已按当前口径迁移）**：8 轮调度 / 84 次工具调用 / 82.3 秒 / 33 个候选 → 4 通过、29 否决 → 交付 4（要求 8）；4 轮 / 39 次调用 / 50.3 秒 / 15 个候选 → 7 通过、8 否决 → 交付 7（要求 8）。迁移时把与当前硬规则冲突的历史「通过」（异性候选、复核不满足必须项）改判否决并重写了运行总结，页面、漏斗、交付数字现在是自洽的。
 - **演示库**：900 位租客（男女各 450、20 家门店）、2,500 条动态、80 个兴趣标签、2 条演示运行记录；历史数据已按当前口径迁移，新发起的匹配同样走修复后的硬校验。
 - **模型调用**：仓库不包含任何 API Key；不填 Key 只能浏览页面、管理配置和跑测试，不能发起真实匹配。
-- **安全边界**：密码已改为 PBKDF2 哈希、上传需要登录且服务端重命名、用户名列表仅管理员可见；但这是**单人本机演示栈**，没有限流、审计、备份策略与公网加固，不要直接暴露到公网。
+- **安全边界**：密码为 PBKDF2 哈希、上传鉴权+魔数校验、登录失败限流、改密吊销旧 JWT、分页限幅、nginx 安全响应头、用户名列表仅管理员可见；但这是**单人本机演示栈**，仍缺审计日志、备份策略与公网加固，不要直接暴露到公网。
 - **运行期**：匹配任务跑在 FastAPI BackgroundTasks 里，单进程、无队列、无重试；服务重启时会把悬挂运行标记为失败（前端会提示重新发起）。单次运行默认 600 秒超时。
 
 ## 这个仓库里没有什么
 
 - **没有真实房源/租约/合同/支付**：只有租客档案、偏好、匹配与审核；不是完整的公寓租赁业务系统。
-- **没有生产级高可用**：单机 MySQL + 单进程后端，没有多副本、消息队列、限流和跨城容灾。
+- **没有生产级高可用**：单机 MySQL + 单进程后端，没有多副本、消息队列和跨城容灾；登录限流是进程内实现，不跨实例。
 - **没有真实住户数据**：演示租客、动态、运行记录均为种子数据。
 - **没有随仓库分发的模型密钥**：`.env` 与任何 Key 都不进版本控制，仓库只保留 `.env.example`。
 - **没有前端自动化测试**：前端只做构建与页面冒烟（截图来自真实 Docker 栈）。
@@ -200,6 +203,7 @@ docker compose build web
 - 部署、配置与故障处理：[docs/operations.md](docs/operations.md)
 - 部署冒烟脚本：[scripts/smoke_check.py](scripts/smoke_check.py)
 - 种子库生成说明：[scripts/prepare_seed.py](scripts/prepare_seed.py)
+- AI 能力评测（Phase 0）：[eval/README.md](eval/README.md)
 
 ## 截图
 

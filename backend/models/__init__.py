@@ -9,10 +9,12 @@
     config.py      模型配置、Prompt 模板、系统参数、Agent 与工具注册
     process.py     Agent 运行、步骤、工具调用日志
     result.py      匹配任务、候选池、画像
+    assist.py      AI 辅助能力调用日志（Phase 0）
 
 引入新表时按域放进对应文件，并在本文件里导入，Tortoise 才能扫描到。
 """
 
+from models.assist import AiAssistLog
 from models.config import (
     AgentDefinition,
     AiModelConfig,
@@ -44,4 +46,5 @@ __all__ = [
     "MatchTask",
     "MatchCandidate",
     "MemberPortrait",
+    "AiAssistLog",
 ]

@@ -70,7 +70,7 @@ sequenceDiagram
 
 主管的「已经发生的事」优先读角色节点写入的**对账结论**（数据库口径），而不是模型自报的结论；旧数据回退到模型结论。
 
-## 数据模型（16 表，无物理外键）
+## 数据模型（17 表，无物理外键）
 
 | 域 | 表 | 说明 |
 |---|---|---|
@@ -80,6 +80,7 @@ sequenceDiagram
 | 匹配 | `match_task` / `match_candidate` | 任务状态机；候选池（初筛分、放宽说明、审核结论、否决分类） |
 | 运行 | `agent_run` / `agent_step` / `tool_call_log` | 运行总账 / 每步记录 / 每次工具调用 |
 | 配置 | `ai_model_config` / `prompt_template` / `agent_definition` / `function_tool` / `sys_config` | 模型、Prompt、角色、工具、闸门参数 |
+| AI 能力 | `ai_assist_log` | 资料教练/解读官等助手调用留痕：场景、Prompt 哈希、模型、耗时、tokens、是否采纳；只存摘要不存原文 |
 
 完整性由应用层 + 12 个唯一索引保证；`MatchCandidate(task_id, candidate_member_id)`、`MemberPortrait(member_id, version)` 在 ORM 中登记为 `unique_together`，业务关键多写序列在事务中提交。
 
