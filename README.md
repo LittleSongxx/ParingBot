@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/MySQL-8-4479A1?style=flat-square&logo=mysql&logoColor=white" />
   <img src="https://img.shields.io/badge/Vue-3.4-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white" />
   <img src="https://img.shields.io/badge/Docker%20Compose-3%20services-2496ED?style=flat-square&logo=docker&logoColor=white" />
-  <img src="https://img.shields.io/badge/tests-300%20passed-2ea44f?style=flat-square" />
+  <img src="https://img.shields.io/badge/tests-339%20passed-2ea44f?style=flat-square" />
 </p>
 
 <p align="center">
@@ -90,7 +90,7 @@
 | **代码复核会翻案** | 模型判「通过」后，代码按候选方标为必须的条件复核申请方；验不过（含同性硬规则）的候选当场改判否决，而不是只写一条备注。 |
 | **每一步可复盘** | `agent_run` / `agent_step` / `tool_call_log` 三张账本；调度时间线 + 候选漏斗；异常一律翻译成「去哪个页面改哪一项」。 |
 | **配置中台** | 模型、Prompt、角色、工具、7 项闸门参数全部入库，运行时现查、改完下一步生效；停用一个工具，模型手里真的没有它。 |
-| **可部署、可测试** | Docker Compose 三服务（MySQL + FastAPI + Nginx/Vue）；266 条原有用例 + 新增回归共 **300 条**，AI 流程用 FakeModel 回放，不需要真实 API Key。 |
+| **可部署、可测试** | Docker Compose 三服务（MySQL + FastAPI + Nginx/Vue）；266 条原有用例 + 新增回归共 **339 条**，AI 流程用 FakeModel 回放，不需要真实 API Key。 |
 
 ## 架构
 
@@ -149,7 +149,7 @@ docker compose ps             # 三个服务 healthy 后访问
 
 | 身份 | 账号 | 密码 |
 |---|---|---|
-| 管理员 | `admin` | `admin` |
+| 管理员 | `admin` | `admin123` |
 | 租客 | `member01` | `123456` |
 
 登录后还差最后一步：管理员进入【AI 模型配置】，给「调度 / 画像 / 筛选 / 审核」四个用途填上模型 API Key（可共用一条）。种子配置的 Key 为空，不填时发起匹配会被前置检查拦下并提示去哪里补。
@@ -168,20 +168,20 @@ python scripts/smoke_check.py --base http://127.0.0.1:8080
 
 # 后端全量测试：真实 MySQL + FakeModel，不需要模型 API Key
 docker compose exec -T backend pytest -q
-# -> 300 passed
+# -> 339 passed
 
 # 前端构建（镜像构建阶段已执行 npm ci + vite build）
 docker compose build web
 ```
 
-当前基线：**300 项后端测试，0 失败**（2026-10-30，本机 Docker Compose 栈内实测）。测试数量来自 `pytest -q` 尾行统计；AI 相关用例用 FakeModel 按脚本回放，不依赖真实模型。
+当前基线：**339 项后端测试，0 失败**（2026-10-30，本机 Docker Compose 栈内实测）。测试数量来自 `pytest -q` 尾行统计；AI 相关用例用 FakeModel 按脚本回放，不依赖真实模型。
 
 ## 实测与边界
 
 这些数字只代表本机 Docker Desktop 与仓库内演示数据，不是生产容量或 SLA：
 
-- **一次真实运行（种子库保留的历史记录）**：8 轮调度 / 84 次工具调用 / 82.3 秒 / 33 个候选 → 10 通过、23 否决 → 交付 8；另一次 4 轮 / 39 次调用 / 50.3 秒 / 15 个候选 → 8 通过。
-- **演示库**：900 位租客（男女各 450、20 家门店）、2,500 条动态、80 个兴趣标签、2 条历史运行记录。演示库保留了修复前产生的历史运行记录，新发起的匹配走修复后的口径，历史记录不追溯。
+- **两条演示运行记录（种子库内置，已按当前口径迁移）**：8 轮调度 / 84 次工具调用 / 82.3 秒 / 33 个候选 → 4 通过、29 否决 → 交付 4（要求 8）；4 轮 / 39 次调用 / 50.3 秒 / 15 个候选 → 7 通过、8 否决 → 交付 7（要求 8）。迁移时把与当前硬规则冲突的历史「通过」（异性候选、复核不满足必须项）改判否决并重写了运行总结，页面、漏斗、交付数字现在是自洽的。
+- **演示库**：900 位租客（男女各 450、20 家门店）、2,500 条动态、80 个兴趣标签、2 条演示运行记录；历史数据已按当前口径迁移，新发起的匹配同样走修复后的硬校验。
 - **模型调用**：仓库不包含任何 API Key；不填 Key 只能浏览页面、管理配置和跑测试，不能发起真实匹配。
 - **安全边界**：密码已改为 PBKDF2 哈希、上传需要登录且服务端重命名、用户名列表仅管理员可见；但这是**单人本机演示栈**，没有限流、审计、备份策略与公网加固，不要直接暴露到公网。
 - **运行期**：匹配任务跑在 FastAPI BackgroundTasks 里，单进程、无队列、无重试；服务重启时会把悬挂运行标记为失败（前端会提示重新发起）。单次运行默认 600 秒超时。

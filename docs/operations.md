@@ -24,7 +24,7 @@ DOCKER_CONTEXT=default docker compose up -d --build
 
 | 身份 | 账号 | 密码 |
 |---|---|---|
-| 管理员 | `admin` | `admin` |
+| 管理员 | `admin` | `admin123` |
 | 租客 | `member01` | `123456` |
 
 ## 3. 配置项（.env）
@@ -111,3 +111,16 @@ docker compose stop          # 停止但保留数据
 docker compose down          # 停止并删容器/网络，保留数据卷
 docker compose down -v       # 连同数据卷一起删除（不可恢复）
 ```
+
+## 安全与鉴权行为
+
+| 行为 | 说明 |
+|---|---|
+| 登录失败 | 账号或 IP 维度 10 次失败 / 5 分钟触发锁定（默认 5 分钟），锁定期间正确密码也拒绝；可通过环境变量调整 |
+| 账号枚举 | 未注册、密码错误、账号停用统一返回「账号或密码错误」；未知账号用等价 PBKDF2 计算对齐耗时 |
+| Token 失效 | JWT 内带密码指纹：改密码后旧 token 立即失效；账号停用/删除同样失效 |
+| 上传 | 除扩展名外校验文件头魔数（png/jpg/jpeg/gif/webp），HTML 改名图片会被拒绝；单文件 ≤5 MB |
+| 分页 | 服务端统一限幅：page_num ≥ 1、page_size ≤ 100，负数/超大值会被规整而不是报 500 |
+| 响应头 | nginx 统一加 `X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy` |
+| 文件访问 | `/files/download/{文件名}` 仅放行合法文件路径；其它 `/files/*` 返回 404，不再落到 SPA 首页 |
+| 级联删除 | 删除账号时档案/偏好/动态/画像/匹配记录在同一事务内删除，文件清理在事务之后 |
