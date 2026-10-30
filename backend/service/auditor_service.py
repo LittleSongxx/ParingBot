@@ -22,9 +22,9 @@
 1. 一批审几位、按什么顺序分批，按工具调用上限和待审人数算，模型只能审这一批的名单。
 2. 每一批审了几位、通过几位、否决几位，全部从数据库里现查，不采信模型结论里报的数；
    两边对不上时以库里的为准，并把这件事写进这一批的结论。
-3. 模型判「通过」的候选，代码会拿候选方标为必须的条件再复核一遍申请方，
-   并把「合租只找同性」也复核一遍；复核不过的当场改判为否决，理由里写清
-   是哪一项维度或性别不同——判断依据要验得上，不能只看模型那一句通过。
+3. 模型判「通过」的候选，代码会双向复核必须项：申请方要满足候选方标为必须的
+   条件，候选方也要满足申请方标为必须的条件；「合租只找同性」同样复核。复核不过的
+   当场改判为否决，理由里写清是哪个方向、哪一项维度或性别不同——判断依据要验得上。
 
 一次审核留下两类记录：agent_run / agent_step 记过程，match_candidate 上回填结论。
 租客端页面读的是候选池的现查结果，页面上的数字全部来自数据库。
@@ -129,13 +129,15 @@ class AuditResult:
 class Recheck:
     """代码复核发现的一位「模型判通过、但数据上过不去」的候选。
 
-    违规维度与性别分开记：改判理由里要写清是哪一条把这一位挡下来的，
-    主管和页面都从这里知道下一步该换人还是该补材料。
+    双向都必须记下来：violations 是申请方没满足候选方的必须项，reverse_violations
+    是候选方没满足申请方的必须项，gender_conflict 是性别不同。改判理由里要写清是
+    哪个方向、哪一条把这一位挡下来的，主管和页面都从这里知道下一步该做什么。
     """
 
     row: MatchCandidate
     candidate: MemberProfile
     violations: list[str] = field(default_factory=list)
+    reverse_violations: list[str] = field(default_factory=list)
     gender_conflict: bool = False
 
     def _detail(self) -> str:
@@ -143,11 +145,13 @@ class Recheck:
         if self.gender_conflict:
             parts.append("合租只找同性：申请方与候选方性别不同")
         if self.violations:
-            parts.append(f"候选方标为必须的「{'、'.join(self.violations)}」项申请方不满足")
+            parts.append(f"申请方不满足候选方标为必须的「{'、'.join(self.violations)}」项")
+        if self.reverse_violations:
+            parts.append(f"候选方不满足申请方标为必须的「{'、'.join(self.reverse_violations)}」项")
         return "；".join(parts) or "代码复核不通过"
 
     def rejected_because(self) -> str:
-        """写进候选行 reject_reason 的改判理由：含具体维度或「合租只找同性」。"""
+        """写进候选行 reject_reason 的改判理由：含方向、维度或「合租只找同性」。"""
         return "代码复核改判：" + self._detail()
 
     def describe(self) -> str:
@@ -423,27 +427,50 @@ def _step_params(step: AgentStep) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-async def _recheck(applicant: MemberProfile, rows: list) -> list[Recheck]:
-    """代码复核：模型判通过的候选，申请方是不是真的满足候选方标为必须的项。
+async def recheck_rows(applicant: MemberProfile, rows: list,
+                       applicant_preference: RoommatePreference | None = None) -> list[Recheck]:
+    """按当前硬规则复核一批候选：同性 + 双向必须项，返回结构化明细。
 
-    模型判「通过」是一句话，验不验得上要看数据。这里按候选方标为必须的条件，
-    拿申请方的档案逐项对一遍；「合租只找同性」也在这里一并复核。返回的是
-    结构化明细：哪一行、违规了哪些维度、是不是性别冲突，调用方据此直接改判。
+    模型判「通过」是一句话，验不验得上要看数据。这里做两件事：
+
+    - 正向：申请方是不是满足候选方标为必须的条件（换一个立场重评）；
+    - 反向：候选方是不是满足申请方标为必须的条件（申请方自己的偏好也要对得上）。
+
+    「合租只找同性」一并复核。档案与偏好按 id__in 一次性预取，批次多大都只查固定
+    几条 SQL；审核改判和交付前复核共用这一份判断，两处口径不会分叉。
     """
+    if not rows:
+        return []
+    candidate_ids = [row.candidate_member_id for row in rows]
+    members = {item.id: item for item in await MemberProfile.filter(id__in=candidate_ids)}
+    preferences = {item.member_id: item for item in await RoommatePreference.filter(
+        member_id__in=candidate_ids)}
+    if applicant_preference is None:
+        applicant_preference = await RoommatePreference.get_or_none(member_id=applicant.id)
     records: list[Recheck] = []
     for row in rows:
-        candidate = await MemberProfile.get_or_none(id=row.candidate_member_id)
+        candidate = members.get(row.candidate_member_id)
         if candidate is None:
             continue
-        preference = await RoommatePreference.get_or_none(member_id=candidate.id)
-        violations = []
-        if preference is not None:
-            violations = hard_violations(applicant, candidate, preference)
+        violations: list[str] = []
+        candidate_preference = preferences.get(candidate.id)
+        if candidate_preference is not None:
+            violations = hard_violations(applicant, candidate, candidate_preference)
+        reverse: list[str] = []
+        if applicant_preference is not None:
+            reverse = hard_violations(candidate, applicant, applicant_preference)
         conflict = gender_conflict(applicant, candidate)
-        if violations or conflict:
+        if violations or reverse or conflict:
             records.append(Recheck(row=row, candidate=candidate,
-                                   violations=violations, gender_conflict=conflict))
+                                   violations=violations,
+                                   reverse_violations=reverse,
+                                   gender_conflict=conflict))
     return records
+
+
+async def _recheck(applicant: MemberProfile, rows: list) -> list[Recheck]:
+    """代码复核入口：审核批内改判用，逻辑与交付前复核共用 recheck_rows。"""
+    return await recheck_rows(applicant, rows)
 
 
 async def _prompt_values(member: MemberProfile, rows: list) -> dict:

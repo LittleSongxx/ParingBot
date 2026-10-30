@@ -287,6 +287,8 @@ async def test_one_round_is_enough(db, monkeypatch):
 
     steps = await AgentStep.filter(run_id=run.id).order_by("step_index")
     assert [step.step_type for step in steps] == ["工具调用", "工具调用", "工具调用", "角色结论"]
+    # A-11：主管调度步骤固定 step_index=0，角色步骤从 2 起，同轮内不再和主管撞号
+    assert [step.step_index for step in steps] == [2, 3, 4, 5]
     assert [step.tool_code for step in steps[:3]] == [
         "read_roommate_preference", "search_members", "save_candidates"]
     assert steps[0].agent_code == "SCREENER" and steps[0].round_no == 1
@@ -332,10 +334,12 @@ async def test_short_of_deliver_count_relaxes_one_dimension(db, monkeypatch):
     assert "可以放宽的维度：年龄" in second_round_system
 
     # 步骤按轮记：两轮各三条工具调用加一条结论
-    steps = await AgentStep.filter(run_id=run.id).order_by("round_no", "step_index")
+    steps = await AgentStep.filter(run_id=run.id).order_by("round_no", "step_index", "id")
     assert [step.round_no for step in steps] == [1, 1, 1, 1, 2, 2, 2, 2]
     assert [step.step_type for step in steps] == (
         ["工具调用", "工具调用", "工具调用", "角色结论"] * 2)
+    # 每轮的角色步骤都从 2 起，轮与轮之间互不影响
+    assert [step.step_index for step in steps] == [2, 3, 4, 5, 2, 3, 4, 5]
 
 
 async def test_round_rows_keep_a_round_that_found_nobody(db, monkeypatch):

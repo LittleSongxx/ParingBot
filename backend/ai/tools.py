@@ -21,6 +21,7 @@ from typing import Any, Callable
 from tortoise.transactions import in_transaction
 
 from common.exception_handler import CustomException
+from common.redact import redact_text
 from common.text import split_values
 from common.times import cost_millis, format_datetime, now, precise_now
 from models import (AgentStep, FunctionTool, InterestTag, MatchCandidate, MemberMoment,
@@ -109,11 +110,16 @@ class ToolContext:
 
 
 def _json_text(value: Any) -> str:
-    """把入参或返回转成存日志的文本，过长就截断。"""
+    """把入参或返回转成存日志的文本：先脱敏、再截断。
+
+    工具返回里可能带租客原文（自我介绍、动态、手机号等），写进 tool_call_log 之前
+    统一把手机号/邮箱/身份证号打码；排查问题时仍看得出这里原来有个值。
+    """
     try:
         text = json.dumps(value, ensure_ascii=False, default=str)
     except (TypeError, ValueError):
         text = str(value)
+    text = redact_text(text) or ""
     if len(text) <= LOG_TEXT_LIMIT:
         return text
     return text[:LOG_TEXT_LIMIT] + "……（内容过长已截断）"
@@ -136,8 +142,9 @@ def _row_count(result: Any) -> int | None:
 
 
 def _truncate(message: str) -> str:
-    """错误原因写库前的截断，列长 500。"""
-    text = str(message or "").strip() or "工具执行失败"
+    """错误原因写库前先脱敏再截断，列长 500。"""
+    text = redact_text(str(message or "").strip()) or ""
+    text = text or "工具执行失败"
     return text if len(text) <= ERROR_LIMIT else text[:ERROR_LIMIT]
 
 
@@ -658,7 +665,8 @@ async def _relax_used(context: ToolContext) -> dict:
                 continue
     if context.run_id:
         steps = await AgentStep.filter(
-            run_id=context.run_id, tool_code="save_candidates").order_by("step_index")
+            run_id=context.run_id,
+            tool_code="save_candidates").order_by("step_index", "id")
         for step in steps:
             params = _load_json(step.request_params)
             # 轮次以步骤记录上的轮次为准：真实运行里它就是调度轮次，
@@ -873,6 +881,10 @@ async def save_audit_result(context: ToolContext, candidate_member_id: int,
                             reject_reason: str | None = None) -> dict:
     """把一个候选的审核结论回填到候选池。
 
+    结论只能回填一次：只有「待审核」的候选能被回填，已经有结论的行一律拒绝。
+    这样模型跨批、重复调用或下一轮重审都不能悄悄覆盖别人的结论，批次计数和候选池
+    才对得上；真要改判由代码复核在批内完成，或由管理员处理。
+
     合租只找同性：申请方与候选方性别都已知且不同的，判通过会被直接拒绝——
     性别不在合住偏好的七个维度里，模型从偏好文本上看不出这一条，只能由代码兜住。
 
@@ -898,6 +910,10 @@ async def save_audit_result(context: ToolContext, candidate_member_id: int,
     if row is None:
         raise CustomException(
             "这位租客不在本次任务的候选池里，请先让筛选官把他筛出来，再来回填结论")
+    if row.audit_status != "待审核":
+        raise CustomException(
+            f"这位候选已经有审核结论（{row.audit_status}），结论只能回填一次；"
+            f"请不要重复回填或跨批改判，需要改判请让代码复核或管理员处理")
     if status == AUDIT_PASS and context.member_id:
         applicant = await MemberProfile.get_or_none(id=context.member_id)
         candidate = await MemberProfile.get_or_none(id=row.candidate_member_id)

@@ -35,6 +35,7 @@ from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from ai import model_factory, prompt_loader
 from ai import tools as tool_box
 from common.exception_handler import CustomException
+from common.redact import redact_text
 from common.times import cost_millis, now, precise_now
 from models import AgentDefinition, AgentStep
 from service import config_service
@@ -104,7 +105,12 @@ class AgentOutcome:
 
 
 def _json_text(value, limit: int = TEXT_LIMIT) -> str | None:
-    """把入参或返回转成存库的文本，过长就截断。"""
+    """把入参或返回转成文本，过长就截断。
+
+    同一个函数既给写库用、也给回给模型的工具消息用，所以这里不做脱敏：
+    PII 打码只发生在 write_step 这个写库入口，模型拿到的工具返回保持原样，
+    编排行为不受日志策略影响。
+    """
     if value is None:
         return None
     try:
@@ -115,7 +121,7 @@ def _json_text(value, limit: int = TEXT_LIMIT) -> str | None:
 
 
 def _error_text(message) -> str:
-    text = str(message or "").strip() or "角色执行失败"
+    text = redact_text(str(message or "").strip()) or "角色执行失败"
     return text if len(text) <= ERROR_LIMIT else text[:ERROR_LIMIT]
 
 
@@ -228,8 +234,9 @@ async def write_step(context: tool_box.ToolContext, round_no: int, step_index: i
         step_type=step_type,
         step_name=step_name,
         tool_code=tool_code,
-        request_params=_json_text(request_params),
-        response_result=_json_text(response_result),
+        # 写库前统一脱敏：步骤表里可能有租客原文、手机号/邮箱/身份证号
+        request_params=redact_text(_json_text(request_params)),
+        response_result=redact_text(_json_text(response_result)),
         step_status=step_status,
         error_message=_error_text(error_message) if error_message else None,
         # 时间列是秒精度，存 now() 的原值；microsecond 的起点只用来算耗时
@@ -241,12 +248,14 @@ async def write_step(context: tool_box.ToolContext, round_no: int, step_index: i
 
 async def write_reconciled_step(context: tool_box.ToolContext, round_no: int,
                                 conclusion: str, *, step_name: str | None = None,
-                                agent_name: str | None = None) -> None:
+                                agent_name: str | None = None,
+                                step_status: str = STEP_DONE) -> None:
     """写一条「对账结论」步骤：这一轮的产出以数据库现查的结果为准。
 
     执行器写的那条角色结论是模型自报的摘要，主管不能拿它当数；服务返回之后、
     结果已经落库，调用方用这里把对账后的结论补成一条独立步骤。step_index 固定
     用 999，保证排在同一轮所有工具步骤之后；没有运行编号时（页面试跑）直接跳过。
+    正常收尾用默认的「已完成」；角色被上限拦下这类分支传 STEP_FAILED，时间线上标红。
     """
     if not context.run_id:
         return
@@ -254,7 +263,7 @@ async def write_reconciled_step(context: tool_box.ToolContext, round_no: int,
         context, round_no, RECONCILED_STEP_INDEX, STEP_RECONCILED,
         step_name=step_name or f"{agent_name or context.agent_code or '角色'}对账结论",
         response_result=conclusion,
-        step_status=STEP_DONE,
+        step_status=step_status,
         started=precise_now())
 
 
@@ -328,7 +337,10 @@ async def run_agent(agent_code: str, context: tool_box.ToolContext, *,
         messages.append(HumanMessage(content=instruction))
     max_tool_call, max_same_tool = await role_limits(agent)
     round_no = context.round_no or 1
-    step_index = 0
+    # 角色步骤从 2 起：0 留给主管的调度步骤、1 留给主管的失败步骤，
+    # 同轮里主管与角色的 step_index 不会撞车，时间线排序才有稳定依据。
+    # 历史数据保持原样可读，不需要回填
+    step_index = 1
     tool_calls_used = 0
     last_tool = ""
     same_streak = 0

@@ -474,6 +474,49 @@ async def test_code_recheck_turns_an_opposite_gender_pass_into_a_reject(db, monk
     assert "代码复核改判 1 人" in result.conclusion
 
 
+async def test_code_recheck_turns_a_reverse_must_violation_into_a_reject(db, monkeypatch):
+    """反向复核：候选方不满足申请方标为必须的条件时，同样改判否决。"""
+    member = await _make_applicant()  # 申请方偏好：整洁度一般、租期 6-12 个月标为必须
+    # 候选方租期只有 3 个月以下，低于申请方的必须项
+    candidate = await _make_candidate(lease_term="3个月以下")
+    await _make_preference(candidate)
+    task = await _open_task(member)
+    await _put(task, candidate)
+    run = await _open_run(task)
+    _use_fake_model(monkeypatch, _audit_script([
+        (candidate.id, auditor_service.AUDIT_PASS, None)]))
+
+    result = await auditor_service.build_audit(member.id, task.id, run.id)
+
+    assert result.passed == 0 and result.rejected == 1
+    row = await MatchCandidate.get(task_id=task.id, candidate_member_id=candidate.id)
+    assert row.audit_status == auditor_service.AUDIT_REJECT
+    assert row.reject_code == "MISMATCH_HARD"
+    assert "租期" in row.reject_reason
+    assert "候选方不满足申请方" in row.reject_reason
+    assert "代码复核改判 1 人" in result.batches[0].conclusion
+
+
+async def test_recheck_rows_checks_both_directions(db):
+    """交付前复核与审核改判共用一份判断：双向必须项都验，返回结构化方向。"""
+    applicant = await _make_applicant()
+    reverse = await _make_candidate(lease_term="3个月以下")
+    await _make_preference(reverse)
+    ok = await _make_candidate()
+    await _make_preference(ok)
+    task = await _open_task(applicant)
+    reverse_row = await _put(task, reverse, audit_status=auditor_service.AUDIT_PASS)
+    ok_row = await _put(task, ok, audit_status=auditor_service.AUDIT_PASS)
+
+    records = await auditor_service.recheck_rows(applicant, [reverse_row, ok_row])
+
+    assert [item.row.id for item in records] == [reverse_row.id]
+    assert records[0].reverse_violations == ["租期"]
+    assert records[0].violations == []
+    assert records[0].gender_conflict is False
+    assert "候选方不满足申请方" in records[0].rejected_because()
+
+
 async def test_disabled_role_is_refused_before_anything_is_written(db, monkeypatch):
     """审核官被停用时直接拦住，提示指回子 Agent 定义，候选池一条都不动。"""
     member = await _make_applicant()
@@ -763,21 +806,45 @@ async def test_pass_of_another_gender_is_refused(db):
     assert saved["audit_status"] == auditor_service.AUDIT_REJECT
 
 
-async def test_pass_does_not_write_a_reject_code(db):
-    """通过就不带否决分类和理由：上一次留下的否决痕迹要一起清掉。"""
+async def test_audit_result_can_only_be_written_once(db):
+    """审核结论只回填一次：同一批里重复回填不能再改结论。"""
+    member = await _make_applicant()
+    candidate = await _make_candidate()
+    task = await _open_task(member)
+    row = await _put(task, candidate)
+    context = await _context(member, task, round_no=2)
+    saved = await tool_box.save_audit_result(
+        context, candidate.id, auditor_service.AUDIT_PASS)
+    assert saved["audit_status"] == auditor_service.AUDIT_PASS
+    with pytest.raises(CustomException) as error:
+        await tool_box.save_audit_result(
+            context, candidate.id, auditor_service.AUDIT_REJECT,
+            "MISMATCH_HARD", "想改成否决")
+    assert "已经有审核结论" in error.value.message
+    assert "只能回填一次" in error.value.message
+    stored = await MatchCandidate.get(id=row.id)
+    assert stored.audit_status == auditor_service.AUDIT_PASS
+    assert stored.reject_code is None and stored.reject_reason is None
+    assert stored.audit_round == 2
+
+
+async def test_audit_result_of_a_decided_row_is_refused(db):
+    """跨批/重审覆盖同样拒绝：已经审过的行不能再被另一条结论改写。"""
     member = await _make_applicant()
     candidate = await _make_candidate()
     task = await _open_task(member)
     row = await _put(task, candidate, audit_status=auditor_service.AUDIT_REJECT,
                      reject_code="MISMATCH_HARD", reject_reason="之前判过", audit_round=1)
-    saved = await tool_box.save_audit_result(
-        await _context(member, task, round_no=2), candidate.id,
-        auditor_service.AUDIT_PASS, "MISMATCH_HARD", "之前判过")
-    assert saved["reject_code"] is None
+    with pytest.raises(CustomException) as error:
+        await tool_box.save_audit_result(
+            await _context(member, task, round_no=2), candidate.id,
+            auditor_service.AUDIT_PASS)
+    assert "已经有审核结论" in error.value.message
     stored = await MatchCandidate.get(id=row.id)
-    assert stored.audit_status == auditor_service.AUDIT_PASS
-    assert stored.reject_code is None and stored.reject_reason is None
-    assert stored.audit_round == 2
+    assert stored.audit_status == auditor_service.AUDIT_REJECT
+    assert stored.reject_code == "MISMATCH_HARD"
+    assert stored.reject_reason == "之前判过"
+    assert stored.audit_round == 1
 
 
 # ---------------------------------------------------------------- 纯函数

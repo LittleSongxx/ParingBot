@@ -54,6 +54,8 @@ SUMMARY_LIMIT = 2000
 ERROR_LIMIT = 500
 # 中断的原因，也是页面上给租客的下一步指示
 INTERRUPT_REASON = "服务重启，这次运行已经中断，请重新发起匹配"
+# 审核官停用时交付名单的说明：这批人没有经过反向审核，待审核也计入，但明确否决的不交付
+AUDITOR_DISABLED_NOTE = "审核官已停用，本次候选没有经过反向审核，按未否决的候选交付（待审核也计入）"
 
 
 def _check(key: str, label: str, ok: bool, message: str,
@@ -239,20 +241,52 @@ async def _close(run: AgentRun, task: MatchTask, started, ok: bool, summary: str
             error_message=None if ok else summary[:ERROR_LIMIT])
 
 
+def _deliverable_sort_key(row: MatchCandidate):
+    """交付名单的排序键：初筛得分高的在前，同分按审核轮次近的在前，最后用 id 兜底。
+
+    排序必须稳定：页面、运行总结、漏斗读的是同一份名单，两次请求不能给出两种顺序。
+    """
+    return (-(row.screen_score if row.screen_score is not None else -1),
+            -(row.audit_round or 0), row.id)
+
+
 async def deliverable(task_id: int) -> tuple[list, str | None]:
-    """这次匹配最终能交付哪些候选，以及要顺带说明的一句话。
+    """这次匹配最终能交付哪些候选（按当前硬规则复核过），以及要顺带说明的一句话。
 
-    审核官启用时只算通过审核的那些；审核官被停用时，候选池里的人没有经过审核这一环，
-    按全部可交付处理，并把这件事写进结论——页面上不能让人以为审核做过了。
+    交付不等于「审核状态是通」：审核官启用时，只有通过审核、并且按当前规则复核
+    得上的候选才算交付——合租同性、候选方的必须项申请方满足、申请方的必须项候选方
+    也满足。历史数据里模型误判或规则变化前留下的「通过」，在这里被挡下来，不再悄悄
+    交付；挡下来了就在 note 里说明被剔除几人。
 
-    调度时间线与候选漏斗那一页也要用这一条口径，所以它是公开的：
+    审核官被停用时，这批候选没有经过反向审核，按「没有明确否决」交付（待审核也计入），
+    同样在 note 里说清。名单按 _deliverable_sort_key 稳定排序。
+
+    运行总结、我的匹配页、调度时间线的候选漏斗都读这一份口径：
     同一个「通过」在两处按两种算法数，页面上的数字迟早对不上。
     """
     auditor = await AgentDefinition.get_or_none(agent_code=agents.AGENT_AUDITOR)
-    rows = await MatchCandidate.filter(task_id=task_id).order_by("id")
+    rows = await MatchCandidate.filter(task_id=task_id)
     if auditor is None or auditor.enabled != "是":
-        return list(rows), "审核官已停用，本次候选没有经过反向审核，按候选池里的全部交付"
-    return [row for row in rows if row.audit_status == tool_box.AUDIT_PASS], None
+        candidates = [row for row in rows if row.audit_status != tool_box.AUDIT_REJECT]
+        return sorted(candidates, key=_deliverable_sort_key), AUDITOR_DISABLED_NOTE
+
+    passed = [row for row in rows if row.audit_status == tool_box.AUDIT_PASS]
+    note = None
+    if passed:
+        task = await MatchTask.get_or_none(id=task_id)
+        applicant = await MemberProfile.get_or_none(
+            id=task.member_id) if task else None
+        if applicant is None:
+            note = ("发起匹配的租客档案已经查不到，无法按当前规则复核交付名单，"
+                    "本次交付名单未做复核")
+        else:
+            records = await auditor_service.recheck_rows(applicant, passed)
+            if records:
+                blocked = {item.row.id for item in records}
+                passed = [row for row in passed if row.id not in blocked]
+                note = (f"通过审核的候选里有 {len(records)} 人按当前规则不可交付"
+                        f"（性别或双向必须项复核不通过），已从交付名单里剔除")
+    return sorted(passed, key=_deliverable_sort_key), note
 
 
 def _summary(final: dict, counts: dict, rounds: int, task: MatchTask,
@@ -371,7 +405,7 @@ async def round_rows(run_id: int | None) -> list[dict]:
     """
     if not run_id:
         return []
-    steps = await AgentStep.filter(run_id=run_id).order_by("round_no", "step_index")
+    steps = await AgentStep.filter(run_id=run_id).order_by("round_no", "step_index", "id")
     names = {role.agent_code: role.agent_name for role in await AgentDefinition.all()}
     rows: dict = {}
     order: list = []

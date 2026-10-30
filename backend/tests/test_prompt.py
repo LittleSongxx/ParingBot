@@ -294,3 +294,4 @@ async def test_seed_prompts_are_readable_utf8(db):
         assert len(chinese) >= 50, (row.code, len(chinese))
         assert contract[row.code] in content, row.code
         assert "Ã" not in content and "ä½" not in content, row.code
+        assert "【安全约束】" in content, row.code

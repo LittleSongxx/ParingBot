@@ -220,7 +220,7 @@ async def _round_note(run_id: int | None, round_no: int) -> str | None:
         return None
     note = None
     steps = await AgentStep.filter(
-        run_id=run_id, tool_code=SAVE_TOOL).order_by("step_index")
+        run_id=run_id, tool_code=SAVE_TOOL).order_by("step_index", "id")
     for step in steps:
         params = _step_params(step)
         # 以步骤记录上的调度轮次为准：save_candidates 落库的 found_round 已经是
@@ -613,7 +613,7 @@ async def round_rows(task: MatchTask) -> list[dict]:
         return []
     notes: dict = {}
     steps = await AgentStep.filter(
-        run_id=task.run_id, tool_code=SAVE_TOOL).order_by("step_index")
+        run_id=task.run_id, tool_code=SAVE_TOOL).order_by("step_index", "id")
     for step in steps:
         params = _step_params(step)
         # 轮次同样以步骤上的 round_no 为准，模型自报的 found_round 只在老数据里兜底

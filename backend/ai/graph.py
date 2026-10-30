@@ -32,7 +32,7 @@ from ai import agents, model_factory, prompt_loader
 from ai import tools as tool_box
 from common.exception_handler import CustomException
 from common.times import precise_now
-from models import (AgentDefinition, AgentStep, FunctionTool, MatchCandidate,
+from models import (AgentDefinition, AgentRun, AgentStep, FunctionTool, MatchCandidate,
                     MatchTask, MemberPortrait, MemberProfile)
 from service import (auditor_service, config_service, member_service, portrait_service,
                      screener_service)
@@ -167,6 +167,10 @@ async def _role_lines() -> list:
     for role in await AgentDefinition.filter(enabled="是").order_by("sort", "id"):
         if role.agent_code == agents.AGENT_SUPERVISOR or not role.tool_group:
             continue
+        if role.agent_code not in agents.SUB_AGENT_CODES:
+            # 调度图里没有这个角色：进展里不列它，ask_supervisor 会给出可读错误，
+            # 不会等到条件边取 key 时才抛一个看不懂的 KeyError
+            continue
         tools = await FunctionTool.filter(
             tool_group=role.tool_group, enabled="是").order_by("sort", "id")
         names = "、".join(tool.tool_name for tool in tools) or "没有可用的工具"
@@ -184,11 +188,11 @@ async def _history_lines(run_id: int) -> list:
     """
     steps = await AgentStep.filter(
         run_id=run_id,
-        step_type=agents.STEP_RECONCILED).order_by("round_no", "step_index")
+        step_type=agents.STEP_RECONCILED).order_by("round_no", "step_index", "id")
     if not steps:
         steps = await AgentStep.filter(
             run_id=run_id,
-            step_type=agents.STEP_CONCLUSION).order_by("round_no", "step_index")
+            step_type=agents.STEP_CONCLUSION).order_by("round_no", "step_index", "id")
         if not steps:
             return ["还没有派过角色，这是第一轮调度"]
     names = {role.agent_code: role.agent_name for role in await AgentDefinition.all()}
@@ -269,8 +273,21 @@ async def ask_supervisor(progress: str, context: tool_box.ToolContext) -> dict:
     if agent.enabled != "是":
         raise CustomException("合租管家已经被停用，整次匹配跑不起来，请到【子 Agent 定义】把它启用")
     roles = await AgentDefinition.filter(enabled="是").order_by("sort", "id")
-    allowed = [role.agent_code for role in roles
-               if role.agent_code != agents.AGENT_SUPERVISOR] + [AGENT_FINISH]
+    enabled_codes = {role.agent_code for role in roles}
+    # 角色表可以加人，但调度图的节点和条件边是写死的四个；启用一个图里没有的角色
+    # 时，主管真派给它就会在条件边取 key 时崩成「未预期错误」。在这里先拦住，
+    # 并说清去哪停用，管理员看得到可照做的下一步
+    unknown = [role for role in roles
+               if role.agent_code != agents.AGENT_SUPERVISOR
+               and role.agent_code not in agents.SUB_AGENT_CODES]
+    if unknown:
+        names = "、".join(f"{role.agent_code}（{role.agent_name}）" for role in unknown)
+        raise CustomException(
+            f"【子 Agent 定义】里有调度图不认识的启用角色：{names}。"
+            f"当前调度图只支持 {'、'.join(agents.SUB_AGENT_CODES)} 三个子角色，"
+            f"请到【子 Agent 定义】把这些角色停用后再发起匹配")
+    # allowed 只放图里真有的子角色（且当前启用中）和收尾，模型不可能派到图外
+    allowed = [code for code in agents.SUB_AGENT_CODES if code in enabled_codes] + [AGENT_FINISH]
 
     system_prompt = await prompt_loader.render(agent.prompt_code, progress=progress)
     config = await model_factory.load_for_purpose(model_factory.PURPOSE_SCHEDULE)
@@ -313,23 +330,31 @@ def _context(state: MatchState, agent_code: str, member_id: int, round_no: int):
 
 
 async def _role_blocked(context, round_no: int, agent_name: str, conclusion: str) -> dict:
-    """角色在被派出去之前就被上限挡住了：写一条结论步骤，把原因带回主管。
+    """角色在被派出去之前就被上限挡住了：写一条失败结论和一条对账结论，把原因带回主管。
 
-    这里的写法和执行器里被闸拦下时一致——结论步骤落成失败状态，
-    页面上这一条会标红，看的人一眼能分出「没干成」和「干完了」。
+    只写失败结论的话，一旦这个运行里已经有过对账结论，主管的「已经发生的事」只读
+    对账结论，被上限拦下这件事就对主管不可见，它可能反复派同一个被拦的角色。所以
+    两种步骤都写，结论文字里带「被上限拦下」，主管下一轮直接看得到。
     """
+    blocked = conclusion if "被上限拦下" in conclusion else f"{conclusion}（被上限拦下）"
     await agents.write_step(
-        context, round_no, 1, agents.STEP_CONCLUSION,
+        context, round_no, 2, agents.STEP_CONCLUSION,
         step_name=f"{agent_name}结论", request_params={"blocked": True},
-        response_result=conclusion, step_status=agents.STEP_FAILED,
-        error_message=conclusion, started=precise_now())
-    return {"last_summary": conclusion}
+        response_result=blocked, step_status=agents.STEP_FAILED,
+        error_message=blocked, started=precise_now())
+    await agents.write_reconciled_step(
+        context, round_no, blocked, step_name=f"{agent_name}对账结论",
+        step_status=agents.STEP_FAILED)
+    return {"last_summary": blocked}
 
 
 async def supervisor_node(state: MatchState) -> dict:
     """主管节点：先把轮次加一，再决定下一步派谁或者收尾。
 
     轮次到顶就收尾，不再问模型——这是最后一道闸，问也只会拿到一个还想继续干的决定。
+    调度步骤用 step_index=0（角色步骤从 2 起），请求参数只记摘要（轮次、候选统计、
+    交给角色的指令），不再把整段进展全文塞进步骤表；当前轮次同时写回运行记录，
+    页面轮询时不用再另查步骤表。
     """
     round_no = int(state.get("round_no") or 0) + 1
     max_round = await config_service.get_int(MAX_ROUND_KEY, MAX_ROUND_DEFAULT)
@@ -342,11 +367,28 @@ async def supervisor_node(state: MatchState) -> dict:
         raise CustomException("这次运行挂着的匹配任务已经不存在了，请重新发起匹配")
     progress = await build_progress(task, state["run_id"], round_no)
     context = _context(state, agents.AGENT_SUPERVISOR, task.member_id, round_no)
-    decision = await ask_supervisor(progress, context)
+    try:
+        decision = await ask_supervisor(progress, context)
+    except CustomException as exc:
+        # 主管自己失败也要落一条失败步骤：复盘时看得到「这一轮为什么断了」，
+        # 否则步骤表里只有上一轮角色的记录，失败原因只存在于 agent_run.error_message
+        await agents.write_step(
+            context, round_no, 1, agents.STEP_CONCLUSION,
+            step_name=f"第 {round_no} 轮调度失败",
+            request_params={"round_no": round_no},
+            response_result=exc.message, step_status=agents.STEP_FAILED,
+            error_message=exc.message, started=precise_now())
+        raise
+    counts = pool_counts(await MatchCandidate.filter(task_id=task.id))
     await agents.write_step(
-        context, round_no, 1, agents.STEP_SCHEDULE,
-        step_name=f"第 {round_no} 轮调度", request_params=progress,
+        context, round_no, 0, agents.STEP_SCHEDULE,
+        step_name=f"第 {round_no} 轮调度",
+        request_params={"round_no": round_no, "candidate_counts": counts,
+                        "next_agent": decision["next_agent"],
+                        "instruction": decision["instruction"]},
         response_result=decision, started=precise_now())
+    # 运行中的实时轮次：页面轮询 current_round 时不用等收尾才有值
+    await AgentRun.filter(id=state["run_id"]).update(current_round=round_no)
     finished = decision["next_agent"] == AGENT_FINISH
     return {"round_no": round_no, "next_agent": decision["next_agent"],
             "instruction": decision["instruction"],
@@ -421,8 +463,17 @@ async def auditor_node(state: MatchState) -> dict:
 
 
 def next_node(state: MatchState) -> str:
-    """主管之后往哪走：它派谁就去谁那儿，说收尾就去终点。"""
-    return state.get("next_agent") or AGENT_FINISH
+    """主管之后往哪走：它派谁就去谁那儿，说收尾就去终点。
+
+    条件边只接了四个 key；走到这里还是别的值时说明调度图与角色表对不上，
+    抛一句能照做的错误，别让 langgraph 抛一个看不懂的 KeyError。
+    """
+    code = str(state.get("next_agent") or "").strip() or AGENT_FINISH
+    if code not in agents.SUB_AGENT_CODES and code != AGENT_FINISH:
+        raise CustomException(
+            f"主管派了一个调度图里没有的角色「{code}」，本次运行已经中断；"
+            f"请到【子 Agent 定义】把这个角色停用后再试")
+    return code
 
 
 def build_graph():

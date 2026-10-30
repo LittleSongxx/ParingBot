@@ -74,10 +74,13 @@ async def funnel(task_id: int | None) -> dict:
     rejected = sum(1 for row in rows if row.audit_status == tool_box.AUDIT_REJECT)
     # 待审核的人既不算通过也不算否决，说清楚他们的去向，两个数字才加得起来
     pending = total - approved - rejected
+    # 漏斗的「通过/交付」和运行总结、租客页读同一份交付名单：
+    # 审核官启用时还要过当前硬规则复核，历史误判的「通过」不计入
     passed_rows, note = await match_service.deliverable(task.id)
     passed = len(passed_rows)
     delivered = min(passed, task.deliver_count)
-    audited = note is None
+    auditor = await AgentDefinition.get_or_none(agent_code=agents.AGENT_AUDITOR)
+    audited = auditor is not None and auditor.enabled == "是"
 
     stages = [
         _stage(STAGE_TOTAL, "筛出", total, total,
@@ -85,8 +88,8 @@ async def funnel(task_id: int | None) -> dict:
         _stage(STAGE_REJECT, "否决", rejected, total,
                "审核官站在候选人那一方重新看一遍，判为不合适的"),
         _stage(STAGE_PASS, "通过", passed, total,
-               "通过审核、可以往下交接的" if audited
-               else "审核官已停用，候选池里的人按全部可交付算"),
+               "通过审核、且按当前规则复核得上的" if audited
+               else "审核官已停用，候选池里未否决的人按可交付算（待审核也计入）"),
         _stage(STAGE_DELIVER, "交付", delivered, total,
                f"最终交到发起人手上的，最多不超过要求的 {task.deliver_count} 人"),
     ]
@@ -130,7 +133,7 @@ async def timeline(run_id: int) -> list[dict]:
     交代了什么、为什么这么派；后面几条是那个角色自己写的工具调用和结论。
     三个角色之间没有连线，所以每一轮走到谁那儿，都是主管上一条记录说了算的。
     """
-    steps = await AgentStep.filter(run_id=run_id).order_by("round_no", "step_index")
+    steps = await AgentStep.filter(run_id=run_id).order_by("round_no", "step_index", "id")
     if not steps:
         return []
     names = await _agent_names()

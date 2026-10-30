@@ -59,6 +59,8 @@ class MatchCandidate(Model):
         # 同一个任务里一位候选只占一行，重复筛到只算一次；
         # 并发写入时由数据库唯一键兜底
         unique_together = (("task_id", "candidate_member_id"),)
+        # 交付/漏斗/候选页都按「任务 + 第几轮筛出来」过滤，03 迁移脚本里建同名索引
+        indexes = (("task_id", "found_round"),)
 
 
 class MemberPortrait(Model):
