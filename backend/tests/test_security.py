@@ -11,7 +11,7 @@
 所以上传的文件由用例自己回收；会写进数据库的账号都带「单元测试专用」后缀。
 不需要真实模型 Key。
 
-运行前提：MySQL 已启动，且已执行过 smartlect.sql。
+运行前提：MySQL 已启动，且已执行过 paringbot.sql。
 """
 
 import os

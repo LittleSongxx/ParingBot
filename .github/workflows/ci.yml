@@ -13,7 +13,7 @@ jobs:
         image: mysql:8.0.40
         env:
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: smartlect
+          MYSQL_DATABASE: paringbot
         ports:
           - 3306:3306
         options: >-
@@ -24,7 +24,7 @@ jobs:
     env:
       DB_HOST: 127.0.0.1
       DB_PORT: "3306"
-      DB_NAME: smartlect
+      DB_NAME: paringbot
       DB_USER: root
       DB_PASSWORD: root
       JWT_SECRET: ci-only-secret
@@ -43,7 +43,7 @@ jobs:
           until mysqladmin ping -h127.0.0.1 -uroot -proot --silent; do sleep 2; done
           for f in deploy/mysql/init/*.sql; do
             echo "import $f"
-            mysql -h127.0.0.1 -uroot -proot smartlect < "$f"
+            mysql -h127.0.0.1 -uroot -proot paringbot < "$f"
           done
       - name: pytest
         working-directory: backend

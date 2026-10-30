@@ -5,7 +5,7 @@
  Source Server Type    : MySQL
  Source Server Version : 80040 (8.0.40)
  Source Host           : localhost:3306
- Source Schema         : smartlect
+ Source Schema         : paringbot
 
  Target Server Type    : MySQL
  Target Server Version : 80040 (8.0.40)

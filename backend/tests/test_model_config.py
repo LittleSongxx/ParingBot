@@ -76,7 +76,7 @@ def test_seed_configs_cover_four_purposes(client, admin_headers):
     for purpose in SEED_PURPOSES:
         assert purpose in enabled, (
             f"初始化数据里「{purpose}」用途没有启用中的配置，"
-            f"请把这一条的配置重新启用（重新执行一次 smartlect.sql 里那四条初始化配置也行）")
+            f"请把这一条的配置重新启用（重新执行一次 paringbot.sql 里那四条初始化配置也行）")
     # 一个用途只留一条启用中的配置
     counts = {}
     for row in rows:

@@ -1,4 +1,4 @@
-# SmartLect 运维手册
+# ParingBot 运维手册
 
 ## 1. 环境要求
 
@@ -32,8 +32,8 @@ DOCKER_CONTEXT=default docker compose up -d --build
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `MYSQL_ROOT_PASSWORD` | 无 | MySQL root 口令，必须设置 |
-| `MYSQL_DATABASE` | `smartlect` | 业务库名，首次初始化时建库 |
-| `MYSQL_USER` / `MYSQL_PASSWORD` | `smartlect` / 无 | 应用账号（由镜像自动授权） |
+| `MYSQL_DATABASE` | `paringbot` | 业务库名，首次初始化时建库 |
+| `MYSQL_USER` / `MYSQL_PASSWORD` | `paringbot` / 无 | 应用账号（由镜像自动授权） |
 | `JWT_SECRET` | 无 | JWT 签名密钥，务必改为随机值 |
 | `APP_PORT` | `8080` | 对外端口（只绑定 127.0.0.1） |
 | `PUBLIC_BASE_URL` | 空 | 文件地址前缀；空表示返回相对路径（推荐） |
@@ -67,18 +67,18 @@ docker compose exec -T backend python -c "import main; print('import ok')"
 
 ```bash
 # 备份
-docker compose exec -T mysql sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" smartlect' > backup.sql
+docker compose exec -T mysql sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" paringbot' > backup.sql
 # 恢复（覆盖当前库）
-docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" smartlect' < backup.sql
+docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" paringbot' < backup.sql
 ```
 
-数据卷：`smartlect_mysql_data`（数据库）、`smartlect_uploads`（上传文件）。
+数据卷：`paringbot_mysql_data`（数据库）、`paringbot_uploads`（上传文件）。
 重建空库：`docker compose down -v && docker compose up -d --build`（会删除以上两个卷）。
 
 ## 7. 本地开发模式（不用 Docker）
 
 ```bash
-# 数据库：本机 MySQL 8，建库 smartlect 并导入 deploy/mysql/init/*.sql
+# 数据库：本机 MySQL 8，建库 paringbot 并导入 deploy/mysql/init/*.sql
 cd backend
 python -m venv .venv && . .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -r requirements.txt

@@ -3,7 +3,7 @@
 只验证三件事：应用能起来、数据库能连上、统一返回格式没被破坏。
 业务功能的测试随各自功能一起补，本文件不随业务增长而膨胀。
 
-运行前提：MySQL 已启动，且已执行过 smartlect.sql。
+运行前提：MySQL 已启动，且已执行过 paringbot.sql。
 """
 
 from fastapi.testclient import TestClient

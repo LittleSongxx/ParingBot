@@ -3,7 +3,7 @@
     <div class="manager-header">
       <div class="manager-header-left">
         <img src="@/assets/imgs/logo.png" alt="">
-        <div class="title">SmartLect 智能合租匹配平台</div>
+        <div class="title">ParingBot 智能合租匹配平台</div>
       </div>
       <div class="manager-header-center">
         <el-breadcrumb separator="/">

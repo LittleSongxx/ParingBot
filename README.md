@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/assets/logo.svg" alt="SmartLect" width="88" />
+  <img src="docs/assets/logo.svg" alt="ParingBot" width="88" />
 </p>
 
-<h1 align="center">SmartLect</h1>
+<h1 align="center">ParingBot</h1>
 
 <p align="center">
   <b>长租公寓智能合租匹配平台</b><br/>
@@ -20,12 +20,12 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/screenshots/front-match.png" alt="SmartLect 智能匹配" width="100%" />
+  <img src="docs/assets/screenshots/front-match.png" alt="ParingBot 智能匹配" width="100%" />
 </p>
 
 ---
 
-**SmartLect 是一个可运行的智能合租匹配演示平台。** 租客填好档案、七维合住偏好和动态后发起匹配，合租管家（主管）每一轮看一遍当前进展，决定把活派给画像师、筛选官还是审核官；候选不够就放宽「加分」项，画像不够就补一版画像，通过审核的人数够了就收尾交付。三个角色之间不直接对话，所有事实从库里现查，模型只负责判断，边界由代码守住。
+**ParingBot 是一个可运行的智能合租匹配演示平台。** 租客填好档案、七维合住偏好和动态后发起匹配，合租管家（主管）每一轮看一遍当前进展，决定把活派给画像师、筛选官还是审核官；候选不够就放宽「加分」项，画像不够就补一版画像，通过审核的人数够了就收尾交付。三个角色之间不直接对话，所有事实从库里现查，模型只负责判断，边界由代码守住。
 
 在线演示：本地 Docker 一键起，见[快速开始](#快速开始) · 设计文档：[docs/architecture.md](docs/architecture.md) · 运维手册：[docs/operations.md](docs/operations.md)
 
@@ -108,7 +108,7 @@ flowchart LR
 ```
 
 ```text
-smartlect/
+paringbot/
 ├── backend/                FastAPI + Tortoise ORM + LangGraph
 │   ├── ai/                 调度图、子 Agent 执行器、工具、模型/Prompt 加载
 │   ├── api/                18 个路由模块（83 条接口 + 根路由）

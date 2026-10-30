@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""SmartLect 部署后冒烟检查（只用标准库，Windows / Linux 都能跑）。
+"""ParingBot 部署后冒烟检查（只用标准库，Windows / Linux 都能跑）。
 
 用法:
     python scripts/smoke_check.py [--base http://127.0.0.1:8080]
@@ -50,7 +50,7 @@ def parse(blob):
 
 
 def multipart(field, filename, content, ctype):
-    boundary = "----smartlect" + uuid.uuid4().hex
+    boundary = "----paringbot" + uuid.uuid4().hex
     body = (
         f"--{boundary}\r\n"
         f'Content-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'

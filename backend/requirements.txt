@@ -1,5 +1,5 @@
 # =============================================================
-# SmartLect backend requirements
+# ParingBot backend requirements
 #
 # All versions are pinned on purpose. Do not use ~= or >=.
 # FastAPI / Starlette / Pydantic / LangChain move fast between minor

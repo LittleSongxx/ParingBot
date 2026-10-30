@@ -1,7 +1,7 @@
 <template>
   <div class="login-container">
     <div class="login-box">
-      <div class="login-title">SmartLect 智能合租匹配平台</div>
+      <div class="login-title">ParingBot 智能合租匹配平台</div>
       <div class="login-subtitle">由多个 Agent 智能体分工协作，为你匹配生活习惯合拍的室友</div>
       <el-form ref="formRef" :model="data.form" :rules="data.rules">
         <el-form-item prop="username">

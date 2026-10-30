@@ -70,7 +70,7 @@ _load_env()
 # Agent 过程记录，没有第二个数据库。
 DB_HOST = _env_str("DB_HOST", "localhost")
 DB_PORT = _env_int("DB_PORT", 3306)
-DB_NAME = _env_str("DB_NAME", "smartlect")
+DB_NAME = _env_str("DB_NAME", "paringbot")
 DB_USER = _env_str("DB_USER", "root")
 DB_PASSWORD = _env_str("DB_PASSWORD", "123456")
 
@@ -81,7 +81,7 @@ TORTOISE_ORM = {
             "credentials": {
                 "host": DB_HOST,
                 "port": DB_PORT,
-                # 数据库名称，和 smartlect.sql 里建的库同名
+                # 数据库名称，和 paringbot.sql 里建的库同名
                 "database": DB_NAME,
                 "user": DB_USER,
                 # 数据库密码，按本机 MySQL 实际密码改；线上用环境变量覆盖

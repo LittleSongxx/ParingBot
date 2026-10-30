@@ -62,7 +62,7 @@ def test_seed_templates_cover_four_codes(client, admin_headers):
     """初始化数据里四个场景各有一套模板，变量清单和内容说的是同一件事。"""
     rows = {row["code"]: row for row in _list_templates(client, admin_headers)}
     for code in SEED_CODES:
-        assert code in rows, f"初始化数据里缺少 {code}，请确认已执行 smartlect.sql"
+        assert code in rows, f"初始化数据里缺少 {code}，请确认已执行 paringbot.sql"
         assert rows[code]["enabled"] == "是"
     for row in rows.values():
         expected = " ".join("{" + name + "}" for name in row["variable_names"])

@@ -1,12 +1,12 @@
-name: smartlect-app
+name: paringbot-app
 
 services:
   mysql:
     build: ./deploy/mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-smartlect}
-      MYSQL_USER: ${MYSQL_USER:-smartlect}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-paringbot}
+      MYSQL_USER: ${MYSQL_USER:-paringbot}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       TZ: ${TZ:-Asia/Shanghai}
     command:
@@ -29,8 +29,8 @@ services:
     environment:
       DB_HOST: mysql
       DB_PORT: "3306"
-      DB_NAME: ${MYSQL_DATABASE:-smartlect}
-      DB_USER: ${MYSQL_USER:-smartlect}
+      DB_NAME: ${MYSQL_DATABASE:-paringbot}
+      DB_USER: ${MYSQL_USER:-paringbot}
       DB_PASSWORD: ${MYSQL_PASSWORD}
       TZ: ${TZ:-Asia/Shanghai}
     volumes:
@@ -57,6 +57,6 @@ services:
 
 volumes:
   mysql_data:
-    name: smartlect_app_mysql_data
+    name: paringbot_app_mysql_data
   uploads:
-    name: smartlect_app_uploads
+    name: paringbot_app_uploads
