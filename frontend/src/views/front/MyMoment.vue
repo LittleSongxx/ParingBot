@@ -251,7 +251,7 @@ const save = () => {
       return
     }
     // 还有图在传的时候先拦住，等地址回来再保存，数据里不会混进本地预览地址
-    if (data.fileList.some(file => !file.url || !file.url.startsWith('http'))) {
+    if (data.fileList.some(file => !file.url)) {
       ElMessage.warning('还有图片没上传完，等图片都显示出来之后再点保存')
       return
     }

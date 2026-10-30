@@ -264,6 +264,16 @@ h1, h2, h3, h4 { color: var(--pb-text); letter-spacing: -0.01em; }
 .chip-violet { background: var(--pb-violet-soft); border-color: rgba(139, 92, 246, 0.2); color: #6d28d9; }
 .chip-cyan { background: var(--pb-cyan-soft); border-color: rgba(6, 182, 212, 0.22); color: #0e7490; }
 
+/* 长文本 chip（例如画像的 focus_hint）允许换行，避免把页面撑出横向滚动 */
+.chip-wrap {
+    align-items: flex-start;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.65;
+    text-align: left;
+    max-width: 100%;
+}
+
 .status-dot {
     width: 7px;
     height: 7px;

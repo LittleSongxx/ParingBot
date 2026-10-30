@@ -37,7 +37,7 @@
       <template v-else>
         <div class="card portrait-card">
           <div class="portrait-head">
-            <span v-if="data.portrait.focus_hint" class="chip chip-amber">
+            <span v-if="data.portrait.focus_hint" class="chip chip-amber chip-wrap">
               <el-icon><WarningFilled /></el-icon>
               本次重点补 {{ data.portrait.focus_hint }}
             </span>
