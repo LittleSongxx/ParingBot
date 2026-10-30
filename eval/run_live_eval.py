@@ -125,6 +125,7 @@ def run_trial(app_base: str, member_token: str, admin_token: str,
     except SystemExit as exc:
         print(f"  [warn] 读取调度详情失败：{exc}")
     timeline = detail.get("timeline") or []
+    stat = detail.get("stat") or {}
     step_types = {}
     for step in timeline:
         key = step.get("step_type") or "未知"
@@ -147,7 +148,10 @@ def run_trial(app_base: str, member_token: str, admin_token: str,
         "output_summary": run.get("output_summary"),
         "error_message": run.get("error_message"),
         "funnel": detail.get("funnel"),
-        "stat": detail.get("stat"),
+        "stat": stat,
+        "tool_calls": stat.get("tool_calls"),
+        "steps_total": stat.get("steps"),
+        "failed_steps": stat.get("failed"),
         "timeline_steps": len(timeline),
         "step_types": step_types,
         "rounds": data.get("rounds"),
@@ -166,16 +170,16 @@ def markdown_report(env: dict, models: list[dict], trials: list[dict], path: Pat
     for item in models:
         lines.append(f"  - {item['purpose']}：{item['provider']} / {item['model']}（{item['base_url']}）")
     lines += ["", "## 结果汇总", ""]
-    header = "| Trial | 状态 | 轮次 | 候选 | 通过 | 否决 | 交付 | 耗时(s) | 工具调用步骤 |"
-    sep = "|---|---|---|---|---|---|---|---|---|"
+    header = "| Trial | 状态 | 轮次 | 候选 | 通过 | 否决 | 交付 | 耗时(s) | 工具调用 | 步骤 | 失败步骤 |"
+    sep = "|---|---|---|---|---|---|---|---|---|---|---|"
     lines += [header, sep]
     for item in trials:
         counts = item.get("counts") or {}
-        tool_steps = item.get("step_types", {}).get("工具调用", 0)
         lines.append(
             f"| {item['trial']} | {item.get('run_status')} | {item.get('total_round')} | "
             f"{counts.get('total')} | {counts.get('passed')} | {counts.get('rejected')} | "
-            f"{item.get('delivered')} | {item.get('wall_seconds')} | {tool_steps} |")
+            f"{item.get('delivered')} | {item.get('wall_seconds')} | {item.get('tool_calls')} | "
+            f"{item.get('steps_total')} | {item.get('failed_steps')} |")
     for item in trials:
         lines += ["", f"## Trial {item['trial']} · {item.get('run_no')}", ""]
         lines.append(f"- 任务：{item.get('task_no')}（{item.get('task_status')}）")
@@ -191,7 +195,8 @@ def markdown_report(env: dict, models: list[dict], trials: list[dict], path: Pat
             dist = "；".join(f"{row.get('label') or row.get('code')} {row.get('count')}"
                              for row in distribution if row.get("count"))
             lines.append(f"- 否决分类：{dist or '无'}")
-        lines.append(f"- 步骤：{item.get('timeline_steps')} 条（{item.get('step_types')}）")
+        lines.append(f"- 记录：{item.get('steps_total')} 个步骤 / {item.get('tool_calls')} 次工具调用 / "
+                     f"{item.get('failed_steps')} 个失败步骤（时间线 {item.get('timeline_steps')} 个调度节点）")
         if item.get("note"):
             lines.append(f"- 说明：{item['note']}")
         lines += ["", "运行总结：", "", "```", str(item.get("output_summary") or ""), "```"]

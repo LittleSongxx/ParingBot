@@ -38,6 +38,7 @@ python eval/run_live_eval.py          # 跑一次真实匹配，输出报告
 | `EVAL_API_KEY` | DeepSeek 控制台创建的 Key：<https://platform.deepseek.com/api_keys> |
 | `EVAL_BASE_URL` | 留空（脚本用官方 OpenAI 兼容地址 `https://api.deepseek.com`；若 404 可手工改成 `https://api.deepseek.com/v1`） |
 | `EVAL_MODEL` | 留空（脚本用 `deepseek-flash`；想更强可填 `deepseek-v4-pro`） |
+| `EVAL_MAX_TOKENS` | `8192`（Qwen/长输出模型建议；DeepSeek 2048 也够，但统一到同一值便于比较） |
 
 DeepSeek 官方模型名以控制台/文档为准：`deepseek-flash`（快、便宜，适合先跑通）和
 `deepseek-v4-pro`（更强，适合调度/审核）。参考：[DeepSeek API 文档](https://api-docs.deepseek.com/)。
@@ -145,6 +146,9 @@ python eval/run_live_eval.py --label qwen3.7-plus-crosscheck
 
 ## 5. 报告里看什么
 
+> 已跑过的真实评测与结论见 [RESULTS.md](RESULTS.md)（DeepSeek 完成、Qwen3.7-plus 在这台机器/该 endpoint 上两次失败、Qwen3.8-flash 完成但更慢）。
+
+
 | 指标 | 含义 | 关注点 |
 |---|---|---|
 | `run_status` / `task_status` | 运行是否完成 | 失败先看 `error_message` |
@@ -167,6 +171,7 @@ python eval/run_live_eval.py --label qwen3.7-plus-crosscheck
 | 401 / invalid key | 检查 Key、base_url、账号是否同地域；重新填 |
 | 404 / model not found | 模型名与供应商文档对齐；DeepSeek 可试 `https://api.deepseek.com/v1`；Qwen 确认地域/WorkspaceId |
 | 429 / rate limit | 降低并发（一次只跑一个 trial），等几分钟再试 |
+| Qwen 请求很慢 / 连接超时 | 换更近的 Workspace 地域 endpoint；调大 `EVAL_MAX_WAIT_SECONDS` 与 `MATCH_TIMEOUT_SECONDS`；或改用 qwen3.8-flash 做快速交叉 |
 | `/match/my` 前置检查被拦 | 按 blocker 提示处理；模型 Key 相关先跑 configure_models |
 | 等很久不结束 | 默认 600s 超时；到管理端调度时间线看卡在哪一步，必要时重启后端（会标记失败） |
 | 报告没有生成 | 看终端错误；`eval/reports/` 已被 gitignore |

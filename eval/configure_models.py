@@ -148,6 +148,7 @@ def plan(env: dict, args) -> list[dict]:
             "base_url": base_url,
             "provider": preset["label"],
             "api_key": key,
+            "max_tokens": env.get("EVAL_MAX_TOKENS"),
         })
     return rows
 
@@ -156,6 +157,8 @@ def print_plan(rows: list[dict], env: dict, path: Path) -> None:
     print(f"配置文件：{path}")
     print(f"供应商：{rows[0]['provider']}  Base URL：{rows[0]['base_url']}")
     print(f"API Key：{mask(rows[0]['api_key']) or '（空，请填写 EVAL_API_KEY）'}")
+    if rows[0].get("max_tokens"):
+        print(f"最大输出 Token：{rows[0]['max_tokens']}")
     print("\n用途 -> 模型：")
     for row in rows:
         print(f"  {row['purpose']}：{row['model']}")
@@ -191,11 +194,13 @@ def configure(rows: list[dict], env: dict, test: bool) -> None:
                 "id": target["id"],
                 "name": target.get("name") or f"评测-{row['purpose']}模型",
                 "temperature": target.get("temperature"),
-                "max_tokens": target.get("max_tokens"),
+                "max_tokens": int(row["max_tokens"]) if row.get("max_tokens") else target.get("max_tokens"),
             })
             request(app_base, "PUT", "/aiModelConfig/update", token=token, payload=payload)
         else:
             payload["name"] = f"评测-{row['purpose']}模型"
+            if row.get("max_tokens"):
+                payload["max_tokens"] = int(row["max_tokens"])
             request(app_base, "POST", "/aiModelConfig/add", token=token, payload=payload)
         # 重新取列表确认 id（新增后要测试连接）
         latest = request(app_base, "GET", "/aiModelConfig/selectPage?page_num=1&page_size=100", token=token) or {}

@@ -5,7 +5,8 @@
 > 本目录不依赖数据库、模型 API Key 或网络，CI 可直接跑。
 
 > 需要接**真实模型**跑匹配评测？看 [RUNBOOK.md](RUNBOOK.md)：
-> 如何填 `.env.eval`、选哪个供应商/模型、`configure_models.py` 与 `run_live_eval.py` 怎么用。
+ > 如何填 `.env.eval`、选哪个供应商/模型、`configure_models.py` 与 `run_live_eval.py` 怎么用；
+> 已跑过的真实模型结果见 [RESULTS.md](RESULTS.md)。
 
 ## 为什么需要它
 
