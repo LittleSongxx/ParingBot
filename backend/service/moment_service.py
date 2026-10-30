@@ -11,6 +11,7 @@
 from typing import List
 
 from common.exception_handler import CustomException
+from common.pagination import normalize_page
 from common.result import PageInfo
 from common.text import split_values
 from common.times import format_datetime, now
@@ -85,6 +86,7 @@ async def select_my_page(current_user: User, page_num: int = 1,
                          page_size: int = 10) -> PageInfo:
     """当前租客的动态分页，按发布时间倒序，最新的排在最前面。"""
     member = await member_service.get_my_member(current_user, "查看我的动态")
+    page_num, page_size = normalize_page(page_num, page_size)
     query = MemberMoment.filter(member_id=member.id)
     # 同一秒内连着发的两条按编号倒序兜底，顺序才是稳定的
     moments = await query.order_by("-publish_time", "-id").offset(

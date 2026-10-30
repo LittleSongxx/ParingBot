@@ -115,7 +115,8 @@ def test_disabled_user_cannot_login(client, admin_headers):
 
     login = client.post("/login", json={"username": username, "password": "123456"}).json()
     assert login["code"] == "500"
-    assert login["msg"] == "账号已被停用"
+    # 登录失败提示已统一成「账号或密码错误」，不暴露账号是否被停用
+    assert login["msg"] == "账号或密码错误"
 
 
 def test_admin_cannot_disable_self(client, admin_headers):

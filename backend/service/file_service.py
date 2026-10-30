@@ -3,7 +3,7 @@
 上传落盘的文件名由服务端生成，不再用用户传上来的原始文件名：
 1. 同名文件不会互相覆盖；
 2. 用户传的名字不会变成磁盘上的路径，从根上避开路径穿越；
-3. 扩展名白名单只放图片，别的类型一律拒绝。
+3. 扩展名白名单只放图片，文件头（魔数）再核一遍，改名伪装的文件进不来。
 """
 
 import os
@@ -37,10 +37,24 @@ MEDIA_TYPES = {
     "webp": "image/webp",
     "gif": "image/gif",
 }
+# 图片文件头（魔数）。扩展名可以随便改，文件内容是改不了的：
+# 落盘前先按扩展名核对文件头，HTML/脚本改名成 .png 会在这一步被拒。
+MAGIC_NUMBERS = {
+    "png": (b"\x89PNG\r\n\x1a\n",),
+    "jpg": (b"\xff\xd8\xff",),
+    "jpeg": (b"\xff\xd8\xff",),
+    "gif": (b"GIF87a", b"GIF89a"),
+}
+# WEBP 的头是 RIFF....WEBP，两段都要对，单独写一段判断
+WEBP_HEAD_SIZE = 12
+# 读多少字节做文件头判断：最长的一种头也不超过 12 字节
+MAGIC_HEAD_SIZE = 16
 # 文件不存在时统一用 404 业务码，前端据此提示用户重新上传
 NOT_FOUND_CODE = "404"
 # 文件不存在时的统一提示，下载和删除都复用这一句
 NOT_FOUND_MESSAGE = "文件不存在，可能已经被删除，请回到原来的页面重新上传"
+# 文件头不匹配时的提示：说清是内容问题，不是文件名问题
+BAD_CONTENT_MESSAGE = "上传的文件内容不是有效的图片（文件头校验失败），请选择真正的 jpg、png、webp 或 gif 图片"
 
 
 def _extension_of(filename: str | None) -> str:
@@ -53,6 +67,15 @@ def _extension_of(filename: str | None) -> str:
     if extension not in ALLOWED_EXTENSIONS:
         raise CustomException("只允许上传图片文件（jpg、jpeg、png、webp、gif）")
     return extension
+
+
+def _looks_like_image(extension: str, head: bytes) -> bool:
+    """按扩展名核对文件头。只认该扩展名对应的那几种头，别的都算伪装。"""
+    if extension == "webp":
+        return (len(head) >= WEBP_HEAD_SIZE and head[:4] == b"RIFF"
+                and head[8:12] == b"WEBP")
+    signatures = MAGIC_NUMBERS.get(extension) or ()
+    return any(head.startswith(signature) for signature in signatures)
 
 
 def _remove_quietly(file_path: str) -> None:
@@ -85,9 +108,20 @@ def save(file: UploadFile) -> str:
     filename = f"{uuid.uuid4().hex}.{extension}"
     file_path = os.path.join(UPLOAD_DIR, filename)
     max_bytes = MAX_UPLOAD_MB * 1024 * 1024
+    # 先读一个块做文件头校验，校验不过就一个字节都不落盘
+    head = file.file.read(CHUNK_SIZE)
+    if not head:
+        raise CustomException("上传的文件是空的，请重新选择图片")
+    if not _looks_like_image(extension, head[:MAGIC_HEAD_SIZE]):
+        raise CustomException(BAD_CONTENT_MESSAGE)
+    written = 0
     try:
         with open(file_path, "wb") as buffer:
-            written = 0
+            written += len(head)
+            # 头一块也可能已经超过上限（上限很小的情况），先判一次再写
+            if written > max_bytes:
+                raise CustomException(f"上传的文件不能超过 {MAX_UPLOAD_MB} MB")
+            buffer.write(head)
             while True:
                 chunk = file.file.read(CHUNK_SIZE)
                 if not chunk:

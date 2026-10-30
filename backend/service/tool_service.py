@@ -21,6 +21,7 @@ from tortoise.expressions import Q
 
 from ai import tools
 from common.exception_handler import CustomException
+from common.pagination import normalize_page
 from common.result import PageInfo
 from common.times import cost_millis, format_datetime, precise_now
 from models import AgentDefinition, FunctionTool, MemberProfile, ToolCallLog
@@ -154,6 +155,7 @@ def tool_dict(tool: FunctionTool) -> dict:
 async def select_page(keyword: str = "", tool_group: str = "", enabled: str = "",
                       page_num: int = 1, page_size: int = 10) -> PageInfo:
     """工具分页查询。关键词同时匹编码和名称。"""
+    page_num, page_size = normalize_page(page_num, page_size)
     query = FunctionTool.all()
     if keyword:
         query = query.filter(Q(tool_code__contains=keyword) | Q(tool_name__contains=keyword))
@@ -361,8 +363,7 @@ async def call_log_page(run_id: int | None = None, agent_code: str = "",
         query = query.filter(tool_code=tool_code)
     if success:
         query = query.filter(success=_check_yes_no(success, "调用结果"))
-    if page_size > MAX_PAGE_SIZE:
-        page_size = MAX_PAGE_SIZE
+    page_num, page_size = normalize_page(page_num, page_size, max_size=MAX_PAGE_SIZE)
     total = await query.count()
     rows = await query.order_by("-id").offset(
         (page_num - 1) * page_size).limit(page_size)

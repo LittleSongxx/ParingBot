@@ -34,7 +34,7 @@ def test_login_with_wrong_password_returns_business_error():
 def test_login_success_returns_token():
     """初始化数据里的管理员账号能登录，并拿到 token。"""
     with TestClient(app) as client:
-        response = client.post("/login", json={"username": "admin", "password": "admin"})
+        response = client.post("/login", json={"username": "admin", "password": "admin123"})
     body = response.json()
     assert body["code"] == "200"
     assert body["data"]["role"] == "ADMIN"

@@ -1,8 +1,13 @@
 """登录、注册、修改密码相关的业务逻辑。"""
 
+import math
+import uuid
+
+from common import rate_limit
 from common.auth import create_token
 from common.exception_handler import CustomException
-from common.security import hash_password, needs_rehash, verify_password
+from common.security import (hash_password, needs_rehash, password_fingerprint,
+                             verify_password)
 from models import User
 
 # 系统只有两种用户角色：管理端 ADMIN、用户端 USER
@@ -15,6 +20,41 @@ USERNAME_MIN_LENGTH = 3
 USERNAME_MAX_LENGTH = 30
 PASSWORD_MIN_LENGTH = 6
 PASSWORD_MAX_LENGTH = 30
+
+# 登录失败统一提示。「账号不存在 / 密码错 / 账号被停用」三种情况共用这一句，
+# 从提示上分不出账号状态，配合限流和常量时间校验一起用
+LOGIN_FAILED_MESSAGE = "账号或密码错误"
+
+# 账号不存在时用来跑一次校验的假哈希。真实账号错密码会跑一次 PBKDF2，
+# 未知账号如果不跑，响应耗时明显更短，就能被用来枚举哪些账号存在。
+_DUMMY_STORED: str | None = None
+
+
+def _dummy_stored_password() -> str:
+    """懒加载一条固定格式的假哈希，只消耗和真实校验相同的算力。"""
+    global _DUMMY_STORED
+    if _DUMMY_STORED is None:
+        _DUMMY_STORED = hash_password(uuid.uuid4().hex)
+    return _DUMMY_STORED
+
+
+def _login_keys(username: str | None, client_ip: str | None) -> list[str]:
+    """限流要记的两个维度：账号（统一小写）和来源 IP。"""
+    keys: list[str] = []
+    name = (username or "").strip().lower()
+    if name:
+        keys.append(f"账号:{name}")
+    if client_ip:
+        keys.append(f"IP:{client_ip}")
+    return keys
+
+
+def _lock_message(seconds: int) -> str:
+    """锁定期间给用户的提示：说清多久之后可以再试。"""
+    if seconds >= 60:
+        minutes = max(1, math.ceil(seconds / 60))
+        return f"登录失败次数太多，账号或来源已被锁定，请 {minutes} 分钟后再试"
+    return f"登录失败次数太多，账号或来源已被锁定，请 {max(1, seconds)} 秒后再试"
 
 
 def check_username(username: str | None) -> str:
@@ -66,23 +106,41 @@ def account_dict(user: User, token: str | None = None) -> dict:
     return data
 
 
-async def login(username: str | None, password: str | None) -> dict:
+async def login(username: str | None, password: str | None,
+                client_ip: str | None = None) -> dict:
+    # 先看账号/IP 是否还在锁定期：锁着的时候连密码都不验，直接拒绝
+    keys = _login_keys(username, client_ip)
+    locked = rate_limit.lock_remaining(keys)
+    if locked:
+        raise CustomException(_lock_message(locked), "429")
     # 登录不做长度校验，只去掉首尾空格再去查：
     # 老账号的口径可能和新规则不同，这里统一报「账号或密码错误」比报长度不对更合适，
     # 也不会把账号的命名规则透露出去
     user = await User.get_or_none(username=(username or "").strip())
+    # 账号不存在时也跑一次哈希校验，让两条分支的耗时落在同一个量级，
+    # 不能让人靠响应时间试出哪些账号存在
+    stored = user.password if user is not None else _dummy_stored_password()
+    password_ok = verify_password(password, stored)
     # 账号不存在和密码错误合并成同一句提示，不告诉对方是哪一步错了。
     # 用 verify_password 校验：库里存的可能是新哈希，也可能是历史数据里的明文，
     # 两种都认，老账号不用改密码就能继续登录
-    if user is None or not verify_password(password, user.password):
-        raise CustomException("账号或密码错误")
-    # 密码对了还要看状态，管理员在用户管理里停用的账号不允许登录
+    if user is None or not password_ok:
+        rate_limit.record_failure(keys)
+        raise CustomException(LOGIN_FAILED_MESSAGE)
+    # 密码对了还要看状态，管理员在用户管理里停用的账号不允许登录。
+    # 提示和密码错误共用同一句：说清「已被停用」等于告诉对方这个账号存在
     if user.status != "NORMAL":
-        raise CustomException("账号已被停用")
+        rate_limit.record_failure(keys)
+        raise CustomException(LOGIN_FAILED_MESSAGE)
     # 旧明文密码（或迭代次数过时的哈希）在这里顺手升级成当前格式，
     # 用户无感，库里的口令也不会一直明文躺着
     if needs_rehash(user.password):
-        await User.filter(id=user.id).update(password=hash_password(password))
+        hashed = hash_password(password)
+        await User.filter(id=user.id).update(password=hashed)
+        # 同步内存里的对象：下面签发 token 会用到这份存储值算密码指纹
+        user.password = hashed
+    # 登录成功清掉失败计数，正常用户不会被自己之前的输错连累
+    rate_limit.record_success(keys)
     # 校验全通过，签发 token 并连同用户信息一起返回
     return account_dict(user, create_token(user))
 
@@ -128,5 +186,6 @@ async def update_password(
     # 用 verify_password 判断，哈希过的密码也能认出「新密码其实就是原密码」
     if verify_password(new_password, current_user.password):
         raise CustomException("新密码不能与原密码相同")
-    # 按当前登录用户的 id 更新，改不到别人头上；新密码同样只存哈希
+    # 按当前登录用户的 id 更新，改不到别人头上；新密码同样只存哈希。
+    # 存储值一变，token 里的密码指纹就对不上，改密前签发的 token 全部立即失效
     await User.filter(id=current_user.id).update(password=hash_password(new_password))

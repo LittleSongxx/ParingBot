@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import List
 
 from common.exception_handler import CustomException
+from common.pagination import normalize_page
 from common.result import PageInfo
 from common.text import split_values
 from common.times import LOCAL_TZ, format_datetime, now, to_local
@@ -368,6 +369,7 @@ async def select_page(nickname: str = "", gender: str = "", store_id: int | None
                       audit_status: str = "", enabled: str = "",
                       page_num: int = 1, page_size: int = 10) -> PageInfo:
     """管理端的租客档案分页查询。"""
+    page_num, page_size = normalize_page(page_num, page_size)
     query = MemberProfile.all()
     # 空值时等于不加这个筛选条件
     if nickname:

@@ -15,6 +15,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from ai import model_factory
 from common.exception_handler import CustomException
+from common.pagination import normalize_page
 from common.result import PageInfo
 from common.times import format_datetime
 from models import AiModelConfig
@@ -191,6 +192,7 @@ async def _clear_other_enabled(purpose: str, keep_id: int | None = None) -> None
 async def select_page(name: str = "", model_purpose: str = "",
                       enabled: str = "", page_num: int = 1, page_size: int = 10) -> PageInfo:
     """管理端的配置分页查询。"""
+    page_num, page_size = normalize_page(page_num, page_size)
     query = AiModelConfig.all()
     if name:
         query = query.filter(name__contains=name)

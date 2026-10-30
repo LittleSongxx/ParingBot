@@ -12,6 +12,7 @@
 from tortoise.expressions import Q
 
 from common.exception_handler import CustomException
+from common.pagination import normalize_page
 from common.result import PageInfo
 from common.times import format_datetime
 from models import SysConfig
@@ -107,6 +108,7 @@ async def select_page(keyword: str = "", enabled: str = "",
     关键词同时匹参数编码和参数名称：管理员记得住名字还是编码不一定，
     只按一个查会让他先自己确认到底记住的是哪个。
     """
+    page_num, page_size = normalize_page(page_num, page_size)
     query = SysConfig.all()
     if keyword:
         query = query.filter(

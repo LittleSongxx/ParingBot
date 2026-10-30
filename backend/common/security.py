@@ -88,3 +88,14 @@ def needs_rehash(stored: str | None) -> bool:
     except (TypeError, ValueError):
         return True
     return iterations != HASH_ITERATIONS
+
+
+def password_fingerprint(stored: str | None) -> str:
+    """密码存储值（哈希或历史明文）的短指纹，写进 token 用来做吊销。
+
+    改密码会改变库里的存储值，指纹跟着变，旧 token 里的指纹就对不上，
+    get_current_user 一验就能让旧 token 立即失效；换新密码重新登录拿新 token。
+    只取摘要前 16 位十六进制：够区分，又不把存储值本身放进可被解码的 token。
+    """
+    text = stored or ""
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]

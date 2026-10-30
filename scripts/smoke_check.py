@@ -69,7 +69,7 @@ def main():
     body = parse(blob)
     check("health /api/", status == 200 and body.get("code") == "200", body)
 
-    status, blob, _ = call(base, "POST", "/api/login", body={"username": "admin", "password": "admin"})
+    status, blob, _ = call(base, "POST", "/api/login", body={"username": "admin", "password": "admin123"})
     body = parse(blob)
     admin = (body.get("data") or {}).get("token")
     check("admin login", body.get("code") == "200" and bool(admin), body.get("msg"))

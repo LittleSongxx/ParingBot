@@ -22,6 +22,12 @@ services:
       retries: 40
       start_period: 20s
     restart: unless-stopped
+    # 日志轮转：单文件 10MB、最多留 3 份，长期运行不会把磁盘写满
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   backend:
     build: ./backend
@@ -45,6 +51,12 @@ services:
       retries: 12
       start_period: 15s
     restart: unless-stopped
+    # 日志轮转：单文件 10MB、最多留 3 份，长期运行不会把磁盘写满
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   web:
     build: ./frontend
@@ -54,6 +66,12 @@ services:
       backend:
         condition: service_healthy
     restart: unless-stopped
+    # 日志轮转：单文件 10MB、最多留 3 份，长期运行不会把磁盘写满
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   mysql_data:

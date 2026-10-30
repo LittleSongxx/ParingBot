@@ -65,11 +65,6 @@ async def select_one(user_id: int, current_user: User = Depends(get_current_user
     return Result.success(await user_service.select_by_id(current_user, user_id))
 
 
-@router.get("/selectAll")
-async def select_all(name: str = "", _: User = Depends(require_admin)):
-    return Result.success(await user_service.select_all(name))
-
-
 @router.get("/selectPage")
 async def select_page(
     # name 和 role 来自地址栏的查询参数，不传时是空字符串，表示不加这个筛选条件

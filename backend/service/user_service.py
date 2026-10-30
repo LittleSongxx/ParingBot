@@ -8,7 +8,10 @@
 import re
 from typing import List
 
+from tortoise.transactions import in_transaction
+
 from common.exception_handler import CustomException
+from common.pagination import normalize_page
 from common.result import PageInfo
 from common.security import hash_password
 from common.times import format_datetime
@@ -163,24 +166,34 @@ async def _check_deletable(user: User) -> None:
 
 
 async def _delete_one(user: User) -> None:
-    """删掉一个账号，并清掉挂在它名下的租客从属数据。"""
+    """删掉一个账号，并清掉挂在它名下的租客从属数据。
+
+    五张表的删除放在同一条事务里：删到一半出错时整批回滚，
+    不会出现「档案没了、账号还在」或反过来的半删状态。
+    磁盘文件的删除放在事务提交之后：事务回滚时文件必须还在，
+    数据库已经提交后文件删失败也只是留下一个没人引用的文件，不影响数据一致性。
+    """
     profile = await _member_of(user)
+    # 生活照和动态配图都是上传下来的磁盘文件，记录删完就没有地方引用它们了。
+    # 地址先收齐，等事务提交后再一起清，files 目录不会只涨不消
+    files: list[str] = []
     if profile is not None:
-        # 生活照和动态配图都是上传下来的磁盘文件，记录删完就没有地方引用它们了。
-        # 地址先收齐，记录删完再一起清，files 目录不会只涨不消
-        files = [profile.photo_paths]
+        files.append(profile.photo_paths)
         files += [row.image_paths
                   for row in await MemberMoment.filter(member_id=profile.id)]
-        # 从属数据按依赖倒序删：画像、偏好、动态都挂在租客档案上，
-        # 最后才删档案本身
-        await MemberPortrait.filter(member_id=profile.id).delete()
-        await RoommatePreference.filter(member_id=profile.id).delete()
-        await MemberMoment.filter(member_id=profile.id).delete()
-        await MemberProfile.filter(id=profile.id).delete()
+    avatar = user.avatar
+    async with in_transaction():
+        if profile is not None:
+            # 从属数据按依赖倒序删：画像、偏好、动态都挂在租客档案上，
+            # 最后才删档案本身
+            await MemberPortrait.filter(member_id=profile.id).delete()
+            await RoommatePreference.filter(member_id=profile.id).delete()
+            await MemberMoment.filter(member_id=profile.id).delete()
+            await MemberProfile.filter(id=profile.id).delete()
+        await User.filter(id=user.id).delete()
+    if profile is not None:
         # 这些文件已经没有记录再引用，跟着一起清掉
         file_service.remove(",".join(item for item in files if item))
-    avatar = user.avatar
-    await User.filter(id=user.id).delete()
     # 头像文件可能还被别的账号用着（初始化数据里有几个账号共用同一张占位图），
     # 确认没有其他账号引用之后再删
     if avatar and not await User.filter(avatar=avatar).exists():
@@ -222,12 +235,9 @@ async def select_by_id(current_user: User, user_id: int) -> dict:
     return user_dict(user)
 
 
-async def select_all(name: str = "") -> List[dict]:
-    users = await User.filter(name__contains=name).order_by("-id")
-    return [user_dict(user) for user in users]
-
-
 async def select_page(name: str = "", role: str = "", page_num: int = 1, page_size: int = 10) -> PageInfo:
+    # 页码/每页条数来自查询字符串，先夹到安全范围：负数、0、超大值都不会再拼出非法 SQL
+    page_num, page_size = normalize_page(page_num, page_size)
     # name 来自页面顶部姓名输入框，contains 是模糊匹配；
     # 空字符串时匹配所有记录，等于不加这个条件
     query = User.filter(name__contains=name)

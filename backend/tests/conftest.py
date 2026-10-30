@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 from tortoise import Tortoise
 
+from common import rate_limit
 from main import app
 from settings import TORTOISE_ORM
 
@@ -32,6 +33,18 @@ async def db():
     await Tortoise.close_connections()
 
 
+@pytest.fixture(autouse=True)
+def reset_login_rate_limit():
+    """每个用例前后清空登录失败计数。
+
+    登录限流是进程内存状态：用例之间不隔离的话，上一条用例故意输错的密码
+    会累积到下一条，把正常用例锁在门外。限流自身的用例在一条用例内触发即可。
+    """
+    rate_limit.reset()
+    yield
+    rate_limit.reset()
+
+
 @pytest.fixture()
 def client():
     """带生命周期的测试客户端，进入时连数据库，退出时释放连接。"""
@@ -42,7 +55,7 @@ def client():
 @pytest.fixture()
 def admin_headers(client):
     """用初始化数据里的管理员账号登录，返回带 token 的请求头。"""
-    response = client.post("/login", json={"username": "admin", "password": "admin"})
+    response = client.post("/login", json={"username": "admin", "password": "admin123"})
     body = response.json()
     assert body["code"] == "200", "管理员登录失败，请确认已执行 paringbot.sql 且密码未被改过"
     return {"token": body["data"]["token"]}

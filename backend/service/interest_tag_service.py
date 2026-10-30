@@ -12,6 +12,7 @@
 from typing import List
 
 from common.exception_handler import CustomException
+from common.pagination import normalize_page
 from common.result import PageInfo
 from common.text import split_values
 from common.times import format_datetime
@@ -109,6 +110,7 @@ async def select_page(tag_name: str = "", category: str = "", enabled: str = "",
     按录入顺序排：词表是一批批加进来的，同类的标签天然挨在一起，
     管理员翻页时看到的就是一份整理好的字典。
     """
+    page_num, page_size = normalize_page(page_num, page_size)
     query = InterestTag.all()
     if tag_name:
         query = query.filter(tag_name__contains=tag_name)

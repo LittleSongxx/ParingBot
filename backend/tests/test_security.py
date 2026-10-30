@@ -1,11 +1,15 @@
 """安全相关的纯函数与接口测试。
 
-覆盖四块：
-1. 密码哈希格式、校验、历史明文兼容、needs_rehash；
-2. 上传接口必须登录，落盘文件名由服务端生成（UUID），非图片扩展名被拒，
-   同名上传不覆盖，超过大小上限被拒且不留半文件；
-3. 下载接口保持公开，路径穿越和不存在文件一律按 404 处理；
-4. /user/selectAll 只有管理员能调。
+覆盖：
+1. 密码哈希格式、校验、历史明文兼容、needs_rehash、密码指纹；
+2. 日志脱敏 redact_text（手机号/邮箱/身份证号打码）；
+3. 分页参数归一化 normalize_page，以及接口层的负数/超大/非数字分页；
+4. 上传接口必须登录、UUID 文件名、图片文件头（魔数）校验、非图片扩展名、
+   同名不覆盖、超过大小上限且不留半文件；
+5. 下载保持公开、路径穿越/不存在文件一律 404；
+6. 全局异常不再手写 ACAO:*、CORS 白名单生效；
+7. /user/selectAll 死接口已删除、列表接口权限；
+8. 账号级联删除使用事务（静态断言）。
 
 上传的文件落盘后名字是 UUID，conftest 的清扫夹具按「单元测试专用」匹配不到它，
 所以上传的文件由用例自己回收；会写进数据库的账号都带「单元测试专用」后缀。
@@ -14,19 +18,24 @@
 运行前提：MySQL 已启动，且已执行过 paringbot.sql。
 """
 
+import inspect
 import os
 import re
 
 import pytest
+from fastapi.testclient import TestClient
 
 from common.exception_handler import CustomException
+from common.pagination import MAX_PAGE_NUM, MAX_PAGE_SIZE, normalize_page
+from common.redact import redact_text
 from common.security import (
     HASH_ITERATIONS,
     hash_password,
     needs_rehash,
     verify_password,
 )
-from service import account_service, file_service
+from main import app
+from service import file_service, user_service
 from settings import MAX_UPLOAD_MB
 
 # 测试数据统一带这个后缀，会落库的记录由清扫夹具按它回收
@@ -40,6 +49,10 @@ PNG_BYTES = bytes.fromhex(
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
     "0000000a49444154789c6360000002000154a24f5e0000000049454e44ae426082"
 )
+# 最小 JPEG 头（只看文件头，服务端不解码图片内容）
+JPEG_BYTES = b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+# 改名伪装成 .png 的 HTML
+FAKE_IMAGE_BYTES = b"<html><script>alert(1)</script></html>"
 
 
 @pytest.fixture()
@@ -118,20 +131,51 @@ def test_needs_rehash_flags_plaintext_and_outdated_iterations():
     assert needs_rehash(outdated) is True
 
 
-async def test_login_upgrades_legacy_plaintext_password(db):
-    """老明文密码登录成功后自动升级成哈希，用户不用改密码。"""
-    from models import User
+# ---------------------------------------------------------------------------
+# 日志脱敏
+# ---------------------------------------------------------------------------
 
-    username = f"shengji{TEST_MARK}"
-    await User.create(username=username, password="old-plain", name=username, role="USER")
+def test_redact_text_masks_phone_email_and_id_card():
+    """手机号、邮箱、身份证号打码，排查日志仍看得出字段形态。"""
+    text = "联系 13800138000，邮箱 zhangsan@example.com，身份证 110101199001011234"
+    masked = redact_text(text)
+    assert "13800138000" not in masked
+    assert "138****8000" in masked
+    assert "zhangsan@example.com" not in masked
+    assert "z***@example.com" in masked
+    assert "110101199001011234" not in masked
+    assert "110***********1234" in masked
 
-    await account_service.login(username, "old-plain")
 
-    user = await User.get(username=username)
-    assert user.password.startswith("pbkdf2_sha256$")
-    assert verify_password("old-plain", user.password)
-    # 升级之后原来的明文不应再作为密码通过校验的旁路存在
-    assert "old-plain" not in user.password
+def test_redact_text_keeps_normal_text_and_none():
+    """没有 PII 的正常文本原样返回；None 保持 None。"""
+    text = "预算 3500 元，张江店，早睡早起，工号 20261030"
+    assert redact_text(text) == text
+    assert redact_text(None) is None
+
+
+# ---------------------------------------------------------------------------
+# 分页参数归一化
+# ---------------------------------------------------------------------------
+
+def test_normalize_page_clamps_negative_and_zero():
+    """负数、0 一律夹回合法范围：页码至少 1，每页至少 1 条。"""
+    assert normalize_page(-5, -3) == (1, 1)
+    assert normalize_page(0, 0) == (1, 1)
+
+
+def test_normalize_page_caps_huge_values():
+    """超大每页条数夹到上限，超大页码也会封顶，offset 不会撑爆 BIGINT。"""
+    page_num, page_size = normalize_page(10 ** 20, 10 ** 20)
+    assert page_num == MAX_PAGE_NUM
+    assert page_size == MAX_PAGE_SIZE
+    assert normalize_page(2, 100000) == (2, MAX_PAGE_SIZE)
+
+
+def test_normalize_page_falls_back_for_non_numbers():
+    """非数字输入用兜底值，不抛异常。"""
+    assert normalize_page("abc", "xyz") == (1, 10)
+    assert normalize_page(None, None, default=20) == (1, 20)
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +261,31 @@ def test_upload_rejects_non_image_extension(client, admin_headers):
     assert "只允许上传图片文件" in body["msg"]
 
 
+def test_upload_rejects_html_disguised_as_png(client, admin_headers):
+    """HTML 改名成 .png 也会被文件头校验拒绝，且不留下半文件。"""
+    os.makedirs(file_service.UPLOAD_DIR, exist_ok=True)
+    before = set(os.listdir(file_service.UPLOAD_DIR))
+
+    body = client.post(
+        "/files/upload",
+        files={"file": (f"weizhuang{TEST_MARK}.png", FAKE_IMAGE_BYTES, "image/png")},
+        headers=admin_headers,
+    ).json()
+
+    assert body["code"] == "500"
+    assert "文件头校验失败" in body["msg"]
+    assert set(os.listdir(file_service.UPLOAD_DIR)) == before
+
+
+def test_upload_accepts_jpeg_by_magic(client, admin_headers, upload):
+    """JPEG 文件头对上就能上传（媒体类型仍按扩展名给）。"""
+    body = upload(f"zhaopian{TEST_MARK}.jpg", admin_headers, content=JPEG_BYTES)
+    assert body["code"] == "200"
+    filename = body["data"].rsplit("/", 1)[-1]
+    assert filename.endswith(".jpg")
+    assert os.path.isfile(os.path.join(file_service.UPLOAD_DIR, filename))
+
+
 def test_upload_same_original_name_does_not_overwrite(client, admin_headers, upload):
     """两次上传同名原文件，磁盘上生成两个不同的 UUID 文件，互不覆盖。"""
     first = upload(f"chongming{TEST_MARK}.png", admin_headers)
@@ -233,10 +302,13 @@ def test_upload_same_original_name_does_not_overwrite(client, admin_headers, upl
 
 
 def test_upload_over_limit_is_rejected_and_partial_file_removed(client, admin_headers):
-    """超过大小上限要拒绝，写到一半的半文件也要删掉。"""
+    """超过大小上限要拒绝，写到一半的半文件也要删掉。
+
+    内容要以合法 PNG 头开头，否则会先被文件头校验拦下，测的就不是大小上限了。
+    """
     os.makedirs(file_service.UPLOAD_DIR, exist_ok=True)
     before = set(os.listdir(file_service.UPLOAD_DIR))
-    too_large = b"0" * (MAX_UPLOAD_MB * 1024 * 1024 + 1)
+    too_large = PNG_BYTES + b"0" * (MAX_UPLOAD_MB * 1024 * 1024)
 
     body = client.post(
         "/files/upload",
@@ -268,16 +340,108 @@ def test_download_unknown_uuid_file_returns_404_code(client):
 
 
 # ---------------------------------------------------------------------------
-# 用户列表权限
+# 分页接口（负数/超大/非数字不再打到全局 500）
 # ---------------------------------------------------------------------------
 
-def test_select_all_requires_admin(client, user_headers, admin_headers):
+def test_user_list_page_size_is_capped(client, admin_headers):
+    """page_size 传 100000 也最多返回 MAX_PAGE_SIZE 条。"""
+    body = client.get(
+        "/user/selectPage?page_size=100000", headers=admin_headers).json()
+    assert body["code"] == "200"
+    assert len(body["data"]["list"]) <= MAX_PAGE_SIZE
+
+
+def test_negative_page_num_is_clamped(client, admin_headers):
+    """page_num 传 -1 按第 1 页处理，不再拼出非法 offset。"""
+    body = client.get(
+        "/user/selectPage?page_num=-1&page_size=5", headers=admin_headers).json()
+    assert body["code"] == "200"
+    assert len(body["data"]["list"]) <= 5
+
+
+def test_negative_page_size_is_clamped_for_member_moments(client, user_headers):
+    """租客动态列表 page_size=-1 也被夹到合法值，接口不再 500。"""
+    body = client.get(
+        "/moment/selectMyPage?page_size=-1", headers=user_headers).json()
+    assert body["code"] == "200"
+
+
+def test_member_page_size_is_capped(client, admin_headers):
+    """租客管理列表同样受全局上限约束。"""
+    body = client.get(
+        "/member/selectPage?page_size=100000", headers=admin_headers).json()
+    assert body["code"] == "200"
+    assert len(body["data"]["list"]) <= MAX_PAGE_SIZE
+
+
+def test_non_numeric_page_size_returns_readable_error(client, admin_headers):
+    """非数字分页参数走校验分支，给出能指回字段的提示。"""
+    body = client.get(
+        "/member/selectPage?page_size=abc", headers=admin_headers).json()
+    assert body["code"] == "500"
+    assert "格式不对" in body["msg"]
+    assert "page_size" in body["msg"]
+
+
+# ---------------------------------------------------------------------------
+# 全局异常 / CORS
+# ---------------------------------------------------------------------------
+
+def test_cors_only_allows_whitelisted_origin(client):
+    """白名单来源能拿到 ACAO，其它来源拿不到。"""
+    allowed = client.get("/", headers={"Origin": "http://localhost:5173"})
+    assert allowed.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+    evil = client.get("/", headers={"Origin": "http://evil.example"})
+    assert "access-control-allow-origin" not in {key.lower() for key in evil.headers}
+
+
+def test_global_error_does_not_add_wildcard_cors(monkeypatch):
+    """未处理异常走全局兜底时不再手工写 ACAO:*，跨域头只由 CORSMiddleware 决定。"""
+    async def boom(*args, **kwargs):
+        raise RuntimeError("unit-test boom")
+
+    monkeypatch.setattr(user_service, "select_page", boom)
+    # 兜底异常会再抛出给 TestClient，用 False 让测试拿到响应本身
+    with TestClient(app, raise_server_exceptions=False) as failure_client:
+        login = failure_client.post(
+            "/login", json={"username": "admin", "password": "admin123"}).json()
+        assert login["code"] == "200"
+        token = login["data"]["token"]
+        response = failure_client.get(
+            "/user/selectPage",
+            headers={"token": token, "Origin": "http://evil.example"},
+        )
+
+    assert response.json()["code"] == "500"
+    header_names = {key.lower() for key in response.headers}
+    assert "access-control-allow-origin" not in header_names
+
+
+# ---------------------------------------------------------------------------
+# 用户列表权限 / 死接口 / 级联删除事务
+# ---------------------------------------------------------------------------
+
+def test_select_all_endpoint_is_removed(client, admin_headers):
+    """前端没在用、又容易变成用户枚举入口的 /user/selectAll 已删除。"""
+    response = client.get("/user/selectAll", headers=admin_headers)
+    assert response.status_code == 404
+
+
+def test_user_list_requires_admin(client, user_headers, admin_headers):
     """用户列表只给管理员：租客 403，管理员 200 且不带密码字段。"""
-    member = client.get("/user/selectAll", headers=user_headers).json()
+    member = client.get("/user/selectPage", headers=user_headers).json()
     assert member["code"] == "403"
 
-    admin = client.get("/user/selectAll", headers=admin_headers).json()
+    admin = client.get("/user/selectPage?page_size=20", headers=admin_headers).json()
     assert admin["code"] == "200"
-    assert isinstance(admin["data"], list)
-    for row in admin["data"]:
+    for row in admin["data"]["list"]:
         assert "password" not in row
+
+
+def test_cascade_delete_uses_a_transaction():
+    """账号级联删除的五张表删除必须包在事务里（文件删除放事务后）。"""
+    source = inspect.getsource(user_service._delete_one)
+    assert "in_transaction" in source
+    # 文件清理放在事务之后：事务里只做数据库删除
+    assert source.index("in_transaction") < source.index("file_service.remove")

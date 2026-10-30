@@ -1,6 +1,6 @@
 """登录、注册、修改密码、获取当前登录账号。"""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from common.auth import get_current_user
@@ -23,9 +23,12 @@ class Account(BaseModel):
 
 
 @router.post("/login")
-async def login(account: Account):
+async def login(account: Account, request: Request):
+    # 登录失败限流按「账号 + 来源 IP」两个维度记，IP 从连接信息里取，
+    # 不接受前端自己传（否则攻击者换个假 IP 就能绕过）
+    client_ip = request.client.host if request.client else None
     # FastAPI 按 Account 的字段名把请求体解析成对象，路由层不做业务判断
-    data = await account_service.login(account.username, account.password)
+    data = await account_service.login(account.username, account.password, client_ip=client_ip)
     # data 里含 token 和账号信息，Result.success 包成统一格式返回给前端
     return Result.success(data)
 
