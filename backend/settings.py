@@ -9,6 +9,7 @@ env_file 注入的值不会被仓库里的 .env 盖掉。
 """
 
 import os
+import time
 
 # settings.py 在 backend/ 目录下，仓库根目录是它的上一级
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -64,6 +65,14 @@ def _env_int(name: str, default: int) -> int:
 
 
 _load_env()
+
+# 进程级时区口径：项目所有时间都按东八区写入和展示（TORTOISE_ORM 的 timezone 也是它）。
+# Tortoise 的 auto_now_add 用的是 Python 的 datetime.now()（naive），不会看 ORM 的
+# timezone 配置；容器/CI 的宿主机时区若是 UTC，自动写入的时间就会落在东八区的昨天。
+# 这里在进程启动时把时区固定下来，保证本机、容器、CI 三处时间口径一致。
+os.environ["TZ"] = "Asia/Shanghai"
+if hasattr(time, "tzset"):
+    time.tzset()
 
 # ---------- 数据库 ----------
 # 业务库：MySQL。本项目全部结构化数据都在这一个库里：用户、租客、匹配、
