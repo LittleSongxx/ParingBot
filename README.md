@@ -20,12 +20,14 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/screenshots/front-match.png" alt="ParingBot 智能匹配" width="100%" />
+  <img src="docs/assets/screenshots/front-home.png" alt="ParingBot 租客工作台" width="100%" />
 </p>
 
 ---
 
 **ParingBot 是一个可运行的智能合租匹配演示平台。** 租客填好档案、七维合住偏好和动态后发起匹配，合租管家（主管）每一轮看一遍当前进展，决定把活派给画像师、筛选官还是审核官；候选不够就放宽「加分」项，画像不够就补一版画像，通过审核的人数够了就收尾交付。三个角色之间不直接对话，所有事实从库里现查，模型只负责判断，边界由代码守住。
+
+界面走浅色工作台风格（浅灰渐变底、白色细边框卡片、蓝色强调、药丸标签），设计 token 集中在 `frontend/src/assets/css/global.css`，管理端与租客端共用同一套视觉语言；视觉风格参考了作者的 NewsClaw 项目。
 
 在线演示：本地 Docker 一键起，见[快速开始](#快速开始) · 设计文档：[docs/architecture.md](docs/architecture.md) · 运维手册：[docs/operations.md](docs/operations.md)
 
@@ -38,7 +40,7 @@
 租客填 17 项档案（性别、生日、预算、整洁度、租期、门店、作息、宠物、吸烟、自我介绍、室友期望、生活照等），管理员审核通过后才会进入候选池；七维合住偏好逐项标「必须 / 加分」，其中「必须」维度任何情况下都不放宽。动态是画像师的证据来源。
 
 <p align="center">
-  <img src="docs/assets/screenshots/front-home.png" alt="租客端首页" width="100%" />
+  <img src="docs/assets/screenshots/front-profile.png" alt="租客档案" width="100%" />
 </p>
 
 **② 发起匹配：先过 11 项前置检查**
@@ -201,4 +203,4 @@ docker compose build web
 
 ## 截图
 
-全部页面截图在 [`docs/assets/screenshots/`](docs/assets/screenshots/)：登录、租客端首页/智能匹配/审核结果/画像结果、管理端调度时间线/工具中心，均由本机 Docker Compose 栈（1440×900）实时截取。
+全部页面截图在 [`docs/assets/screenshots/`](docs/assets/screenshots/)：登录、租客端首页/档案/智能匹配/候选结果/审核结果/画像结果、管理端首页/调度时间线/工具中心/用户管理，均由本机 Docker Compose 栈（1440×900）实时截取；前端视觉规范见 [`docs/frontend-style.md`](docs/frontend-style.md)。
