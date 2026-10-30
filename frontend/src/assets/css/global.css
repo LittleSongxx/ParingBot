@@ -17,8 +17,8 @@
     --pb-line: rgba(17, 24, 39, 0.09);
     --pb-line-strong: rgba(17, 24, 39, 0.16);
     --pb-text: rgba(17, 24, 39, 0.94);
-    --pb-muted: rgba(17, 24, 39, 0.56);
-    --pb-faint: rgba(17, 24, 39, 0.38);
+    --pb-muted: #4b5563;
+    --pb-faint: #6b7280;
 
     /* 品牌与语义色 */
     --pb-brand: #2563eb;
@@ -507,4 +507,78 @@ h1, h2, h3, h4 { color: var(--pb-text); letter-spacing: -0.01em; }
 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+/* -------------------------------------------------------------
+   窄屏（<=900px）：内容区让位，筛选/分页/配置卡片允许折行
+   管理端外壳由 manager.css 的抽屉样式负责，本段只处理页面内容
+   ------------------------------------------------------------- */
+@media (max-width: 900px) {
+    /* 页头左侧保留弹性，不再固定 320px 下限，否则 390px 会把页面撑宽 */
+    .page-head .page-head-main {
+        min-width: 0;
+    }
+
+    .page-head.with-action {
+        align-items: flex-start;
+    }
+
+    .page-head .page-head-action {
+        width: 100%;
+    }
+
+    .manager-content .card,
+    .manager-content .block-card {
+        padding: 16px 14px;
+    }
+
+    .manager-content .table-card {
+        padding: 14px 12px 12px;
+    }
+
+    /* 筛选条在窄屏改成整行控件，避免固定宽度把卡片撑出横向滚动 */
+    .manager-content .filter-card .filter-input,
+    .manager-content .filter-card .filter-select,
+    .manager-content .filter-card .filter-select-wide,
+    .manager-content .filter-card .filter-number {
+        width: 100% !important;
+    }
+
+    .manager-content .filter-card .filter-actions {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+    }
+
+    .manager-content .pager-row {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .manager-content .pager-row .el-pagination,
+    .manager-content .pager-card .el-pagination {
+        flex-wrap: wrap;
+        row-gap: 6px;
+    }
+
+    /* 配置类卡片（模型/Prompt/工具/Agent）在窄屏全部单列，长文本允许折行 */
+    .manager-content .config-card .config-meta {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .manager-content .config-card .config-head,
+    .manager-content .config-card .config-actions {
+        flex-wrap: wrap;
+    }
+
+    .manager-content .config-card .meta-value,
+    .manager-content .config-card .prompt-content,
+    .manager-content .config-card .tool-desc {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .manager-content .config-card .config-actions .el-button {
+        margin-left: 0;
+    }
 }

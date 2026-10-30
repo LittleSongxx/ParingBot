@@ -341,7 +341,7 @@ const updateEnabled = (row, enabled) => {
         ElMessage.error(res.msg)
       }
     })
-  })
+  }).catch(() => {})
 }
 
 const blockReason = (row) => {
@@ -368,7 +368,7 @@ const del = (row) => {
         ElMessage.error(res.msg)
       }
     })
-  })
+  }).catch(() => {})
 }
 
 const reset = () => {

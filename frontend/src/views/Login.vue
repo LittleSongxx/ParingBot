@@ -20,11 +20,11 @@
 
         <el-form ref="formRef" :model="data.form" :rules="data.rules">
           <el-form-item prop="username">
-            <el-input :prefix-icon="User" size="large" v-model="data.form.username" placeholder="请输入账号" />
+            <el-input :prefix-icon="User" size="large" v-model="data.form.username" placeholder="请输入账号" aria-label="账号" />
           </el-form-item>
           <el-form-item prop="password">
             <el-input show-password :prefix-icon="Lock" size="large" v-model="data.form.password"
-                      placeholder="请输入密码" @keyup.enter="login" />
+                      placeholder="请输入密码" aria-label="密码" @keyup.enter="login" />
           </el-form-item>
           <el-form-item>
             <el-button size="large" type="primary" class="auth-submit" :loading="data.loading" @click="login">
@@ -36,8 +36,8 @@
         <div class="auth-demo">
           <span class="auth-demo-title">演示账号 · 点击填入</span>
           <div class="auth-demo-row">
-            <button class="demo-chip" type="button" @click="fill('admin', 'admin')">
-              <span class="demo-dot admin"></span>管理员 admin / admin
+            <button class="demo-chip" type="button" @click="fill('admin', 'admin123')">
+              <span class="demo-dot admin"></span>管理员 admin / admin123
             </button>
             <button class="demo-chip" type="button" @click="fill('member01', '123456')">
               <span class="demo-dot user"></span>租客 member01 / 123456

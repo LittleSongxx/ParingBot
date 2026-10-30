@@ -201,7 +201,7 @@ const handleDelete = (row) => {
         ElMessage.error(res.msg)
       }
     })
-  })
+  }).catch(() => {})
 }
 
 const deleteBatch = () => {
@@ -222,7 +222,7 @@ const deleteBatch = () => {
         ElMessage.error(res.msg)
       }
     })
-  })
+  }).catch(() => {})
 }
 
 const search = () => {

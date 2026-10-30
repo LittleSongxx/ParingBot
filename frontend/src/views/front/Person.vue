@@ -16,6 +16,7 @@
               :before-upload="beforeUpload"
               :on-success="handleUploadSuccess"
               :on-error="handleUploadError"
+              :on-remove="handleRemove"
               :show-file-list="false"
               class="avatar-uploader"
           >
@@ -46,7 +47,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from "vue";
+import { nextTick, reactive, ref } from "vue";
 import request from "@/utils/request.js";
 import { ElMessage } from "element-plus";
 import NameAvatar from "@/components/NameAvatar.vue";
@@ -81,19 +82,38 @@ const beforeUpload = (file) => {
   return true
 }
 
-const handleUploadSuccess = (res) => {
+// el-upload 会用 blob: 本地地址渲染缩略图。移除文件时组件会同步 revoke 这个地址，
+// 而浏览器可能还在加载那张缩略图，控制台就会报 net::ERR_FILE_NOT_FOUND。
+// 这里先把缩略图换成一个透明占位图，等 DOM 更新完再 revoke，就不会再出现这条报错
+const TRANSPARENT_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
+const releaseBlobPreview = (file) => {
+  const url = file && file.url
+  if (url && url.startsWith('blob:')) {
+    file.url = TRANSPARENT_PLACEHOLDER
+    nextTick(() => URL.revokeObjectURL(url))
+  }
+}
+
+const handleUploadSuccess = (res, file) => {
   // 上传接口返回的 data 是文件下载地址，写进表单后页面立刻显示新头像，
   // 点保存才真正写进数据库
   if (res.code !== '200') {
     ElMessage.error(res.msg)
     return
   }
+  releaseBlobPreview(file)
   data.user.avatar = res.data
   ElMessage.success('头像已上传，点保存后生效')
 }
 
-const handleUploadError = () => {
+const handleUploadError = (error, file) => {
+  releaseBlobPreview(file)
   ElMessage.error('头像上传失败，请稍后重试')
+}
+
+// 头像不展示文件列表，但 el-upload 仍可能留下本地预览地址，移除时一并清掉
+const handleRemove = (file) => {
+  releaseBlobPreview(file)
 }
 
 // 保存成功后要通知外层布局刷新右上角的头像和姓名，

@@ -383,7 +383,7 @@ const updateEnabled = (row, enabled) => {
         ElMessage.error(res.msg)
       }
     })
-  })
+  }).catch(() => {})
 }
 
 const handleDelete = (row) => {
@@ -401,7 +401,7 @@ const handleDelete = (row) => {
         ElMessage.error(res.msg)
       }
     })
-  })
+  }).catch(() => {})
 }
 
 const searchMembers = (keyword) => {

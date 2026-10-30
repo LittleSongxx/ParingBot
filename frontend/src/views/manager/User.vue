@@ -54,8 +54,10 @@
         <el-table-column prop="create_time" label="注册时间" width="170" />
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="scope">
-            <el-button type="primary" circle :icon="Edit" @click="handleEdit(scope.row)"></el-button>
-            <el-button type="danger" circle :icon="Delete" @click="del(scope.row)"></el-button>
+            <el-button type="primary" circle :icon="Edit" aria-label="编辑用户" title="编辑用户"
+                       @click="handleEdit(scope.row)"></el-button>
+            <el-button type="danger" circle :icon="Delete" aria-label="删除用户" title="删除用户"
+                       @click="del(scope.row)"></el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -236,7 +238,7 @@ const del = (row) => {
         ElMessage.error(res.msg)
       }
     })
-  })
+  }).catch(() => {})
 }
 
 const delBatch = () => {
@@ -255,7 +257,7 @@ const delBatch = () => {
         ElMessage.error(res.msg)
       }
     })
-  })
+  }).catch(() => {})
 }
 
 const handleSelectionChange = (rows) => {

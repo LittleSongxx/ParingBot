@@ -1,6 +1,14 @@
 <template>
   <div class="manager-shell">
     <header class="manager-topbar">
+      <!-- 窄屏才出现的菜单按钮：打开/收起侧边抽屉 -->
+      <button v-if="data.isNarrow" class="nav-toggle" type="button"
+              :aria-label="data.sidebarOpen ? '关闭管理菜单' : '打开管理菜单'"
+              :aria-expanded="data.sidebarOpen ? 'true' : 'false'"
+              aria-controls="manager-sidebar"
+              @click="data.sidebarOpen = !data.sidebarOpen">
+        <el-icon><operation /></el-icon>
+      </button>
       <div class="manager-brand" @click="router.push('/manager/home')">
         <img class="brand-mark" src="@/assets/imgs/logo-bot.svg" alt="ParingBot" />
         <div class="brand-text">
@@ -33,11 +41,14 @@
       </div>
     </header>
 
+    <!-- 窄屏抽屉打开时的遮罩：点一下收起侧边栏，避免挡住内容 -->
+    <div v-if="data.isNarrow && data.sidebarOpen" class="sidebar-mask" @click="data.sidebarOpen = false"></div>
     <div class="manager-body">
-      <aside class="manager-sidebar">
+      <aside id="manager-sidebar" class="manager-sidebar" :class="{ 'is-open': data.sidebarOpen }">
         <el-menu class="sidebar-menu"
                  :default-active="router.currentRoute.value.path"
                  :default-openeds="['system', 'member', 'ai', 'agent']"
+                 @select="handleMenuSelect"
                  router>
           <el-menu-item index="/manager/home">
             <el-icon><HomeFilled /></el-icon>
@@ -124,14 +135,44 @@
 </template>
 
 <script setup>
-import { reactive } from "vue";
+import { onBeforeUnmount, onMounted, reactive } from "vue";
 import router from "@/router/index.js";
 import { ElMessage } from "element-plus";
 import NameAvatar from "@/components/NameAvatar.vue";
 
+// 窄屏（<=900px）时侧边栏改成抽屉：用响应式开关控制抽屉与遮罩，
+// 桌面端这个开关不起作用，布局与改版前完全一致
+const NARROW_BREAKPOINT = 900
+
 const data = reactive({
-  user: JSON.parse(localStorage.getItem('xm-user') || '{}')
+  user: JSON.parse(localStorage.getItem('xm-user') || '{}'),
+  isNarrow: false,
+  sidebarOpen: false
 })
+
+// 监听视口宽度：进入窄屏先收起抽屉，回到桌面宽度时恢复常驻侧边栏
+const syncViewport = () => {
+  data.isNarrow = window.innerWidth <= NARROW_BREAKPOINT
+  if (!data.isNarrow) {
+    data.sidebarOpen = false
+  }
+}
+
+onMounted(() => {
+  syncViewport()
+  window.addEventListener('resize', syncViewport)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncViewport)
+})
+
+// 窄屏点完菜单就收起抽屉，别让它挡住刚打开的页面
+const handleMenuSelect = () => {
+  if (data.isNarrow) {
+    data.sidebarOpen = false
+  }
+}
 
 const logout = () => {
   localStorage.removeItem('xm-user')

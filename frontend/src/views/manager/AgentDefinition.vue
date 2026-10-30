@@ -257,7 +257,7 @@ const updateEnabled = (row, enabled) => {
         ElMessage.error(res.msg)
       }
     })
-  })
+  }).catch(() => {})
 }
 
 load()

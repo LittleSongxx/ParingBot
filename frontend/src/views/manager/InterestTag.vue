@@ -221,7 +221,7 @@ const del = (row) => {
         ElMessage.error(res.msg)
       }
     })
-  })
+  }).catch(() => {})
 }
 
 const delBatch = () => {
@@ -248,7 +248,7 @@ const delBatch = () => {
         ElMessage.error(res.msg)
       }
     })
-  })
+  }).catch(() => {})
 }
 
 // 停用不影响已经在用的租客档案，只影响新档案能不能选到它，确认框里把这条说清楚
@@ -266,7 +266,7 @@ const updateEnabled = (row, enabled) => {
         ElMessage.error(res.msg)
       }
     })
-  })
+  }).catch(() => {})
 }
 
 const handleSelectionChange = (rows) => {

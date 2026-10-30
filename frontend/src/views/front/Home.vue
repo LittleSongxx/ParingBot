@@ -11,7 +11,7 @@
           档案填得越全，推荐的室友越合拍。
         </p>
         <div class="hero-actions">
-          <el-button type="primary" size="large" @click="router.push('/front/person')">完善资料</el-button>
+          <el-button type="primary" size="large" @click="router.push('/front/memberProfile')">完善资料</el-button>
           <router-link class="hero-btn-ghost" to="/front/myMatch">发起匹配</router-link>
         </div>
         <div class="hero-steps">

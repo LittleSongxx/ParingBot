@@ -19,14 +19,14 @@
 
       <el-form ref="formRef" :model="data.form" :rules="data.rules">
         <el-form-item prop="username">
-          <el-input :prefix-icon="User" size="large" v-model="data.form.username" placeholder="请输入账号" />
+          <el-input :prefix-icon="User" size="large" v-model="data.form.username" placeholder="请输入账号" aria-label="账号" />
         </el-form-item>
         <el-form-item prop="password">
-          <el-input show-password :prefix-icon="Lock" size="large" v-model="data.form.password" placeholder="请输入密码" />
+          <el-input show-password :prefix-icon="Lock" size="large" v-model="data.form.password" placeholder="请输入密码" aria-label="密码" />
         </el-form-item>
         <el-form-item prop="confirmPassword">
           <el-input show-password :prefix-icon="Lock" size="large" v-model="data.form.confirmPassword"
-                    placeholder="请再次输入密码" @keyup.enter="register" />
+                    placeholder="请再次输入密码" aria-label="确认密码" @keyup.enter="register" />
         </el-form-item>
         <el-form-item>
           <el-button size="large" type="primary" class="auth-submit" :loading="data.loading" @click="register">注 册</el-button>

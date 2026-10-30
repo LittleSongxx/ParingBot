@@ -157,7 +157,8 @@
               :before-upload="beforeUpload"
               :on-success="handleUploadSuccess"
               :on-error="handleUploadError"
-              :on-exceed="handleExceed">
+              :on-exceed="handleExceed"
+              :on-remove="handleRemove">
             <el-icon><Plus /></el-icon>
           </el-upload>
           <div class="upload-tip">生活照不是必填项；最多 9 张，单张不超过 5MB。删掉的照片在保存之后才会从服务器一并清掉。</div>
@@ -172,7 +173,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from "vue";
+import { nextTick, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
 import { Plus } from "@element-plus/icons-vue";
 import request from "@/utils/request.js";
@@ -310,6 +311,18 @@ const beforeUpload = (file) => {
   return true
 }
 
+// el-upload 会用 blob: 本地地址渲染缩略图。移除文件时组件会同步 revoke 这个地址，
+// 而浏览器可能还在加载那张缩略图，控制台就会报 net::ERR_FILE_NOT_FOUND。
+// 这里先把缩略图换成一个透明占位图，等 DOM 更新完再 revoke，就不会再出现这条报错
+const TRANSPARENT_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
+const releaseBlobPreview = (file) => {
+  const url = file && file.url
+  if (url && url.startsWith('blob:')) {
+    file.url = TRANSPARENT_PLACEHOLDER
+    nextTick(() => URL.revokeObjectURL(url))
+  }
+}
+
 const handleUploadSuccess = (res, file) => {
   if (res.code !== '200') {
     ElMessage.error(res.msg)
@@ -317,18 +330,26 @@ const handleUploadSuccess = (res, file) => {
   }
   // 上传接口返回的是文件下载地址，写到这一条上做预览，
   // 点保存时才会把整份生活照写进数据库
+  releaseBlobPreview(file)
   file.url = res.data
   ElMessage.success('照片已上传，点保存后生效')
 }
 
 const handleUploadError = (error, file) => {
   // 上传失败的那张从列表里摘掉，否则保存时会把一个本地预览地址写进数据库
+  releaseBlobPreview(file)
   data.fileList = data.fileList.filter(item => item.uid !== file.uid)
   ElMessage.error('照片上传失败，请检查网络后重试')
 }
 
 const handleExceed = () => {
   ElMessage.warning('生活照最多放 9 张，想换图请先删掉一张')
+}
+
+// 删除缩略图时同步清掉本地预览地址，并保证 fileList 里不残留这一条
+const handleRemove = (file) => {
+  releaseBlobPreview(file)
+  data.fileList = data.fileList.filter(item => item.uid !== file.uid)
 }
 
 const save = () => {
