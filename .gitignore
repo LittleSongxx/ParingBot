@@ -29,3 +29,11 @@ files/
 
 # AI 评测报告（本地生成，不入库）
 eval/report*.json
+
+# 评测环境（含 API Key，绝不入库）
+.env.eval
+.env.eval.*
+!.env.eval.example
+
+# 评测报告（本地生成）
+eval/reports/

@@ -204,6 +204,7 @@ docker compose build web
 - 部署冒烟脚本：[scripts/smoke_check.py](scripts/smoke_check.py)
 - 种子库生成说明：[scripts/prepare_seed.py](scripts/prepare_seed.py)
 - AI 能力评测（Phase 0）：[eval/README.md](eval/README.md)
+- 真实模型评测指南（Key/模型怎么填、怎么跑）：[eval/RUNBOOK.md](eval/RUNBOOK.md)
 
 ## 截图
 
