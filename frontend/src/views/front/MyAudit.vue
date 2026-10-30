@@ -1,5 +1,5 @@
 <template>
-  <div class="main-content">
+  <div class="main-content page-wrap">
     <div class="page-head">
       <div class="page-head-main">
         <h2>审核结果</h2>
@@ -45,23 +45,23 @@
             <span class="task-badge">{{ data.task.task_no }}</span>
             <span class="task-time">候选池发起于 {{ data.task.create_time }}</span>
           </div>
-          <div class="count-line">
-            <span class="count-chip">
-              <span class="count-label">候选池</span>
-              <b>{{ data.counts.total }}</b>
-            </span>
-            <span class="count-chip">
-              <span class="count-label">待审核</span>
-              <b>{{ data.counts.pending }}</b>
-            </span>
-            <span class="count-chip is-ok">
-              <span class="count-label">已通过</span>
-              <b>{{ data.counts.passed }}</b>
-            </span>
-            <span class="count-chip is-warn">
-              <span class="count-label">已否决</span>
-              <b>{{ data.counts.rejected }}</b>
-            </span>
+          <div class="metric-grid audit-metrics">
+            <div class="metric-tile">
+              <div class="metric-label">候选池</div>
+              <div class="metric-value">{{ data.counts.total }}<small>人</small></div>
+            </div>
+            <div class="metric-tile">
+              <div class="metric-label">待审核</div>
+              <div class="metric-value">{{ data.counts.pending }}<small>人</small></div>
+            </div>
+            <div class="metric-tile">
+              <div class="metric-label">已通过</div>
+              <div class="metric-value is-ok">{{ data.counts.passed }}<small>人</small></div>
+            </div>
+            <div class="metric-tile">
+              <div class="metric-label">已否决</div>
+              <div class="metric-value is-warn">{{ data.counts.rejected }}<small>人</small></div>
+            </div>
           </div>
           <div v-if="data.run" class="task-line">
             {{ data.run.run_type === '匹配编排' ? '本批来自智能匹配' : '最近一次独立审核' }}：{{ data.run.run_no }}，
@@ -88,9 +88,17 @@
 
         <div class="card block-card">
           <div class="block-title">否决分类分布</div>
-          <el-table :data="data.distribution" stripe class="theme-table">
-            <el-table-column prop="label" label="否决分类" min-width="220"/>
-            <el-table-column prop="code" label="分类编码" width="200"/>
+          <el-table :data="data.distribution" stripe class="data-table">
+            <el-table-column label="否决分类" min-width="220">
+              <template #default="scope">
+                <span :class="scope.row.code === 'MISMATCH_HARD' ? 'chip chip-red' : (scope.row.code === 'PREFERENCE_CONFLICT' ? 'chip chip-amber' : 'chip chip-blue')">
+                  {{ scope.row.label }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="分类编码" width="200">
+              <template #default="scope"><span class="code-text">{{ scope.row.code }}</span></template>
+            </el-table-column>
             <el-table-column label="人数" width="90">
               <template #default="scope">
                 <span :class="{ muted: !scope.row.count }">{{ scope.row.count }}</span>
@@ -107,7 +115,7 @@
 
         <div class="card block-card">
           <div class="block-title">候选审核清单</div>
-          <el-table :data="data.candidates" stripe class="theme-table">
+          <el-table :data="data.candidates" stripe class="data-table">
             <el-table-column prop="nickname" label="昵称" width="120">
               <template #default="scope">{{ scope.row.nickname || '档案已查不到' }}</template>
             </el-table-column>
@@ -129,7 +137,7 @@
             </el-table-column>
             <el-table-column label="否决分类" width="200">
               <template #default="scope">
-                <span v-if="scope.row.reject_label">{{ scope.row.reject_label }}</span>
+                <span v-if="scope.row.reject_label" :class="scope.row.reject_code === 'MISMATCH_HARD' ? 'chip chip-red' : (scope.row.reject_code === 'PREFERENCE_CONFLICT' ? 'chip chip-amber' : 'chip chip-blue')">{{ scope.row.reject_label }}</span>
                 <span v-else class="muted">—</span>
               </template>
             </el-table-column>
@@ -152,13 +160,13 @@
 
         <div class="card block-card">
           <div class="block-title">否决清单</div>
-          <el-table :data="data.rejected" stripe class="theme-table">
+          <el-table :data="data.rejected" stripe class="data-table">
             <el-table-column prop="nickname" label="昵称" width="120">
               <template #default="scope">{{ scope.row.nickname || '档案已查不到' }}</template>
             </el-table-column>
             <el-table-column label="否决分类" width="200">
               <template #default="scope">
-                <span class="reject-chip">{{ scope.row.reject_label }}</span>
+                <span :class="scope.row.reject_code === 'MISMATCH_HARD' ? 'chip chip-red' : (scope.row.reject_code === 'PREFERENCE_CONFLICT' ? 'chip chip-amber' : 'chip chip-blue')">{{ scope.row.reject_label }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="reject_reason" label="否决理由" min-width="260" show-overflow-tooltip/>
@@ -188,27 +196,29 @@
           <el-tag :type="auditType(data.detail.audit_status)" size="small">
             {{ data.detail.audit_status }}
           </el-tag>
-          <span v-if="data.detail.audit_round" class="round-chip">
+          <span v-if="data.detail.audit_round" class="chip chip-blue">
             第 {{ data.detail.audit_round }} 批审的
           </span>
         </div>
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="性别">{{ data.detail.gender || '未填' }}</el-descriptions-item>
-          <el-descriptions-item label="年龄">
-            {{ data.detail.age ? data.detail.age + ' 岁' : '未填' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="月租预算">
-            {{ data.detail.rent_budget ? data.detail.rent_budget + ' 元' : '未填' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="意向门店">{{ data.detail.store || '未填' }}</el-descriptions-item>
-          <el-descriptions-item label="作息">{{ data.detail.schedule_type || '未填' }}</el-descriptions-item>
-          <el-descriptions-item label="整洁度">{{ data.detail.tidiness || '未填' }}</el-descriptions-item>
-          <el-descriptions-item label="是否养宠">{{ data.detail.has_pet || '未填' }}</el-descriptions-item>
-          <el-descriptions-item label="是否吸烟">{{ data.detail.smoking || '未填' }}</el-descriptions-item>
-          <el-descriptions-item label="第几轮筛出">第 {{ data.detail.found_round }} 轮</el-descriptions-item>
-        </el-descriptions>
+        <div class="detail-panel">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="性别">{{ data.detail.gender || '未填' }}</el-descriptions-item>
+            <el-descriptions-item label="年龄">
+              {{ data.detail.age ? data.detail.age + ' 岁' : '未填' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="月租预算">
+              {{ data.detail.rent_budget ? data.detail.rent_budget + ' 元' : '未填' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="意向门店">{{ data.detail.store || '未填' }}</el-descriptions-item>
+            <el-descriptions-item label="作息">{{ data.detail.schedule_type || '未填' }}</el-descriptions-item>
+            <el-descriptions-item label="整洁度">{{ data.detail.tidiness || '未填' }}</el-descriptions-item>
+            <el-descriptions-item label="是否养宠">{{ data.detail.has_pet || '未填' }}</el-descriptions-item>
+            <el-descriptions-item label="是否吸烟">{{ data.detail.smoking || '未填' }}</el-descriptions-item>
+            <el-descriptions-item label="第几轮筛出">第 {{ data.detail.found_round }} 轮</el-descriptions-item>
+          </el-descriptions>
+        </div>
         <div class="detail-block">
-          <div class="tag-label">审核结论</div>
+          <div class="section-title">审核结论</div>
           <div v-if="data.detail.reject_reason" class="summary-box">
             {{ data.detail.reject_label }}：{{ data.detail.reject_reason }}
           </div>
@@ -218,7 +228,7 @@
           <div v-else class="summary-box">通过了：候选方标为必须的条件对申请方都成立。</div>
         </div>
         <div class="detail-block">
-          <div class="tag-label">候选方标为必须的条件</div>
+          <div class="section-title">候选方标为必须的条件</div>
           <div v-if="(data.detail.must_need || []).length" class="need-list">
             <div v-for="item in data.detail.must_need" :key="item.code" class="need-row">
               <span class="need-name">{{ item.name }}</span>
@@ -228,15 +238,15 @@
           <div v-else class="muted">这位候选标为必须的项都填的是不限，等于对谁都不设门槛。</div>
         </div>
         <div class="detail-block">
-          <div class="tag-label">代码复核</div>
+          <div class="section-title">代码复核</div>
           <div class="summary-box">{{ (data.detail.recheck || {}).note }}</div>
         </div>
         <div class="detail-block">
-          <div class="tag-label">他在意的全部条件</div>
+          <div class="section-title">他在意的全部条件</div>
           <div class="summary-box">{{ data.detail.preference_text || '这位候选还没有填合住偏好。' }}</div>
         </div>
         <div class="detail-block">
-          <div class="tag-label">他的自我介绍</div>
+          <div class="section-title">他的自我介绍</div>
           <div class="summary-box">{{ data.detail.self_intro || '（没有填）' }}</div>
         </div>
       </template>
@@ -313,302 +323,85 @@ load()
 </script>
 
 <style scoped>
-.main-content {
-  padding-bottom: 10px;
-  --el-color-primary: #1F6F6B;
-  --el-color-primary-light-3: #4F8F8A;
-  --el-color-primary-light-5: #84B5B2;
-  --el-color-primary-light-7: #A9CFCB;
-  --el-color-primary-light-8: #C4DCDA;
-  --el-color-primary-light-9: #EFF6F5;
-  --el-color-primary-dark-2: #24625E;
-}
-.loading-card {
-  min-height: 180px;
-  margin-top: 12px;
-}
+.page-wrap > .page-head { margin: 0; }
+.page-wrap > .card { margin-top: 0; }
 
-/* 卡片标题统一加粗，不加任何装饰线条 */
-.block-card {
-  margin-top: 12px;
-  padding: 20px 24px 22px;
-}
-.block-title {
-  font-size: 16px;
-  font-weight: bold;
-  line-height: 20px;
-  color: #333;
-}
-.block-card .el-alert {
-  margin-top: 14px;
-}
-.go-action {
-  padding-top: 16px;
-}
+.loading-card { min-height: 200px; }
+.go-action { margin-top: 16px; }
 
-/* 前置条件逐条列出，满足和没满足用两套底色区分 */
-.check-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background-color: #fafafa;
-  font-size: 13px;
-}
-.check-icon {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-}
-.check-icon.is-ok {
-  color: #67c23a;
-  background-color: rgba(103, 194, 58, .12);
-}
-.check-icon.is-warn {
-  color: #e6a23c;
-  background-color: rgba(230, 162, 60, .16);
-}
-.check-label {
-  flex: none;
-  width: 104px;
-  color: #666;
-}
-.check-message {
-  color: #666;
-  line-height: 20px;
-}
-.warn-text {
-  color: #e6a23c;
-}
-.ok-text {
-  color: #67c23a;
-}
-
-/* 一次都没审过、连候选池都还没有时，给一块带图标的空状态 */
-.empty-card {
-  margin-top: 12px;
-  padding: 28px 24px 32px;
-  text-align: center;
-}
-.empty-icon {
-  width: 52px;
-  height: 52px;
-  margin: 0 auto 12px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: #1F6F6B;
-  background-color: rgba(31, 111, 107, .1);
-}
-.empty-title {
-  font-size: 15px;
-  font-weight: bold;
-  color: #333;
-}
-.empty-desc {
-  margin-top: 6px;
-  font-size: 13px;
-  line-height: 22px;
-  color: #999;
-}
-
-/* 任务卡：任务号做成主题色胶囊，跟右边的发起时间拉开主次 */
+/* 任务卡：任务号胶囊 + 时间靠右 */
 .task-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  margin-top: 16px;
-  padding-bottom: 12px;
+  margin-top: 14px;
 }
 .task-badge {
   flex: none;
   padding: 3px 12px;
   border-radius: 999px;
-  font-size: 13px;
-  font-weight: bold;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
   color: #fff;
-  background: linear-gradient(120deg, #1F6F6B 0%, #2F8A84 100%);
+  background: linear-gradient(120deg, #60a5fa, #2563eb);
 }
-.task-time {
-  color: #999;
-  font-size: 12px;
-  margin-left: auto;
-}
+.task-time { margin-left: auto; font-size: 12px; color: var(--pb-faint); }
+
+.audit-metrics { margin: 16px 0 4px; }
+.audit-metrics .metric-value.is-ok { color: #047857; }
+.audit-metrics .metric-value.is-warn { color: #b45309; }
+
 .task-line {
-  color: #333;
+  padding: 12px 0;
   font-size: 13px;
-  line-height: 24px;
-  padding-bottom: 12px;
+  line-height: 1.9;
+  color: rgba(17, 24, 39, 0.78);
 }
+.task-line .el-tag { vertical-align: 1px; }
+.block-card .el-alert { margin-top: 12px; }
 
-/* 四个计数做成胶囊：通过走绿、否决走橙，没填数字的用浅底色兜住 */
-.count-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding-bottom: 14px;
-}
-.count-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
-  border-radius: 999px;
-  border: 1px solid #DFECEB;
-  background-color: #F5FAF9;
-  font-size: 13px;
-  color: #333;
-}
-.count-chip b {
-  font-size: 15px;
-  color: #1F6F6B;
-}
-.count-chip.is-ok {
-  border-color: #e0f0d6;
-  background-color: rgba(103, 194, 58, .1);
-}
-.count-chip.is-ok b {
-  color: #67c23a;
-}
-.count-chip.is-warn {
-  border-color: #f3e0bd;
-  background-color: #fdf6e8;
-}
-.count-chip.is-warn b {
-  color: #e6a23c;
-}
-.count-label {
-  color: #666;
-}
-.muted {
-  color: #bbb;
-}
+.data-table { margin-top: 12px; }
 
-/* 三张表跟着主题色走：表头浅底色，表头字用主题色 */
-.theme-table {
-  margin-top: 14px;
-  --el-table-header-bg-color: #F5FAF9;
-  --el-table-header-text-color: #1F6F6B;
-  --el-table-row-hover-bg-color: #F2F8F7;
-}
-.table-tip {
-  color: #999;
+/* 分类编码用等宽字，和左侧的彩色分类标签区分 */
+.code-text {
+  font-family: var(--pb-mono);
   font-size: 12px;
-  line-height: 20px;
-  padding-top: 10px;
+  color: var(--pb-muted);
 }
 
-/* 详情弹窗：谁、哪一批审的，一行读完 */
+/* 详情弹窗 */
 .detail-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  padding-bottom: 16px;
+  padding: 2px 0 4px;
 }
-.detail-name {
-  font-size: 16px;
-  font-weight: bold;
-  color: #333;
-}
-.round-chip {
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 18px;
-  color: #1F6F6B;
-  border: 1px solid #D5E8E6;
-  background-color: rgba(31, 111, 107, .08);
-}
-.detail-block {
-  padding-top: 16px;
-}
-.tag-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #666;
-  font-size: 13px;
-  padding-bottom: 8px;
-}
-.tag-label::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: #1F6F6B;
-}
+.detail-name { font-size: 16px; font-weight: 650; color: var(--pb-text); }
+.detail-panel { margin-top: 12px; }
+.detail-block { margin-top: 16px; }
+.detail-block .section-title { margin-bottom: 8px; }
 
-/* 候选方标为必须的条件，一条一行，整块用和其它块一样的 1px 边框 */
+/* 候选方标为必须的条件：一条一行，整块浅底 */
 .need-list {
-  border: 1px solid #DFECEB;
-  border-radius: 8px;
-  padding: 4px 14px;
-  background-color: rgba(31, 111, 107, .04);
+  padding: 2px 16px;
+  border: 1px solid var(--pb-line);
+  border-radius: var(--pb-radius-sm);
+  background: var(--pb-surface-2);
 }
 .need-row {
   display: flex;
-  padding: 7px 0;
+  gap: 12px;
+  padding: 8px 0;
   font-size: 13px;
 }
-.need-row + .need-row {
-  border-top: 1px solid #DFEAE9;
-}
-.need-name {
-  width: 110px;
-  color: #666;
-}
-.need-value {
-  color: #333;
-}
+.need-row + .need-row { border-top: 1px solid var(--pb-line); }
+.need-name { flex: none; width: 110px; color: var(--pb-muted); }
+.need-value { color: var(--pb-text); }
 
-/* 弹窗里成段的内容统一抬成一块底色，跟上面的资料表拉开层次 */
-.summary-box {
-  padding: 14px 16px;
-  border-radius: 8px;
-  border: 1px solid #DFECEB;
-  background-color: rgba(31, 111, 107, .05);
-  color: #333;
-  font-size: 13px;
-  line-height: 24px;
-  white-space: pre-wrap;
+@media (max-width: 768px) {
+  .task-time { margin-left: 0; }
 }
-
-/* 否决策略胶囊：否决是这一页里唯一的负向结论，用偏红的一支区分 */
-.reject-chip {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 18px;
-  color: #b3413f;
-  border: 1px solid #f0d5d4;
-  background-color: #fdf3f2;
-}
-
-/* 弹窗挂在 body 上渲染，主题色变量要按它自己的类名给，
-   写在 .main-content 上的页面作用域盖不到 */
-:global(.audit-dialog) {
-  --el-color-primary: #1F6F6B;
-  --el-color-primary-light-3: #4F8F8A;
-  --el-color-primary-light-5: #84B5B2;
-  --el-color-primary-light-7: #A9CFCB;
-  --el-color-primary-light-8: #C4DCDA;
-  --el-color-primary-light-9: #EFF6F5;
-  --el-color-primary-dark-2: #24625E;
-}
-/* 资料表的表头底色跟着主题色走；这个变量 Element Plus 挂在自己的 .el-descriptions 上，
-   写在弹窗根节点上会被它盖掉，所以要直接给到 .el-descriptions */
-:global(.audit-dialog .el-descriptions) {
-  --el-descriptions-item-bordered-label-background: #F5FAF9;
-}
-
 </style>

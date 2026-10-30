@@ -1,21 +1,33 @@
 <template>
-  <div>
-    <div class="card" style="margin-bottom: 5px">
-      <el-input v-model="data.name" style="width: 240px; margin-right: 10px" placeholder="请输入姓名查询"></el-input>
-      <el-select v-model="data.role" clearable style="width: 180px; margin-right: 10px" placeholder="请选择角色">
+  <div class="page-wrap">
+    <!-- 页头：标题 + 说明 + 右侧主操作 -->
+    <div class="page-head with-action">
+      <div class="page-head-main">
+        <h2>用户管理</h2>
+        <p class="page-tip">管理平台账号与角色、联系方式与启用状态；删除账号会连带清掉其名下的租客数据。</p>
+      </div>
+      <div class="page-head-action">
+        <el-button type="primary" @click="handleAdd">新增用户</el-button>
+        <el-button type="danger" plain @click="delBatch">批量删除</el-button>
+      </div>
+    </div>
+
+    <!-- 筛选卡：搜索 + 角色筛选 + 查询/重置 -->
+    <div class="card filter-card">
+      <el-input v-model="data.name" class="filter-input" clearable placeholder="请输入姓名查询"></el-input>
+      <el-select v-model="data.role" clearable class="filter-select" placeholder="请选择角色">
         <el-option label="管理员" value="ADMIN"></el-option>
         <el-option label="租客" value="USER"></el-option>
       </el-select>
-      <el-button type="info" plain @click="load">查询</el-button>
-      <el-button type="warning" plain style="margin: 0 10px" @click="reset">重置</el-button>
-    </div>
-    <div class="card" style="margin-bottom: 5px">
-      <el-button type="primary" plain @click="handleAdd">新增</el-button>
-      <el-button type="danger" plain @click="delBatch">批量删除</el-button>
+      <div class="filter-actions">
+        <el-button type="primary" @click="load">查询</el-button>
+        <el-button @click="reset">重置</el-button>
+      </div>
     </div>
 
-    <div class="card" style="margin-bottom: 5px">
-      <el-table stripe :data="data.tableData" @selection-change="handleSelectionChange">
+    <!-- 表格卡：全局表格样式 + 卡片内右对齐分页 -->
+    <div class="card table-card">
+      <el-table :data="data.tableData" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" />
         <el-table-column prop="username" label="账号" min-width="120" />
         <el-table-column prop="avatar" label="头像" width="80">
@@ -46,54 +58,68 @@
             <el-button type="danger" circle :icon="Delete" @click="del(scope.row)"></el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <div class="empty-card">
+            <div class="empty-title">暂无用户数据</div>
+            <div class="empty-desc">调整筛选条件再试试，或点右上角「新增用户」创建一条。</div>
+          </div>
+        </template>
       </el-table>
-    </div>
-    <div class="card" v-if="data.total">
-      <el-pagination
-          v-model:current-page="data.pageNum"
-          background
-          layout="prev, pager, next"
-          :page-size="data.pageSize"
-          :total="data.total"
-          @current-change="load"
-      />
+      <div class="pager-row" v-if="data.total">
+        <el-pagination
+            v-model:current-page="data.pageNum"
+            background
+            layout="prev, pager, next, total"
+            :page-size="data.pageSize"
+            :total="data.total"
+            @current-change="load"
+        />
+      </div>
     </div>
 
-    <el-dialog title="用户信息" v-model="data.formVisible" width="40%" destroy-on-close>
-      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="70px" style="padding: 20px">
-        <el-form-item prop="username" label="账号">
-          <el-input v-model="data.form.username" placeholder="请输入 3-30 个字符的账号"
-                    :disabled="!!data.form.id"></el-input>
-        </el-form-item>
-        <el-form-item v-if="!data.form.id" prop="password" label="密码">
-          <el-input v-model="data.form.password" show-password placeholder="不填写时默认密码为 123456"></el-input>
-        </el-form-item>
-        <el-form-item prop="avatar" label="头像">
-          <el-upload :action="baseUrl + '/files/upload'" :headers="uploadHeaders" :on-success="handleFileUpload" list-type="picture">
-            <el-button type="primary">点击上传</el-button>
-          </el-upload>
-        </el-form-item>
-        <el-form-item prop="name" label="姓名">
-          <el-input v-model="data.form.name" placeholder="请输入姓名"></el-input>
-        </el-form-item>
-        <el-form-item prop="role" label="角色">
-          <el-select v-model="data.form.role" style="width: 100%">
-            <el-option label="管理员" value="ADMIN"></el-option>
-            <el-option label="租客" value="USER"></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item prop="phone" label="电话">
-          <el-input v-model="data.form.phone" placeholder="请输入电话"></el-input>
-        </el-form-item>
-        <el-form-item prop="email" label="邮箱">
-          <el-input v-model="data.form.email" placeholder="请输入邮箱"></el-input>
-        </el-form-item>
-        <el-form-item prop="status" label="状态">
-          <el-radio-group v-model="data.form.status">
-            <el-radio value="NORMAL">正常</el-radio>
-            <el-radio value="DISABLED">停用</el-radio>
-          </el-radio-group>
-        </el-form-item>
+    <!-- 弹窗：按「账号信息 / 基本资料」分组，不再密集平铺 -->
+    <el-dialog title="用户信息" v-model="data.formVisible" width="580px" destroy-on-close>
+      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="80px" class="dialog-form">
+        <div class="soft-panel form-group">
+          <div class="section-title">账号信息</div>
+          <el-form-item prop="username" label="账号">
+            <el-input v-model="data.form.username" placeholder="请输入 3-30 个字符的账号"
+                      :disabled="!!data.form.id"></el-input>
+          </el-form-item>
+          <el-form-item v-if="!data.form.id" prop="password" label="密码">
+            <el-input v-model="data.form.password" show-password placeholder="不填写时默认密码为 123456"></el-input>
+          </el-form-item>
+        </div>
+
+        <div class="soft-panel form-group">
+          <div class="section-title">基本资料</div>
+          <el-form-item prop="avatar" label="头像">
+            <el-upload :action="baseUrl + '/files/upload'" :headers="uploadHeaders" :on-success="handleFileUpload" list-type="picture">
+              <el-button type="primary" plain>点击上传</el-button>
+            </el-upload>
+          </el-form-item>
+          <el-form-item prop="name" label="姓名">
+            <el-input v-model="data.form.name" placeholder="请输入姓名"></el-input>
+          </el-form-item>
+          <el-form-item prop="role" label="角色">
+            <el-select v-model="data.form.role" style="width: 100%">
+              <el-option label="管理员" value="ADMIN"></el-option>
+              <el-option label="租客" value="USER"></el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item prop="phone" label="电话">
+            <el-input v-model="data.form.phone" placeholder="请输入电话"></el-input>
+          </el-form-item>
+          <el-form-item prop="email" label="邮箱">
+            <el-input v-model="data.form.email" placeholder="请输入邮箱"></el-input>
+          </el-form-item>
+          <el-form-item prop="status" label="状态">
+            <el-radio-group v-model="data.form.status">
+              <el-radio value="NORMAL">正常</el-radio>
+              <el-radio value="DISABLED">停用</el-radio>
+            </el-radio-group>
+          </el-form-item>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="data.formVisible = false">取消</el-button>
@@ -249,3 +275,86 @@ const reset = () => {
 
 load()
 </script>
+
+<style scoped>
+/* 列表页统一范式：页头 → 筛选卡 → 表格卡（分页在卡片内） */
+.filter-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-input { width: 260px; }
+.filter-select { width: 180px; }
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.table-card {
+  padding: 18px 20px 16px;
+}
+
+.table-card :deep(.el-table) {
+  background: transparent;
+}
+
+.table-card :deep(.el-table__empty-block) {
+  background: transparent;
+}
+
+.table-card :deep(.el-table__empty-text) {
+  width: 100%;
+  line-height: 1.6;
+}
+
+.table-card :deep(.empty-card) {
+  width: 100%;
+  margin: 6px 0;
+  padding: 38px 20px;
+}
+
+.pager-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* 弹窗内分组 */
+.dialog-form {
+  max-height: 68vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.dialog-form :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.dialog-form :deep(.el-form-item:last-child) {
+  margin-bottom: 4px;
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .filter-input,
+  .filter-select {
+    width: 100%;
+  }
+
+  .filter-actions {
+    margin-left: 0;
+  }
+}
+</style>

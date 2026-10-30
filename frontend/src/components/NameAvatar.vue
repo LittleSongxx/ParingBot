@@ -24,7 +24,8 @@ const props = defineProps({
   size: { type: Number, default: 40 }
 })
 
-const colors = ['#1F6F6B', '#8B5A2B', '#3F6B63', '#526D82', '#6A5A8C', '#4F8A86']
+// 和全局设计 token 一致的柔和高饱和色，按首字稳定取色
+const colors = ['#2563eb', '#7c3aed', '#0891b2', '#059669', '#d97706', '#db2777']
 const loadFailed = ref(false)
 const displayName = computed(() => (props.name || '').trim() || '用户')
 const initial = computed(() => Array.from(displayName.value)[0])
@@ -32,8 +33,8 @@ const colorIndex = computed(() => initial.value.codePointAt(0) % colors.length)
 const avatarStyle = computed(() => ({
   width: `${props.size}px`,
   height: `${props.size}px`,
-  fontSize: `${Math.max(14, Math.round(props.size * 0.38))}px`,
-  backgroundColor: colors[colorIndex.value]
+  fontSize: `${Math.max(13, Math.round(props.size * 0.38))}px`,
+  background: `linear-gradient(135deg, ${colors[colorIndex.value]}, ${colors[colorIndex.value]}cc)`
 }))
 
 watch(() => props.src, () => {
@@ -50,14 +51,8 @@ watch(() => props.src, () => {
   box-sizing: border-box;
   border-radius: 50%;
   vertical-align: middle;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.12);
 }
-.image-avatar {
-  object-fit: cover;
-}
-.text-avatar {
-  color: #fff;
-  font-weight: 600;
-  line-height: 1;
-  user-select: none;
-}
+.image-avatar { object-fit: cover; }
+.text-avatar { color: #fff; font-weight: 600; line-height: 1; user-select: none; }
 </style>

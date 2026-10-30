@@ -1,23 +1,31 @@
 <template>
-  <div style="width: 50%" class="card">
-    <div class="section-title">修改密码</div>
-    <el-alert class="password-tip" type="info" :closable="false" show-icon
-              title="保存成功后当前登录会退出，需要用新密码重新登录。"></el-alert>
-    <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="80px" style="padding: 0 20px 20px">
-      <el-form-item label="原密码" prop="password">
-        <el-input v-model="data.form.password" placeholder="请输入原密码" show-password></el-input>
-      </el-form-item>
-      <el-form-item label="新密码" prop="newPassword">
-        <el-input v-model="data.form.newPassword" :placeholder="newPasswordPlaceholder" show-password></el-input>
-      </el-form-item>
-      <el-form-item label="确认密码" prop="confirmPassword">
-        <el-input v-model="data.form.confirmPassword" placeholder="请再输入一次新密码" show-password
-                  @keyup.enter="updatePassword"></el-input>
-      </el-form-item>
-      <div style="text-align: center">
-        <el-button type="primary" :loading="data.loading" @click="updatePassword">保 存</el-button>
-      </div>
-    </el-form>
+  <div class="page-wrap">
+    <div class="page-head">
+      <h2>修改密码</h2>
+      <p class="page-tip">修改当前登录账号的登录密码，保存成功后当前登录会退出，需要用新密码重新登录。</p>
+    </div>
+
+    <div class="card narrow-card">
+      <div class="block-title">账号安全</div>
+      <el-alert class="password-tip" type="info" :closable="false" show-icon
+                title="保存成功后当前登录会退出，需要用新密码重新登录。"></el-alert>
+      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="80px" class="narrow-form">
+        <el-form-item label="原密码" prop="password">
+          <el-input v-model="data.form.password" placeholder="请输入原密码" show-password></el-input>
+        </el-form-item>
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input v-model="data.form.newPassword" :placeholder="newPasswordPlaceholder" show-password></el-input>
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input v-model="data.form.confirmPassword" placeholder="请再输入一次新密码" show-password
+                    @keyup.enter="updatePassword"></el-input>
+        </el-form-item>
+        <div class="form-tip password-rule">新密码需要 6 到 30 个字符，且不能与原密码相同。</div>
+        <div class="form-actions">
+          <el-button type="primary" :loading="data.loading" @click="updatePassword">保 存</el-button>
+        </div>
+      </el-form>
+    </div>
   </div>
 </template>
 
@@ -95,12 +103,34 @@ const updatePassword = () => {
 </script>
 
 <style scoped>
-.section-title {
-  font-weight: bold;
-  font-size: 18px;
-  padding: 16px 0 10px 20px;
+/* 修改密码：居中窄卡片，表单与提示保持同一阅读宽度 */
+.narrow-card {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
 }
+
 .password-tip {
-  margin: 0 20px 20px;
+  margin-bottom: 18px;
+}
+
+.narrow-form {
+  padding: 4px 4px 0;
+}
+
+.narrow-form :deep(.el-form-item) {
+  margin-bottom: 20px;
+}
+
+.password-rule {
+  margin-top: 0;
+  padding-left: 80px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
 }
 </style>

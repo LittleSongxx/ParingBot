@@ -1,60 +1,106 @@
-.front-header {
+/* 租客端：玻璃顶栏 + 居中内容区（参考 NewsClaw） */
+
+.front-shell {
+    min-height: 100vh;
     display: flex;
-    height: 60px;
-    line-height: 60px;
-    border-bottom: 1px solid #eee;
+    flex-direction: column;
 }
 
-/* 宽度按标题内容撑开、标题不换行：平台名较长，固定宽度会把标题挤成两行 */
-.front-header-left {
-    flex: none;
-    min-width: 350px;
+.front-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(18px);
+    border-bottom: 1px solid var(--pb-line);
+}
+
+.front-inner {
+    max-width: 1160px;
+    margin: 0 auto;
+    height: 64px;
     display: flex;
     align-items: center;
-    padding: 0 30px;
+    gap: 18px;
+    padding: 0 20px;
 }
 
-.front-header-left img {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-}
-
-.front-header-left .title {
-    white-space: nowrap;
-    color: #333;
-    cursor: pointer;
-    margin-left: 10px;
-    font-size: 18px;
-    font-weight: bold;
-}
-
-.front-header-center {
-    flex: 1;
-    /* min-width 不设 0 的话，顶部菜单会撑着自己的内容宽度不收缩，
-       窗口略窄一点整页就出现横向滚动条；设 0 之后交给 Element Plus 自己
-       把放不下的菜单项收进「更多」里 */
-    min-width: 0;
-}
-
-.front-header-right {
+.front-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     flex: none;
-    padding-right: 20px;
+    cursor: pointer;
 }
 
-.main-content {
-    width: 70%;
-    margin: 0 auto;
-    padding: 20px 0;
-    min-height: 100vh;
-}
+.front-brand .brand-mark { width: 32px; height: 32px; border-radius: 9px; }
+.front-brand .brand-text { display: flex; flex-direction: column; line-height: 1.2; }
+.front-brand .brand-name { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.front-brand .brand-sub { font-size: 11px; color: var(--pb-muted); }
 
+.front-nav { flex: 1; min-width: 0; }
 
-/*Element-Plus样式覆盖*/
-.el-menu--horizontal {
+.front-nav .el-menu--horizontal {
     border: none !important;
-    height: 59px;
+    height: 64px;
+    background: transparent;
 }
-.el-tooltip__trigger {
-    outline: none;
+
+.front-nav .el-menu--horizontal > .el-menu-item {
+    height: 36px;
+    line-height: 36px;
+    margin: 14px 2px;
+    padding: 0 13px;
+    border-radius: 999px;
+    border-bottom: none !important;
+    color: var(--pb-muted);
+    font-size: 13.5px;
+    font-weight: 500;
+}
+
+.front-nav .el-menu--horizontal > .el-menu-item:hover,
+.front-nav .el-menu--horizontal > .el-menu-item.is-active {
+    background: var(--pb-brand-soft);
+    color: var(--pb-brand) !important;
+    border-bottom: none !important;
+}
+
+.front-nav .el-menu--horizontal > .el-menu-item.is-active { font-weight: 600; }
+
+.front-actions { flex: none; display: flex; align-items: center; gap: 10px; }
+
+.front-user-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 4px;
+    border-radius: 999px;
+    border: 1px solid var(--pb-line);
+    background: var(--pb-surface);
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+.front-user-chip:hover { border-color: rgba(37, 99, 235, 0.35); background: var(--pb-brand-soft); }
+.front-user-chip .user-name { font-size: 13px; font-weight: 550; color: var(--pb-text); }
+
+.front-main {
+    flex: 1;
+    width: 100%;
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 28px 20px 44px;
+}
+
+/* 页面根节点统一用 main-content 时，宽度交给 .front-main 控制 */
+.front-main .main-content {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    min-height: 0;
+}
+
+.front-shell .footer-wrap {
+    width: 100%;
+    max-width: 1160px;
+    margin: 0 auto;
 }

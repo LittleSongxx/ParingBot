@@ -1,60 +1,94 @@
 <template>
-  <div>
-    <div class="card" style="margin-bottom: 5px">
-      <el-input v-model="data.name" style="width: 200px; margin-right: 10px"
-                placeholder="请输入配置名称查询"></el-input>
-      <el-select v-model="data.purpose" clearable style="width: 130px; margin-right: 10px" placeholder="模型用途">
+  <div class="page-wrap">
+    <div class="page-head with-action">
+      <div class="page-head-main">
+        <h2>AI 模型配置</h2>
+        <p class="page-tip">全平台的模型都在这里配置，改完立刻生效；一个用途只允许有一条启用中的配置，新增默认停用。</p>
+      </div>
+      <div class="page-head-action">
+        <el-button type="primary" @click="handleAdd">新增配置</el-button>
+      </div>
+    </div>
+
+    <div class="card filter-card">
+      <el-input v-model="data.name" class="filter-input" clearable placeholder="请输入配置名称查询"></el-input>
+      <el-select v-model="data.purpose" clearable class="filter-select" placeholder="模型用途">
         <el-option v-for="item in data.purposes" :key="item" :label="item" :value="item"></el-option>
       </el-select>
-      <el-select v-model="data.enabled" clearable style="width: 130px; margin-right: 10px" placeholder="启用状态">
+      <el-select v-model="data.enabled" clearable class="filter-select" placeholder="启用状态">
         <el-option label="已启用" value="是"></el-option>
         <el-option label="已停用" value="否"></el-option>
       </el-select>
-      <el-button type="info" plain @click="load">查询</el-button>
-      <el-button type="warning" plain style="margin-left: 10px" @click="reset">重置</el-button>
+      <div class="filter-actions">
+        <el-button type="primary" @click="load">查询</el-button>
+        <el-button @click="reset">重置</el-button>
+      </div>
     </div>
 
-    <div class="card" style="margin-bottom: 5px">
-      <el-button type="primary" plain @click="handleAdd">新增</el-button>
-    </div>
+    <!-- 配置卡片列表：一条配置一张卡，状态 chip + mono 连接信息 + 右对齐操作 -->
+    <div class="config-table-card">
+      <el-table :data="data.tableData" :show-header="false" class="config-table">
+        <el-table-column>
+          <template #default="scope">
+            <div class="config-card">
+              <div class="config-head">
+                <span class="config-name">{{ scope.row.name }}</span>
+                <span class="chip chip-blue">{{ scope.row.model_purpose }}</span>
+                <span class="chip" :class="scope.row.enabled === '是' ? 'chip-green' : ''">
+                  {{ scope.row.enabled === '是' ? '已启用' : '已停用' }}
+                </span>
+              </div>
 
-    <div class="card" style="margin-bottom: 5px">
-      <el-table stripe :data="data.tableData">
-        <el-table-column prop="name" label="配置名称" width="150" show-overflow-tooltip />
-        <el-table-column prop="model_purpose" label="用途" width="100" />
-        <el-table-column prop="model_name" label="模型名称" width="150" show-overflow-tooltip />
-        <el-table-column prop="base_url" label="接口地址" min-width="220" show-overflow-tooltip />
-        <el-table-column label="密钥" width="130">
-          <template #default="scope">
-            <span v-if="scope.row.api_key">{{ scope.row.api_key }}</span>
-            <el-tag v-else type="danger" size="small">未填写</el-tag>
+              <div class="config-meta">
+                <div class="meta-item">
+                  <span class="meta-label">接口地址</span>
+                  <span class="mono meta-value">{{ scope.row.base_url }}</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">模型名称</span>
+                  <span class="mono meta-value">{{ scope.row.model_name }}</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">服务商</span>
+                  <span class="meta-value">{{ scope.row.provider || '-' }}</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">密钥</span>
+                  <span v-if="scope.row.api_key" class="mono meta-value key-text">{{ scope.row.api_key }}</span>
+                  <el-tag v-else type="danger" size="small">未填写</el-tag>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">温度</span>
+                  <span class="mono meta-value">{{ scope.row.temperature === null ? '-' : scope.row.temperature }}</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">最大Token</span>
+                  <span class="mono meta-value">{{ scope.row.max_tokens || '-' }}</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">更新时间</span>
+                  <span class="meta-value muted">{{ scope.row.update_time }}</span>
+                </div>
+              </div>
+
+              <div class="config-actions">
+                <el-button type="success" link :loading="data.testingId === scope.row.id"
+                           @click="testConnection(scope.row)">测试连通</el-button>
+                <el-button type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
+                <el-button v-if="scope.row.enabled === '是'" type="warning" link
+                           @click="updateEnabled(scope.row, '否')">停用</el-button>
+                <el-button v-else type="success" link @click="updateEnabled(scope.row, '是')">启用</el-button>
+                <el-button type="danger" link @click="del(scope.row)">删除</el-button>
+              </div>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="温度" width="70">
-          <template #default="scope">{{ scope.row.temperature === null ? '-' : scope.row.temperature }}</template>
-        </el-table-column>
-        <el-table-column label="最大Token" width="95">
-          <template #default="scope">{{ scope.row.max_tokens || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="启用状态" width="95">
-          <template #default="scope">
-            <el-tag :type="scope.row.enabled === '是' ? 'success' : 'info'">
-              {{ scope.row.enabled === '是' ? '已启用' : '已停用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="update_time" label="更新时间" width="170" />
-        <el-table-column label="操作" width="260" fixed="right">
-          <template #default="scope">
-            <el-button type="success" link :loading="data.testingId === scope.row.id"
-                       @click="testConnection(scope.row)">测试连通</el-button>
-            <el-button type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button v-if="scope.row.enabled === '是'" type="warning" link
-                       @click="updateEnabled(scope.row, '否')">停用</el-button>
-            <el-button v-else type="success" link @click="updateEnabled(scope.row, '是')">启用</el-button>
-            <el-button type="danger" link @click="del(scope.row)">删除</el-button>
-          </template>
-        </el-table-column>
+        <template #empty>
+          <div class="empty-card">
+            <div class="empty-title">还没有模型配置</div>
+            <div class="empty-desc">点右上角「新增配置」，为调度、画像、筛选、审核四个用途各配一条。</div>
+          </div>
+        </template>
       </el-table>
       <!-- 这一页的配置改完立刻生效，所以把几条容易踩的规则在页面上说清楚 -->
       <div class="table-tip">
@@ -63,71 +97,85 @@
         用途有调度、画像、筛选、审核四个，分别给合租管家、画像师、筛选官、审核官用。
         「测试连通」会用这里保存的配置真实调一次模型，让它回一个字。
       </div>
+      <div class="pager-card card" v-if="data.total">
+        <el-pagination
+            v-model:current-page="data.pageNum"
+            background
+            layout="prev, pager, next, total"
+            :page-size="data.pageSize"
+            :total="data.total"
+            @current-change="load"
+        />
+      </div>
     </div>
 
-    <div class="card" v-if="data.total">
-      <el-pagination
-          v-model:current-page="data.pageNum"
-          background
-          layout="prev, pager, next"
-          :page-size="data.pageSize"
-          :total="data.total"
-          @current-change="load"
-      />
-    </div>
+    <el-dialog title="AI 模型配置" v-model="data.formVisible" width="680px" destroy-on-close>
+      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="120px" class="dialog-form">
+        <div class="soft-panel form-group">
+          <div class="section-title">基本信息</div>
+          <el-form-item prop="name" label="配置名称">
+            <el-input v-model="data.form.name" maxlength="255"
+                      placeholder="例如：画像提取模型"></el-input>
+          </el-form-item>
+          <el-form-item prop="model_purpose" label="模型用途">
+            <el-select v-model="data.form.model_purpose" style="width: 240px" placeholder="请选择用途">
+              <el-option v-for="item in data.purposes" :key="item" :label="item" :value="item"></el-option>
+            </el-select>
+            <span class="inline-tip">一个用途只有一条启用中的配置</span>
+          </el-form-item>
+          <el-form-item label="模型服务商">
+            <el-select v-model="data.form.provider" filterable allow-create clearable
+                       style="width: 240px" placeholder="选择常用服务商，也可以直接输入"
+                       @change="onProviderChange">
+              <el-option label="DeepSeek" value="DeepSeek"></el-option>
+              <el-option label="通义千问" value="通义千问"></el-option>
+            </el-select>
+          </el-form-item>
+        </div>
 
-    <el-dialog title="AI 模型配置" v-model="data.formVisible" width="620px" destroy-on-close>
-      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="110px">
-        <el-form-item prop="name" label="配置名称">
-          <el-input v-model="data.form.name" maxlength="255"
-                    placeholder="例如：画像提取模型"></el-input>
-        </el-form-item>
-        <el-form-item prop="model_purpose" label="模型用途">
-          <el-select v-model="data.form.model_purpose" style="width: 240px" placeholder="请选择用途">
-            <el-option v-for="item in data.purposes" :key="item" :label="item" :value="item"></el-option>
-          </el-select>
-          <span class="field-tip">一个用途只有一条启用中的配置</span>
-        </el-form-item>
-        <el-form-item label="模型服务商">
-          <el-select v-model="data.form.provider" filterable allow-create clearable
-                     style="width: 240px" placeholder="选择常用服务商，也可以直接输入"
-                     @change="onProviderChange">
-            <el-option label="DeepSeek" value="DeepSeek"></el-option>
-            <el-option label="通义千问" value="通义千问"></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item prop="base_url" label="接口地址">
-          <el-input v-model="data.form.base_url" maxlength="500"
-                    placeholder="OpenAI 兼容地址，例如 https://api.deepseek.com/v1"></el-input>
-        </el-form-item>
-        <el-form-item label="API Key">
-          <el-input v-model="data.form.api_key" type="password" show-password maxlength="500"
-                    placeholder="留空表示不修改，列表里只会显示脱敏后的密钥"></el-input>
-        </el-form-item>
-        <el-form-item prop="model_name" label="模型名称">
-          <el-input v-model="data.form.model_name" maxlength="255"
-                    placeholder="例如：deepseek-chat"></el-input>
-        </el-form-item>
-        <el-form-item label="温度">
-          <el-input-number v-model="data.form.temperature" :min="0" :max="2" :step="0.1"
-                           :precision="2" controls-position="right" style="width: 160px"></el-input-number>
-          <span class="field-tip">0 到 2，留空用服务端默认值；调度、筛选、审核建议 0</span>
-        </el-form-item>
-        <el-form-item label="最大输出Token">
-          <el-input-number v-model="data.form.max_tokens" :min="1" :max="32768" :precision="0"
-                           controls-position="right" style="width: 160px"></el-input-number>
-          <span class="field-tip">留空用服务端默认值</span>
-        </el-form-item>
-        <el-form-item label="启用状态">
-          <el-radio-group v-model="data.form.enabled">
-            <el-radio value="是">启用</el-radio>
-            <el-radio value="否">停用</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="data.form.remark" type="textarea" :rows="2" maxlength="500"
-                    placeholder="说明这条配置用在哪一步"></el-input>
-        </el-form-item>
+        <div class="soft-panel form-group">
+          <div class="section-title">连接配置</div>
+          <el-form-item prop="base_url" label="接口地址">
+            <el-input v-model="data.form.base_url" maxlength="500"
+                      placeholder="OpenAI 兼容地址，例如 https://api.deepseek.com/v1"></el-input>
+          </el-form-item>
+          <el-form-item label="API Key">
+            <el-input v-model="data.form.api_key" type="password" show-password maxlength="500"
+                      placeholder="留空表示不修改，列表里只会显示脱敏后的密钥"></el-input>
+          </el-form-item>
+          <el-form-item prop="model_name" label="模型名称">
+            <el-input v-model="data.form.model_name" maxlength="255"
+                      placeholder="例如：deepseek-chat"></el-input>
+          </el-form-item>
+        </div>
+
+        <div class="soft-panel form-group">
+          <div class="section-title">生成参数</div>
+          <el-form-item label="温度">
+            <el-input-number v-model="data.form.temperature" :min="0" :max="2" :step="0.1"
+                             :precision="2" controls-position="right" style="width: 160px"></el-input-number>
+            <span class="inline-tip">0 到 2，留空用服务端默认值；调度、筛选、审核建议 0</span>
+          </el-form-item>
+          <el-form-item label="最大输出Token">
+            <el-input-number v-model="data.form.max_tokens" :min="1" :max="32768" :precision="0"
+                             controls-position="right" style="width: 160px"></el-input-number>
+            <span class="inline-tip">留空用服务端默认值</span>
+          </el-form-item>
+        </div>
+
+        <div class="soft-panel form-group">
+          <div class="section-title">状态与备注</div>
+          <el-form-item label="启用状态">
+            <el-radio-group v-model="data.form.enabled">
+              <el-radio value="是">启用</el-radio>
+              <el-radio value="否">停用</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="备注">
+            <el-input v-model="data.form.remark" type="textarea" :rows="2" maxlength="500"
+                      placeholder="说明这条配置用在哪一步"></el-input>
+          </el-form-item>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="data.formVisible = false">取消</el-button>
@@ -336,15 +384,189 @@ load()
 </script>
 
 <style scoped>
-.table-tip {
-  color: #999;
-  font-size: 12px;
-  line-height: 20px;
-  padding: 10px 5px 0;
+/* 配置页：筛选卡 + 一条配置一张卡 */
+.filter-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
-.field-tip {
-  color: #909399;
+
+.filter-input { width: 240px; }
+.filter-select { width: 160px; }
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.config-table-card {
+  padding: 0;
+}
+
+/* 用单列 el-table 承载卡片列表：去掉表头、边框与行底色 */
+.config-table {
+  background: transparent;
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: transparent;
+  --el-table-border-color: transparent;
+}
+
+.config-table :deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+.config-table :deep(td.el-table__cell) {
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+.config-table :deep(tr.el-table__row),
+.config-table :deep(tr.el-table__row:hover > td.el-table__cell) {
+  background: transparent !important;
+}
+
+.config-table :deep(.el-table__empty-block) {
+  background: transparent;
+}
+
+.config-table :deep(.el-table__empty-text) {
+  width: 100%;
+  line-height: 1.6;
+}
+
+.config-table :deep(.empty-card) {
+  width: 100%;
+  margin: 6px 0;
+  padding: 40px 20px;
+}
+
+.config-card {
+  margin-bottom: 12px;
+  padding: 16px 18px;
+  background: var(--pb-surface);
+  border: 1px solid var(--pb-line);
+  border-radius: var(--pb-radius);
+  box-shadow: var(--pb-shadow-card);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.config-card:hover {
+  border-color: rgba(17, 24, 39, 0.12);
+  box-shadow: var(--pb-shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.config-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-name {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--pb-text);
+}
+
+.config-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 20px;
+  margin-top: 12px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.meta-label {
+  flex: none;
   font-size: 12px;
+  color: var(--pb-faint);
+}
+
+.meta-value {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--pb-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.key-text {
+  color: var(--pb-text);
+}
+
+.config-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--pb-line);
+}
+
+.pager-card {
+  margin-top: 4px;
+  padding: 12px 18px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 弹窗内分组 */
+.dialog-form {
+  max-height: 68vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.dialog-form :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.dialog-form :deep(.el-form-item:last-child) {
+  margin-bottom: 4px;
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.inline-tip {
   margin-left: 10px;
+  color: var(--pb-faint);
+  font-size: 12px;
+}
+
+@media (max-width: 1200px) {
+  .config-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .filter-input,
+  .filter-select {
+    width: 100%;
+  }
+
+  .filter-actions {
+    margin-left: 0;
+  }
+
+  .config-meta { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

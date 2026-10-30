@@ -1,5 +1,5 @@
 <template>
-  <div class="main-content">
+  <div class="main-content page-wrap">
     <div class="page-head">
       <div class="page-head-main">
         <h2>候选结果</h2>
@@ -57,13 +57,13 @@
 
         <div class="card block-card">
           <div class="block-title">每一轮筛出来的结果</div>
-          <el-table :data="data.rounds" stripe class="theme-table">
+          <el-table :data="data.rounds" stripe class="data-table">
             <el-table-column label="轮次" width="90">
               <template #default="scope">第 {{ scope.row.round }} 轮</template>
             </el-table-column>
             <el-table-column label="这一轮的放宽说明" width="220">
               <template #default="scope">
-                <span v-if="scope.row.relax_note">{{ scope.row.relax_note }}</span>
+                <span v-if="scope.row.relax_note" class="chip chip-amber">{{ scope.row.relax_note }}</span>
                 <span v-else class="muted">未放宽</span>
               </template>
             </el-table-column>
@@ -80,7 +80,7 @@
 
         <div class="card block-card">
           <div class="block-title">候选名单</div>
-          <el-table :data="data.candidates" stripe class="theme-table">
+          <el-table :data="data.candidates" stripe class="data-table">
             <el-table-column prop="nickname" label="昵称" width="120">
               <template #default="scope">{{ scope.row.nickname || '档案已查不到' }}</template>
             </el-table-column>
@@ -98,12 +98,20 @@
             </el-table-column>
             <el-table-column label="放宽说明" width="150">
               <template #default="scope">
-                <span v-if="scope.row.relax_note">{{ scope.row.relax_note }}</span>
+                <span v-if="scope.row.relax_note" class="chip chip-amber">{{ scope.row.relax_note }}</span>
                 <span v-else class="muted">未放宽</span>
               </template>
             </el-table-column>
-            <el-table-column prop="screen_score" label="初筛得分" width="100"/>
-            <el-table-column prop="audit_status" label="审核状态" width="100"/>
+            <el-table-column label="初筛得分" width="100">
+              <template #default="scope"><b class="score-text">{{ scope.row.screen_score }}</b></template>
+            </el-table-column>
+            <el-table-column label="审核状态" width="100">
+              <template #default="scope">
+                <el-tag :type="scope.row.audit_status === '通过' ? 'success' : (scope.row.audit_status === '否决' ? 'danger' : 'info')" size="small">
+                  {{ scope.row.audit_status }}
+                </el-tag>
+              </template>
+            </el-table-column>
             <el-table-column label="操作" width="90">
               <template #default="scope">
                 <el-button link type="primary" @click="showDetail(scope.row)">查看</el-button>
@@ -121,42 +129,44 @@
       <template v-if="data.detail">
         <div class="detail-head">
           <span class="detail-name">{{ data.detail.nickname || '档案已查不到' }}</span>
-          <span class="round-chip">第 {{ data.detail.found_round }} 轮筛出</span>
-          <span v-if="data.detail.relax_note" class="round-chip is-warn">
+          <span class="chip chip-blue">第 {{ data.detail.found_round }} 轮筛出</span>
+          <span v-if="data.detail.relax_note" class="chip chip-amber">
             放宽了 {{ data.detail.relax_note }}
           </span>
         </div>
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="性别">{{ data.detail.gender || '未填' }}</el-descriptions-item>
-          <el-descriptions-item label="年龄">
-            {{ data.detail.age ? data.detail.age + ' 岁' : '未填' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="职业">{{ data.detail.occupation || '未填' }}</el-descriptions-item>
-          <el-descriptions-item label="意向门店">
-            {{ data.detail.store ? data.detail.store + '（' + data.detail.area + '片区）' : '未填' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="月租预算">
-            {{ data.detail.rent_budget ? data.detail.rent_budget + ' 元' : '未填' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="计划租期">{{ data.detail.lease_term || '未填' }}</el-descriptions-item>
-          <el-descriptions-item label="作息">{{ data.detail.schedule_type || '未填' }}</el-descriptions-item>
-          <el-descriptions-item label="整洁度">{{ data.detail.tidiness || '未填' }}</el-descriptions-item>
-          <el-descriptions-item label="是否养宠">{{ data.detail.has_pet || '未填' }}</el-descriptions-item>
-          <el-descriptions-item label="是否吸烟">{{ data.detail.smoking || '未填' }}</el-descriptions-item>
-        </el-descriptions>
+        <div class="detail-panel">
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="性别">{{ data.detail.gender || '未填' }}</el-descriptions-item>
+            <el-descriptions-item label="年龄">
+              {{ data.detail.age ? data.detail.age + ' 岁' : '未填' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="职业">{{ data.detail.occupation || '未填' }}</el-descriptions-item>
+            <el-descriptions-item label="意向门店">
+              {{ data.detail.store ? data.detail.store + '（' + data.detail.area + '片区）' : '未填' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="月租预算">
+              {{ data.detail.rent_budget ? data.detail.rent_budget + ' 元' : '未填' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="计划租期">{{ data.detail.lease_term || '未填' }}</el-descriptions-item>
+            <el-descriptions-item label="作息">{{ data.detail.schedule_type || '未填' }}</el-descriptions-item>
+            <el-descriptions-item label="整洁度">{{ data.detail.tidiness || '未填' }}</el-descriptions-item>
+            <el-descriptions-item label="是否养宠">{{ data.detail.has_pet || '未填' }}</el-descriptions-item>
+            <el-descriptions-item label="是否吸烟">{{ data.detail.smoking || '未填' }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
         <div class="detail-block">
-          <div class="tag-label">兴趣标签</div>
+          <div class="section-title">兴趣标签</div>
           <div class="tag-list">
             <span class="tag-chip" v-for="tag in data.detail.interest_tags || []" :key="tag">{{ tag }}</span>
             <span v-if="!(data.detail.interest_tags || []).length" class="tag-empty">这位租客还没有选兴趣标签</span>
           </div>
         </div>
         <div class="detail-block">
-          <div class="tag-label">自我介绍</div>
+          <div class="section-title">自我介绍</div>
           <div class="summary-box">{{ data.detail.self_intro || '（没有填）' }}</div>
         </div>
         <div class="detail-block">
-          <div class="tag-label">室友期望</div>
+          <div class="section-title">室友期望</div>
           <div class="summary-box">{{ data.detail.roommate_expectation || '（没有填）' }}</div>
         </div>
       </template>
@@ -229,246 +239,82 @@ load()
 </script>
 
 <style scoped>
-.main-content {
-  padding-bottom: 10px;
-  --el-color-primary: #1F6F6B;
-  --el-color-primary-light-3: #4F8F8A;
-  --el-color-primary-light-5: #84B5B2;
-  --el-color-primary-light-7: #A9CFCB;
-  --el-color-primary-light-8: #C4DCDA;
-  --el-color-primary-light-9: #EFF6F5;
-  --el-color-primary-dark-2: #24625E;
-}
-.loading-card {
-  min-height: 180px;
-  margin-top: 12px;
-}
+.page-wrap > .page-head { margin: 0; }
+.page-wrap > .card { margin-top: 0; }
 
-/* 卡片标题统一加粗，不加任何装饰线条 */
-.block-card {
-  margin-top: 12px;
-  padding: 20px 24px 22px;
-}
-.block-title {
-  font-size: 16px;
-  font-weight: bold;
-  line-height: 20px;
-  color: #333;
-}
-.block-card .el-alert {
-  margin-top: 14px;
-}
-.go-action {
-  padding-top: 16px;
-}
+.loading-card { min-height: 200px; }
+.go-action { margin-top: 16px; }
 
-/* 前置条件逐条列出，满足和没满足用两套底色区分 */
-.check-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background-color: #fafafa;
-  font-size: 13px;
-}
-.check-icon {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-}
-.check-icon.is-ok {
-  color: #67c23a;
-  background-color: rgba(103, 194, 58, .12);
-}
-.check-icon.is-warn {
-  color: #e6a23c;
-  background-color: rgba(230, 162, 60, .16);
-}
-.check-label {
-  flex: none;
-  width: 100px;
-  color: #666;
-}
-.check-message {
-  color: #666;
-  line-height: 20px;
-}
-.warn-text {
-  color: #e6a23c;
-}
-
-/* 一次都没筛过时给一块带图标的空状态，比一行灰字更像一个能动手的地方 */
-.empty-card {
-  margin-top: 12px;
-  padding: 28px 24px 32px;
-  text-align: center;
-}
-.empty-icon {
-  width: 52px;
-  height: 52px;
-  margin: 0 auto 12px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: #1F6F6B;
-  background-color: rgba(31, 111, 107, .1);
-}
-.empty-title {
-  font-size: 15px;
-  font-weight: bold;
-  color: #333;
-}
-.empty-desc {
-  margin-top: 6px;
-  font-size: 13px;
-  line-height: 22px;
-  color: #999;
-}
-
-/* 任务卡：任务号做成主题色胶囊，跟右边的发起时间拉开主次 */
+/* 任务卡：任务号胶囊 + 时间靠右 */
 .task-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  margin-top: 16px;
-  padding-bottom: 12px;
+  margin-top: 14px;
 }
 .task-badge {
   flex: none;
   padding: 3px 12px;
   border-radius: 999px;
-  font-size: 13px;
-  font-weight: bold;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
   color: #fff;
-  background: linear-gradient(120deg, #1F6F6B 0%, #2F8A84 100%);
+  background: linear-gradient(120deg, #60a5fa, #2563eb);
 }
-.task-time {
-  color: #999;
-  font-size: 12px;
-  margin-left: auto;
-}
+.task-time { margin-left: auto; font-size: 12px; color: var(--pb-faint); }
 .task-line {
-  color: #333;
+  padding: 12px 0;
   font-size: 13px;
-  line-height: 24px;
-  padding-bottom: 4px;
+  line-height: 1.85;
+  color: rgba(17, 24, 39, 0.78);
 }
-.muted {
-  color: #bbb;
+.block-card .el-alert { margin-top: 12px; }
+
+.data-table { margin-top: 12px; }
+
+/* 初筛得分是参考分，用等宽数字强调一下 */
+.score-text {
+  font-family: var(--pb-mono);
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--pb-text);
 }
 
-/* 两张表跟着主题色走：表头浅底色，表头字用主题色 */
-.theme-table {
-  margin-top: 14px;
-  --el-table-header-bg-color: #F5FAF9;
-  --el-table-header-text-color: #1F6F6B;
-  --el-table-row-hover-bg-color: #F2F8F7;
-}
-.table-tip {
-  color: #999;
-  font-size: 12px;
-  line-height: 20px;
-  padding-top: 10px;
-}
-
-/* 详情弹窗：谁、哪一轮进来、放宽了什么，一行读完 */
+/* 详情弹窗 */
 .detail-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  padding-bottom: 16px;
+  padding: 2px 0 4px;
 }
-.detail-name {
-  font-size: 16px;
-  font-weight: bold;
-  color: #333;
-}
-.round-chip {
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 18px;
-  color: #1F6F6B;
-  border: 1px solid #D5E8E6;
-  background-color: rgba(31, 111, 107, .08);
-}
-.round-chip.is-warn {
-  color: #b7791f;
-  border-color: #f3e0bd;
-  background-color: #fdf6e8;
-}
-.detail-block {
-  padding-top: 16px;
-}
-.tag-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #666;
-  font-size: 13px;
-  padding-bottom: 8px;
-}
-.tag-label::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: #1F6F6B;
-}
+.detail-name { font-size: 16px; font-weight: 650; color: var(--pb-text); }
+.detail-panel { margin-top: 12px; }
+.detail-block { margin-top: 16px; }
+.detail-block .section-title { margin-bottom: 8px; }
+
 .tag-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 .tag-chip {
-  padding: 4px 14px;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 13px;
   border-radius: 999px;
-  font-size: 13px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: var(--pb-brand-soft);
+  color: var(--pb-brand);
+  font-size: 12.5px;
+  font-weight: 500;
   line-height: 18px;
-  color: #1F6F6B;
-  border: 1px solid #D5E8E6;
-  background-color: rgba(31, 111, 107, .08);
 }
-.tag-empty {
-  color: #bbb;
-  font-size: 13px;
-}
-/* 自我介绍和室友期望单独抬成一块底色，跟上面的资料表拉开层次 */
-.summary-box {
-  padding: 14px 16px;
-  border-radius: 8px;
-  border: 1px solid #DFECEB;
-  background-color: rgba(31, 111, 107, .05);
-  color: #333;
-  font-size: 13px;
-  line-height: 24px;
-  white-space: pre-wrap;
-}
+.tag-empty { font-size: 12.5px; color: var(--pb-faint); }
 
-/* 弹窗挂在 body 上渲染，主题色变量要按它自己的类名给，
-   写在 .main-content 上的页面作用域盖不到 */
-:global(.candidate-dialog) {
-  --el-color-primary: #1F6F6B;
-  --el-color-primary-light-3: #4F8F8A;
-  --el-color-primary-light-5: #84B5B2;
-  --el-color-primary-light-7: #A9CFCB;
-  --el-color-primary-light-8: #C4DCDA;
-  --el-color-primary-light-9: #EFF6F5;
-  --el-color-primary-dark-2: #24625E;
+@media (max-width: 768px) {
+  .task-time { margin-left: 0; }
 }
-/* 资料表的表头底色跟着主题色走；这个变量 Element Plus 挂在自己的 .el-descriptions 上，
-   写在弹窗根节点上会被它盖掉，所以要直接给到 .el-descriptions */
-:global(.candidate-dialog .el-descriptions) {
-  --el-descriptions-item-bordered-label-background: #F5FAF9;
-}
-
 </style>

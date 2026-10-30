@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="pb-mark" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#60A5FA"/>
+      <stop offset="0.55" stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#1E40AF"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="17" fill="url(#pb-mark)"/>
+  <path d="M17 31.5 32 19l15 12.5" fill="none" stroke="#FFFFFF" stroke-width="3.6"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M22 30.5V45h20V30.5" fill="none" stroke="#FFFFFF" stroke-width="3.6"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="32" cy="38" r="3.2" fill="#BFDBFE"/>
+</svg>

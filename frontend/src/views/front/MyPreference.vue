@@ -1,5 +1,5 @@
 <template>
-  <div class="main-content">
+  <div class="main-content page-wrap">
     <!-- 页头：说清「必须」和「加分」的区别；右侧实时显示「必须」项数量，多了少了当场说，不用等保存才报错 -->
     <div class="page-head with-action">
       <div class="page-head-main">
@@ -40,6 +40,9 @@
 
     <div class="card form-card" v-if="data.hasProfile">
       <div class="block-title">七个维度</div>
+      <p class="form-tip dimension-tip">
+        每个维度都可以标「必须」或「加分」：「必须」项筛选时不会被放宽，「加分」项在候选不够时可以被筛选官放宽。
+      </p>
       <el-form ref="formRef" :model="data.form" :rules="data.rules">
         <div class="dim-grid">
           <el-form-item prop="age_min" class="dim-card" :class="dimClass('age')">
@@ -171,8 +174,8 @@
         </div>
       </el-form>
       <div class="form-actions">
-        <el-button type="primary" @click="save">保存偏好</el-button>
-        <el-button @click="loadPreference">重新加载</el-button>
+        <el-button type="primary" size="large" class="save-btn" @click="save">保存偏好</el-button>
+        <el-button size="large" @click="loadPreference">重新加载</el-button>
       </div>
     </div>
   </div>
@@ -369,104 +372,86 @@ load()
 </script>
 
 <style scoped>
-/* .main-content 的宽度和留白在 front.css 里，这里只补底部留白 */
-/* Element Plus 自带一套蓝色主色，按钮、输入框聚焦、下拉高亮都会露出蓝色，
-   这里把主色和它的深浅梯度一起换成主题色，页面里才不会掺进第二种颜色 */
-.main-content {
-  padding-bottom: 10px;
-  --el-color-primary: #1F6F6B;
-  --el-color-primary-light-3: #4F8F8A;
-  --el-color-primary-light-5: #84B5B2;
-  --el-color-primary-light-7: #A9CFCB;
-  --el-color-primary-light-8: #C4DCDA;
-  --el-color-primary-light-9: #EFF6F5;
-  --el-color-primary-dark-2: #24625E;
-}
+.page-wrap > .page-head { margin: 0; }
+.page-wrap > .card { margin-top: 0; }
 
-/* 页头右侧的「必须」项计数：数量对了显示绿色，多了少了显示红色，保存前就能看到 */
+/* 页头右侧的「必须」项计数：做成一块状态说明药丸，数量对了绿、多了少了红 */
 .must-count {
-  font-size: 13px;
-  line-height: 20px;
+  display: inline-block;
+  max-width: 540px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--pb-line);
+  background: var(--pb-surface);
+  font-size: 12.5px;
+  line-height: 1.75;
 }
-.must-count b {
-  font-size: 16px;
-}
+.must-count b { font-size: 15px; font-weight: 700; }
 .must-count.is-ok {
-  color: #67c23a;
+  border-color: rgba(16, 185, 129, 0.24);
+  background: var(--pb-ok-soft);
+  color: #065f46;
 }
 .must-count.is-bad {
-  color: #d94a5f;
+  border-color: rgba(239, 68, 68, 0.24);
+  background: var(--pb-danger-soft);
+  color: #991b1b;
 }
 
-.empty-card {
-  margin-top: 12px;
-  padding: 20px 24px 24px;
-}
-.go-profile {
-  padding-top: 16px;
-}
+.go-profile { margin-top: 16px; }
 
-/* 标了「必须」却没起到筛人作用时单独铺一条提醒，颜色比正文重一点 */
+/* 标了「必须」却没起到筛人作用时单独铺一条琥珀提醒 */
 .warn-strip {
   display: flex;
   gap: 10px;
-  margin-top: 12px;
   padding: 12px 16px;
-  border: 1px solid #DDF0EF;
-  border-radius: 10px;
-  background-color: #F7FDFD;
+  border: 1px solid rgba(245, 158, 11, 0.26);
+  border-radius: var(--pb-radius);
+  background: var(--pb-warn-soft);
+  color: #92400e;
   font-size: 13px;
-  color: #2A7F7A;
+  line-height: 1.8;
 }
 .warn-icon {
   flex: none;
   margin-top: 4px;
-  color: #7FC4BF;
+  font-size: 16px;
+  color: var(--pb-warn);
 }
-.warn-text {
-  line-height: 22px;
-}
+.warn-text { min-width: 0; }
 
 .form-card {
-  margin-top: 12px;
-  padding: 20px 24px 24px;
+  padding: 22px 26px 26px;
+}
+.dimension-tip {
+  margin: -2px 0 18px;
+  color: var(--pb-muted);
 }
 
-/* 卡片标题统一加粗，不加任何装饰线条 */
-.block-title {
-  margin-bottom: 14px;
-  font-size: 16px;
-  font-weight: bold;
-  line-height: 20px;
-  color: #333;
-}
-
-/* 七个维度两列铺开，窄屏下退回一列 */
+/* 七个维度两列铺开，窄屏退成一列 */
 .dim-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
-
-/* 每个维度一张卡片，边框和底色跟着「必须 / 加分」变化，宽度和其它卡片一致 */
 .el-form-item.dim-card {
   position: relative;
   overflow: hidden;
   margin-bottom: 0;
-  padding: 14px 16px 18px;
-  border: 1px solid #DFECEB;
-  border-radius: 10px;
-  background-color: #fff;
-  transition: border-color .2s, box-shadow .2s;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--pb-line);
+  border-radius: var(--pb-radius);
+  background: var(--pb-surface);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 .el-form-item.dim-card:hover {
-  border-color: #CDE3E1;
-  box-shadow: 0 6px 16px rgba(31, 111, 107, .1);
+  border-color: rgba(37, 99, 235, 0.24);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.07);
 }
-
 .el-form-item.dim-card.is-must {
-  border-color: #CDE3E1;
-  background-color: #FAFDFD;
+  border-color: rgba(37, 99, 235, 0.32);
+  background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.05);
 }
 
 .dim-head {
@@ -474,37 +459,37 @@ load()
   align-items: center;
   gap: 10px;
   width: 100%;
-  line-height: 20px;
 }
 .dim-icon {
   flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
-  color: #1F6F6B;
-  background-color: rgba(31, 111, 107, .1);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 16px;
+  color: var(--pb-brand);
+  background: var(--pb-brand-soft);
 }
 .dim-name {
   flex: 1;
   min-width: 0;
-  font-size: 15px;
-  font-weight: bold;
-  color: #333;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--pb-text);
 }
-/* 选中「必须」铺主题色、选中「加分」铺浅一档的底色配深色字，和卡片边框是同一个含义。
-   这几个变量 Element Plus 定义在按钮自己身上，覆盖要落在 .el-radio-button 上才生效 */
-.dim-card.is-must .el-radio-button {
-  --el-radio-button-checked-bg-color: #1F6F6B;
-  --el-radio-button-checked-border-color: #1F6F6B;
+.dim-required { flex: none; }
+
+/* 「必须」用品牌蓝、「加分」用中性灰，和卡片边框是同一个含义 */
+.el-form-item.dim-card.is-must .el-radio-button {
+  --el-radio-button-checked-bg-color: var(--pb-brand);
+  --el-radio-button-checked-border-color: var(--pb-brand);
 }
-.dim-card.is-bonus .el-radio-button {
-  --el-radio-button-checked-bg-color: #DFECEB;
-  --el-radio-button-checked-border-color: #C9DDDC;
-  --el-radio-button-checked-text-color: #2A7F7A;
+.el-form-item.dim-card.is-bonus .el-radio-button {
+  --el-radio-button-checked-bg-color: var(--pb-surface-3);
+  --el-radio-button-checked-border-color: var(--pb-line-strong);
+  --el-radio-button-checked-text-color: var(--pb-muted);
 }
 
 .dim-body {
@@ -513,40 +498,41 @@ load()
   flex-wrap: wrap;
   gap: 8px;
   width: 100%;
-  margin-top: 12px;
-  line-height: 20px;
+  margin-top: 14px;
 }
-.num {
-  width: 108px;
-}
-.fill {
-  width: 100%;
-}
+.num { width: 110px; }
+.fill { width: 100%; }
 .dim-sep,
 .dim-unit {
-  color: #999;
+  font-size: 12.5px;
+  color: var(--pb-faint);
 }
 .dim-tip {
   width: 100%;
-  margin-top: 10px;
+  margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid #E4F0EF;
-  color: #999;
+  border-top: 1px dashed var(--pb-line);
   font-size: 12px;
-  line-height: 20px;
+  line-height: 1.75;
+  color: var(--pb-faint);
 }
 
 .form-actions {
-  margin-top: 18px;
-  padding-top: 18px;
-  border-top: 1px solid #DFECEB;
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--pb-line);
 }
+.save-btn { min-width: 160px; }
 
-/* 窄屏下卡片退回一列，两个输入框并排会把区间挤得看不出来 */
 @media (max-width: 1100px) {
-  .dim-grid {
-    grid-template-columns: 1fr;
-  }
+  .dim-grid { grid-template-columns: 1fr; }
+  .form-card { padding: 18px 16px 20px; }
+}
+@media (max-width: 768px) {
+  .dim-required { margin-left: 0; }
+  .dim-head { flex-wrap: wrap; }
 }
 </style>

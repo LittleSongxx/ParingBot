@@ -1,36 +1,46 @@
 <template>
-  <div style="width: 50%" class="card">
-    <div class="section-title">个人资料</div>
-    <el-form ref="formRef" :rules="data.rules" :model="data.user" label-width="70px" style="padding: 10px 20px 20px">
-      <el-form-item prop="avatar" label="头像">
-        <el-upload
-            :action="baseUrl + '/files/upload'"
-            :headers="uploadHeaders"
-            :before-upload="beforeUpload"
-            :on-success="handleUploadSuccess"
-            :on-error="handleUploadError"
-            :show-file-list="false"
-            class="avatar-uploader"
-        >
-          <NameAvatar :name="data.user.name" :src="data.user.avatar" :size="120" />
-        </el-upload>
-      </el-form-item>
-      <el-form-item prop="username" label="账号">
-        <el-input disabled v-model="data.user.username" placeholder="请输入账号"></el-input>
-      </el-form-item>
-      <el-form-item prop="name" label="姓名">
-        <el-input v-model="data.user.name" placeholder="请输入姓名"></el-input>
-      </el-form-item>
-      <el-form-item prop="phone" label="电话">
-        <el-input v-model="data.user.phone" placeholder="请输入 11 位手机号"></el-input>
-      </el-form-item>
-      <el-form-item prop="email" label="邮箱">
-        <el-input v-model="data.user.email" placeholder="请输入邮箱"></el-input>
-      </el-form-item>
-      <div style="text-align: center">
-        <el-button type="primary" @click="update">保 存</el-button>
-      </div>
-    </el-form>
+  <div class="page-wrap">
+    <div class="page-head">
+      <h2>个人资料</h2>
+      <p class="page-tip">维护当前登录账号的头像、姓名与联系方式，保存后右上角的个人信息会同步更新。</p>
+    </div>
+
+    <div class="card narrow-card">
+      <div class="block-title">基本信息</div>
+      <el-form ref="formRef" :rules="data.rules" :model="data.user" label-width="70px" class="narrow-form">
+        <el-form-item prop="avatar" label="头像">
+          <div class="avatar-wrap">
+            <el-upload
+                :action="baseUrl + '/files/upload'"
+                :headers="uploadHeaders"
+                :before-upload="beforeUpload"
+                :on-success="handleUploadSuccess"
+                :on-error="handleUploadError"
+                :show-file-list="false"
+                class="avatar-uploader"
+            >
+              <NameAvatar :name="data.user.name" :src="data.user.avatar" :size="120" />
+            </el-upload>
+            <div class="form-tip">点击头像上传新图片，支持 jpg / png，大小不超过 2MB，保存后生效。</div>
+          </div>
+        </el-form-item>
+        <el-form-item prop="username" label="账号">
+          <el-input disabled v-model="data.user.username" placeholder="请输入账号"></el-input>
+        </el-form-item>
+        <el-form-item prop="name" label="姓名">
+          <el-input v-model="data.user.name" placeholder="请输入姓名"></el-input>
+        </el-form-item>
+        <el-form-item prop="phone" label="电话">
+          <el-input v-model="data.user.phone" placeholder="请输入 11 位手机号"></el-input>
+        </el-form-item>
+        <el-form-item prop="email" label="邮箱">
+          <el-input v-model="data.user.email" placeholder="请输入邮箱"></el-input>
+        </el-form-item>
+        <div class="form-actions">
+          <el-button type="primary" @click="update">保 存</el-button>
+        </div>
+      </el-form>
+    </div>
   </div>
 </template>
 
@@ -109,23 +119,51 @@ const update = () => {
 </script>
 
 <style scoped>
-.section-title {
-  font-weight: bold;
-  font-size: 18px;
-  padding: 16px 0 10px 20px;
+/* 个人资料：居中窄卡片，头像与表单同一列对齐 */
+.narrow-card {
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
 }
-.avatar-uploader {
-  height: 120px;
+
+.narrow-form {
+  padding: 4px 4px 0;
 }
-.avatar-uploader .el-upload {
-  border: 1px dashed var(--el-border-color);
-  border-radius: 50%;
+
+.narrow-form :deep(.el-form-item) {
+  margin-bottom: 20px;
+}
+
+.avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.avatar-uploader :deep(.el-upload) {
+  display: block;
+  padding: 6px;
+  border: 1px dashed var(--pb-line-strong);
+  border-radius: 18px;
+  background: var(--pb-surface-2);
   cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: var(--el-transition-duration-fast);
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
-.avatar-uploader .el-upload:hover {
-  border-color: var(--el-color-primary);
+
+.avatar-uploader :deep(.el-upload):hover {
+  border-color: var(--pb-brand);
+  background: var(--pb-brand-soft);
+  box-shadow: var(--pb-glow);
+}
+
+.avatar-wrap .form-tip {
+  margin-top: 0;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
 }
 </style>

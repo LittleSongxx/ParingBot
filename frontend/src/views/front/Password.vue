@@ -1,10 +1,17 @@
 <template>
-  <div class="main-content">
-    <div class="card password-card">
-      <div class="section-title">修改密码</div>
+  <div class="main-content page-wrap">
+    <div class="page-head narrow-head">
+      <div class="page-head-main">
+        <h2>修改密码</h2>
+        <p class="page-tip">定期更换密码，可以更好地保护账号与你填写的档案信息。</p>
+      </div>
+    </div>
+
+    <div class="card narrow-card">
+      <div class="block-title">账号安全</div>
       <el-alert class="password-tip" type="info" :closable="false" show-icon
                 title="保存成功后当前登录会退出，需要用新密码重新登录。"></el-alert>
-      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="80px">
+      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="88px">
         <el-form-item label="原密码" prop="password">
           <el-input v-model="data.form.password" placeholder="请输入原密码" show-password></el-input>
         </el-form-item>
@@ -15,8 +22,9 @@
           <el-input v-model="data.form.confirmPassword" placeholder="请再输入一次新密码" show-password
                     @keyup.enter="updatePassword"></el-input>
         </el-form-item>
-        <div style="text-align: center">
-          <el-button type="primary" :loading="data.loading" @click="updatePassword">保 存</el-button>
+        <div class="form-actions">
+          <el-button type="primary" size="large" :loading="data.loading" class="submit-btn"
+                     @click="updatePassword">保 存</el-button>
         </div>
       </el-form>
     </div>
@@ -98,18 +106,38 @@ const updatePassword = () => {
 </script>
 
 <style scoped>
-.password-card {
-  width: 60%;
-  margin: 0 auto;
-  padding: 20px 30px 30px;
+/* 页头与卡片收在同一个窄列里，居中排版 */
+.page-wrap > .page-head { margin-bottom: 0; }
+.page-wrap > .card { margin-top: 0; }
+
+.narrow-head,
+.narrow-card {
+  width: 100%;
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
 }
-.section-title {
-  font-weight: bold;
-  font-size: 18px;
-  padding: 10px 0 20px 10px;
-  color: #1F6F6B;
+
+.narrow-card {
+  padding: 22px 28px 26px;
 }
+
 .password-tip {
-  margin-bottom: 20px;
+  margin: 2px 0 20px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: 6px;
+}
+
+.submit-btn {
+  min-width: 180px;
+}
+
+@media (max-width: 640px) {
+  .narrow-card { padding: 18px 16px 20px; }
+  .submit-btn { width: 100%; }
 }
 </style>

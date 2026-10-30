@@ -1,9 +1,15 @@
 <template>
-  <div class="main-content">
+  <div class="main-content page-wrap">
+    <div class="page-head narrow-head">
+      <div class="page-head-main">
+        <h2>个人资料</h2>
+        <p class="page-tip">这里的信息会展示在你的租客档案与匹配结果里，改完点保存即时生效。</p>
+      </div>
+    </div>
+
     <div class="card person-card">
-      <div class="section-title">个人资料</div>
       <el-form ref="formRef" :rules="data.rules" :model="data.user" label-width="70px">
-        <el-form-item prop="avatar" label="头像">
+        <el-form-item prop="avatar" class="avatar-item">
           <el-upload
               :action="baseUrl + '/files/upload'"
               :headers="uploadHeaders"
@@ -13,7 +19,10 @@
               :show-file-list="false"
               class="avatar-uploader"
           >
-            <NameAvatar :name="data.user.name" :src="data.user.avatar" :size="120" />
+            <div class="avatar-box">
+              <NameAvatar :name="data.user.name" :src="data.user.avatar" :size="120" />
+              <span class="avatar-tip">点击更换头像</span>
+            </div>
           </el-upload>
         </el-form-item>
         <el-form-item prop="username" label="账号">
@@ -28,8 +37,8 @@
         <el-form-item prop="email" label="邮箱">
           <el-input v-model="data.user.email" placeholder="请输入邮箱"></el-input>
         </el-form-item>
-        <div style="text-align: center">
-          <el-button type="primary" @click="update">保 存</el-button>
+        <div class="form-actions">
+          <el-button type="primary" size="large" class="submit-btn" @click="update">保 存</el-button>
         </div>
       </el-form>
     </div>
@@ -112,29 +121,70 @@ const update = () => {
 </script>
 
 <style scoped>
+.page-wrap > .page-head { margin-bottom: 0; }
+.page-wrap > .card { margin-top: 0; }
+
+.narrow-head,
 .person-card {
-  width: 60%;
-  margin: 0 auto;
-  padding: 20px 30px 30px;
+  width: 100%;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
 }
-.section-title {
-  font-weight: bold;
-  font-size: 18px;
-  padding: 10px 0 20px 10px;
-  color: #1F6F6B;
+
+.person-card {
+  padding: 26px 32px 30px;
 }
-.avatar-uploader {
-  height: 120px;
+
+/* 头像单独占一行居中，下面的字段沿用左标签右输入的对齐方式 */
+.avatar-item {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6px;
 }
-.avatar-uploader .el-upload {
-  border: 1px dashed var(--el-border-color);
+.avatar-item :deep(.el-form-item__label) { display: none; }
+.avatar-item :deep(.el-form-item__content) {
+  margin-left: 0 !important;
+  justify-content: center;
+}
+
+.avatar-uploader :deep(.el-upload) {
+  border: 1px dashed var(--pb-line-strong);
   border-radius: 50%;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: var(--el-transition-duration-fast);
+  padding: 5px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.avatar-uploader .el-upload:hover {
-  border-color: var(--el-color-primary);
+.avatar-uploader :deep(.el-upload:hover) {
+  border-color: var(--pb-brand);
+  box-shadow: 0 0 0 5px var(--pb-brand-soft);
+}
+
+.avatar-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar-tip {
+  font-size: 12px;
+  color: var(--pb-muted);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--pb-line);
+}
+
+.submit-btn {
+  min-width: 160px;
+}
+
+@media (max-width: 640px) {
+  .person-card { padding: 20px 16px 22px; }
+  .submit-btn { width: 100%; }
 }
 </style>

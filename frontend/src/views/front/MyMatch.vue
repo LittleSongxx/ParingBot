@@ -1,5 +1,5 @@
 <template>
-  <div class="main-content">
+  <div class="main-content page-wrap">
     <!-- 页头：说清这一步在干什么，右侧是发起入口 -->
     <div class="page-head with-action">
       <div class="page-head-main">
@@ -15,6 +15,7 @@
       <div class="page-head-action">
         <el-button
             type="primary"
+            size="large"
             :loading="data.submitting"
             :disabled="!data.readiness.can_run || isRunning"
             @click="handleRun">{{ isRunning ? '匹配执行中' : '重新智能匹配' }}</el-button>
@@ -84,28 +85,28 @@
             <el-tag :type="statusType(data.task.status)" size="small">{{ data.task.status }}</el-tag>
             <span class="task-time">发起于 {{ data.task.create_time }}</span>
           </div>
+          <div class="metric-grid task-metrics">
+            <div class="metric-tile">
+              <div class="metric-label">候选池</div>
+              <div class="metric-value">{{ data.counts.total }}<small>人</small></div>
+            </div>
+            <div class="metric-tile">
+              <div class="metric-label">已通过</div>
+              <div class="metric-value is-ok">{{ data.counts.passed }}<small>人</small></div>
+            </div>
+            <div class="metric-tile">
+              <div class="metric-label">已否决</div>
+              <div class="metric-value is-warn">{{ data.counts.rejected }}<small>人</small></div>
+            </div>
+            <div class="metric-tile">
+              <div class="metric-label">待审核</div>
+              <div class="metric-value">{{ data.counts.pending }}<small>人</small></div>
+            </div>
+          </div>
           <div class="task-line">
             要求交付 {{ data.task.deliver_count }} 人，实际交付 {{ data.delivered }} 人，
             调度 {{ data.task.total_round }} 轮（上限 {{ data.limits.round_limit }} 轮）。
             交付的人就是审核通过的候选，到【审核结果】里看名单和每一位的审核结论。
-          </div>
-          <div class="count-line">
-            <span class="count-chip">
-              <span class="count-label">候选池</span>
-              <b>{{ data.counts.total }}</b>
-            </span>
-            <span class="count-chip is-ok">
-              <span class="count-label">已通过</span>
-              <b>{{ data.counts.passed }}</b>
-            </span>
-            <span class="count-chip is-warn">
-              <span class="count-label">已否决</span>
-              <b>{{ data.counts.rejected }}</b>
-            </span>
-            <span class="count-chip">
-              <span class="count-label">待审核</span>
-              <b>{{ data.counts.pending }}</b>
-            </span>
           </div>
           <el-alert
               v-if="data.task.error_message"
@@ -134,13 +135,13 @@
 
         <div class="card block-card">
           <div class="block-title">调度过程</div>
-          <el-table :data="data.rounds" stripe class="theme-table">
+          <el-table :data="data.rounds" stripe class="data-table">
             <el-table-column label="轮次" width="80">
               <template #default="scope">第 {{ scope.row.round }} 轮</template>
             </el-table-column>
             <el-table-column label="派给谁" width="160">
               <template #default="scope">
-                <span v-if="scope.row.agent_name" class="agent-chip">{{ scope.row.agent_name }}</span>
+                <span v-if="scope.row.agent_name" class="chip chip-violet">{{ scope.row.agent_name }}</span>
                 <span v-else class="muted">—</span>
               </template>
             </el-table-column>
@@ -174,7 +175,7 @@
 
         <div class="card block-card">
           <div class="block-title">否决分类</div>
-          <el-table :data="data.distribution" stripe class="theme-table">
+          <el-table :data="data.distribution" stripe class="data-table">
             <el-table-column prop="label" label="否决原因" width="280"/>
             <el-table-column label="人数" width="90">
               <template #default="scope">
@@ -183,7 +184,7 @@
             </el-table-column>
             <el-table-column label="下一步怎么办" show-overflow-tooltip>
               <template #default="scope">
-                <span class="next-chip">{{ scope.row.solution }}</span>
+                <span class="chip chip-blue">{{ scope.row.solution }}</span>
               </template>
             </el-table-column>
           </el-table>
@@ -196,21 +197,21 @@
     </template>
 
     <el-dialog class="match-dialog" v-model="data.detailVisible" title="这一轮发生了什么" width="680px" destroy-on-close>
-      <div v-if="data.detail">
+      <div v-if="data.detail" class="detail-wrap">
         <div class="detail-head">
           <span class="detail-name">第 {{ data.detail.round }} 轮</span>
-          <span v-if="data.detail.agent_name" class="round-chip">{{ data.detail.agent_name }}</span>
+          <span v-if="data.detail.agent_name" class="chip chip-violet">{{ data.detail.agent_name }}</span>
         </div>
         <div class="detail-block">
-          <div class="tag-label">主管给它的交代</div>
+          <div class="section-title">主管给它的交代</div>
           <div class="summary-box">{{ data.detail.instruction || '（这一轮没有派角色）' }}</div>
         </div>
         <div class="detail-block">
-          <div class="tag-label">主管这么派的依据</div>
+          <div class="section-title">主管这么派的依据</div>
           <div class="summary-box">{{ data.detail.reason || '（轮次用尽，主管直接收尾）' }}</div>
         </div>
         <div class="detail-block">
-          <div class="tag-label">这一轮的结果</div>
+          <div class="section-title">这一轮的结果</div>
           <div class="summary-box">{{ data.detail.conclusion || '（这个角色没有回结论）' }}</div>
         </div>
       </div>
@@ -310,321 +311,127 @@ onBeforeUnmount(stopPolling)
 </script>
 
 <style scoped>
-.main-content {
-  padding-bottom: 10px;
-  --el-color-primary: #1F6F6B;
-  --el-color-primary-light-3: #4F8F8A;
-  --el-color-primary-light-5: #84B5B2;
-  --el-color-primary-light-7: #A9CFCB;
-  --el-color-primary-light-8: #C4DCDA;
-  --el-color-primary-light-9: #EFF6F5;
-  --el-color-primary-dark-2: #24625E;
-}
+.page-wrap > .page-head { margin: 0; }
+.page-wrap > .card { margin-top: 0; }
 
-/* 卡片标题统一加粗，不加任何装饰线条 */
-.block-card {
-  margin-top: 12px;
-  padding: 20px 24px 22px;
+.go-action { margin-top: 16px; }
+
+/* 前置条件：图标放进 30px 圆角色块，通过走绿、缺项走琥珀 */
+.check-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  font-size: 15px;
 }
+.check-icon.is-ok { color: #047857; background: var(--pb-ok-soft); }
+.check-icon.is-warn { color: #b45309; background: var(--pb-warn-soft); }
+.check-label { flex: none; min-width: 96px; }
+.check-message { flex: 1; min-width: 0; }
+.warn-text { color: #b45309; }
+
+/* 运行中：浅蓝渐变卡 + 脉冲圆点 */
 .running-card {
-  margin-top: 12px;
-  padding: 20px 24px;
-  border: 1px solid #D2EAE8;
-  background: linear-gradient(135deg, #fff 0%, #F6FBFA 100%);
+  border-color: rgba(37, 99, 235, 0.18);
+  background: linear-gradient(135deg, #ffffff 0%, #f6f9ff 100%);
 }
 .running-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   margin-bottom: 16px;
 }
 .running-dot {
-  width: 12px;
-  height: 12px;
   flex: none;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
-  background: #1F6F6B;
-  box-shadow: 0 0 0 0 rgba(31, 111, 107, .45);
-  animation: running-pulse 1.5s infinite;
+  background: var(--pb-brand);
+  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45);
+  animation: match-pulse 1.6s ease-out infinite;
 }
-.running-title { font-size: 16px; font-weight: 700; color: #205551; }
-.running-tip { margin-top: 4px; font-size: 13px; color: #748C8A; }
-.running-current { margin-top: 12px; font-size: 13px; color: #526F6D; }
-@keyframes running-pulse {
-  70% { box-shadow: 0 0 0 10px rgba(31, 111, 107, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(31, 111, 107, 0); }
+@keyframes match-pulse {
+  70% { box-shadow: 0 0 0 12px rgba(37, 99, 235, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
 }
-.block-title {
-  font-size: 16px;
-  font-weight: bold;
-  line-height: 20px;
-  color: #333;
-}
-.block-card .el-alert {
+.running-title { font-size: 15px; font-weight: 650; color: var(--pb-text); }
+.running-tip { margin-top: 3px; font-size: 12.5px; color: var(--pb-muted); }
+.running-current {
   margin-top: 14px;
-}
-.go-action {
-  padding-top: 16px;
-}
-
-/* 前置条件逐条列出，满足和没满足用两套底色区分 */
-.check-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background-color: #fafafa;
-  font-size: 13px;
-}
-.check-icon {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-}
-.check-icon.is-ok {
-  color: #67c23a;
-  background-color: rgba(103, 194, 58, .12);
-}
-.check-icon.is-warn {
-  color: #e6a23c;
-  background-color: rgba(230, 162, 60, .16);
-}
-.check-label {
-  flex: none;
-  width: 130px;
-  color: #666;
-}
-.check-message {
-  color: #666;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px dashed var(--pb-line-strong);
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 12.5px;
   line-height: 20px;
-}
-.warn-text {
-  color: #e6a23c;
+  color: var(--pb-muted);
 }
 
-/* 一次都没发起过时给一块带图标的空状态，比一行灰字更像一个起点 */
-.empty-card {
-  margin-top: 12px;
-  padding: 32px 24px 36px;
-  text-align: center;
-}
-.empty-icon {
-  width: 52px;
-  height: 52px;
-  margin: 0 auto 12px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: #1F6F6B;
-  background-color: rgba(31, 111, 107, .1);
-}
-.empty-title {
-  font-size: 15px;
-  font-weight: bold;
-  color: #333;
-}
-.empty-desc {
-  margin-top: 6px;
-  font-size: 13px;
-  line-height: 22px;
-  color: #999;
-}
-
-/* 任务卡：任务号做成主题色胶囊，跟右边的发起时间拉开主次 */
+/* 任务卡：任务号胶囊 + 四个统计块 */
 .task-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
-  margin-top: 16px;
-  padding-bottom: 12px;
+  margin-top: 14px;
 }
 .task-badge {
   flex: none;
   padding: 3px 12px;
   border-radius: 999px;
-  font-size: 13px;
-  font-weight: bold;
-  color: #fff;
-  background: linear-gradient(120deg, #1F6F6B 0%, #2F8A84 100%);
-}
-.task-time {
-  color: #999;
   font-size: 12px;
-  margin-left: auto;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: linear-gradient(120deg, #60a5fa, #2563eb);
 }
+.task-time { margin-left: auto; font-size: 12px; color: var(--pb-faint); }
+.task-metrics { margin: 16px 0 14px; }
+.task-metrics .metric-value.is-ok { color: #047857; }
+.task-metrics .metric-value.is-warn { color: #b45309; }
 .task-line {
-  color: #333;
-  font-size: 13px;
-  line-height: 24px;
   padding-bottom: 12px;
-}
-
-/* 四个计数做成胶囊：通过走绿、否决走橙，其余用主题色浅底兜住 */
-.count-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding-bottom: 14px;
-}
-.count-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 14px;
-  border-radius: 999px;
-  border: 1px solid #DFECEB;
-  background-color: #F5FAF9;
   font-size: 13px;
-  color: #333;
+  line-height: 1.85;
+  color: rgba(17, 24, 39, 0.78);
 }
-.count-chip b {
-  font-size: 15px;
-  color: #1F6F6B;
-}
-.count-chip.is-ok {
-  border-color: #e0f0d6;
-  background-color: rgba(103, 194, 58, .1);
-}
-.count-chip.is-ok b {
-  color: #67c23a;
-}
-.count-chip.is-warn {
-  border-color: #f3e0bd;
-  background-color: #fdf6e8;
-}
-.count-chip.is-warn b {
-  color: #e6a23c;
-}
-.count-label {
-  color: #666;
-}
-.muted {
-  color: #bbb;
-}
+.block-card .el-alert { margin-top: 12px; }
 
-/* 运行卡：运行号一行读完，结论单独抬成一块底色 */
+/* 最近一次运行 */
 .run-line {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 0 12px;
+  padding: 4px 0 12px;
 }
 .run-no {
-  font-weight: bold;
+  font-family: var(--pb-mono);
   font-size: 14px;
-  color: #333;
+  font-weight: 650;
+  color: var(--pb-text);
+  letter-spacing: -0.01em;
 }
-.run-cost {
-  color: #999;
-  font-size: 12px;
-  margin-left: auto;
-}
-.summary-box {
-  padding: 14px 16px;
-  border-radius: 8px;
-  border: 1px solid #DFECEB;
-  background-color: rgba(31, 111, 107, .05);
-  color: #333;
-  font-size: 13px;
-  line-height: 24px;
-  white-space: pre-wrap;
-}
+.run-cost { margin-left: auto; font-size: 12px; color: var(--pb-faint); }
 
-/* 两张表跟着主题色走：表头浅底色，表头字用主题色 */
-.theme-table {
-  margin-top: 14px;
-  --el-table-header-bg-color: #F5FAF9;
-  --el-table-header-text-color: #1F6F6B;
-  --el-table-row-hover-bg-color: #F2F8F7;
-}
-.table-tip {
-  color: #999;
-  font-size: 12px;
-  line-height: 20px;
-  padding-top: 10px;
-}
-/* 派给谁那一列做成浅底色胶囊，跟旁边的纯文字列拉开层次 */
-.agent-chip {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 18px;
-  color: #1F6F6B;
-  border: 1px solid #D5E8E6;
-  background-color: rgba(31, 111, 107, .08);
-}
-/* 下一步怎么办指的是动作，用主题色胶囊标出来 */
-.next-chip {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 18px;
-  color: #1F6F6B;
-  border: 1px solid #DFECEB;
-  background-color: #F5FAF9;
-}
+.data-table { margin-top: 12px; }
 
-/* 详情弹窗：哪一轮、派给谁，一行读完 */
+/* 详情弹窗 */
 .detail-head {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-bottom: 16px;
+  padding: 2px 0 4px;
 }
-.detail-name {
-  font-size: 16px;
-  font-weight: bold;
-  color: #333;
-}
-.round-chip {
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 18px;
-  color: #1F6F6B;
-  border: 1px solid #D5E8E6;
-  background-color: rgba(31, 111, 107, .08);
-}
-.detail-block {
-  padding-top: 16px;
-}
-.tag-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #666;
-  font-size: 13px;
-  padding-bottom: 8px;
-}
-.tag-label::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: #1F6F6B;
-}
+.detail-name { font-size: 16px; font-weight: 650; color: var(--pb-text); }
+.detail-block { margin-top: 14px; }
+.detail-block .section-title { margin-bottom: 8px; }
 
-/* 弹窗挂在 body 上渲染，主题色变量要按它自己的类名给，
-   写在 .main-content 上的页面作用域盖不到 */
-:global(.match-dialog) {
-  --el-color-primary: #1F6F6B;
-  --el-color-primary-light-3: #4F8F8A;
-  --el-color-primary-light-5: #84B5B2;
-  --el-color-primary-light-7: #A9CFCB;
-  --el-color-primary-light-8: #C4DCDA;
-  --el-color-primary-light-9: #EFF6F5;
-  --el-color-primary-dark-2: #24625E;
+@media (max-width: 768px) {
+  .check-row { flex-wrap: wrap; }
+  .check-message { flex-basis: 100%; padding-left: 40px; }
+  .task-time { margin-left: 0; }
 }
-
 </style>

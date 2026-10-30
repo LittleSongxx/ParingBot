@@ -1,47 +1,45 @@
 <template>
-  <div class="footer-wrap">
-    <div class="footer-brand">
-      <img src="@/assets/imgs/logo.png" alt="">
-      <span>ParingBot 智能合租匹配平台</span>
+  <footer class="footer-wrap">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <img src="@/assets/imgs/logo-bot.svg" alt="ParingBot" />
+        <div class="footer-brand-text">
+          <b>ParingBot</b>
+          <span>智能合租匹配平台</span>
+        </div>
+      </div>
+      <div class="footer-meta">
+        <span>站内租客档案、头像与动态均为虚构，仅用于功能演示</span>
+        <span class="footer-sep"></span>
+        <span>CopyRight 2026© ParingBot</span>
+      </div>
     </div>
-    <div class="footer-tip">站内租客档案、头像与动态均为虚构，仅用于功能演示</div>
-    <div class="footer-copyright">CopyRight 2026©ParingBot 智能合租匹配平台</div>
-  </div>
+  </footer>
 </template>
 
 <style scoped>
 .footer-wrap {
-  background-color: #F2F7F7;
-  width: 100%;
-  padding: 20px;
-  margin-top: 20px;
+  margin-top: 30px;
+  border-top: 1px solid var(--pb-line);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
 }
-.footer-brand {
+
+.footer-inner {
   display: flex;
   align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  padding: 18px 20px;
 }
-.footer-brand img {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  margin-right: 10px;
-}
-.footer-brand span {
-  font-size: 16px;
-  color: #1F6F6B;
-  font-weight: bold;
-}
-.footer-tip {
-  text-align: center;
-  color: #888;
-  font-size: 13px;
-  margin-bottom: 10px;
-}
-.footer-copyright {
-  text-align: center;
-  color: #999;
-  font-size: 13px;
-}
+
+.footer-brand { display: flex; align-items: center; gap: 9px; }
+.footer-brand img { width: 26px; height: 26px; border-radius: 8px; }
+.footer-brand-text { display: flex; flex-direction: column; line-height: 1.25; }
+.footer-brand-text b { font-size: 13px; color: var(--pb-text); }
+.footer-brand-text span { font-size: 11px; color: var(--pb-muted); }
+
+.footer-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--pb-faint); }
+.footer-sep { width: 1px; height: 12px; background: var(--pb-line-strong); }
 </style>

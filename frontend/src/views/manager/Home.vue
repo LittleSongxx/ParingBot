@@ -1,5 +1,5 @@
 <template>
-  <div class="home-page">
+  <div class="page-wrap">
     <!-- 页头：一句话说清管理端的功能是怎么组织的 -->
     <div class="page-head">
       <h2>系统首页</h2>
@@ -10,27 +10,27 @@
     </div>
 
     <!-- 快捷入口：平台管理员常用的配置页与观测页，点一下直接进对应页面 -->
-    <div class="card block" v-if="data.isAdmin">
+    <div class="card" v-if="data.isAdmin">
       <div class="block-title">快捷入口</div>
       <div class="quick-grid">
         <div class="quick-item" v-for="item in shortcuts" :key="item.path" @click="router.push(item.path)">
-          <div class="quick-icon">
+          <span class="quick-icon">
             <el-icon><component :is="item.icon" /></el-icon>
-          </div>
-          <div class="quick-text">
-            <div class="quick-name">{{ item.name }}</div>
-            <div class="quick-desc">{{ item.desc }}</div>
-          </div>
+          </span>
+          <span class="quick-text">
+            <span class="quick-name">{{ item.name }}</span>
+            <span class="quick-desc">{{ item.desc }}</span>
+          </span>
         </div>
       </div>
     </div>
 
     <!-- 配置与使用顺序：纯说明文本，让刚接手的管理员知道下一步该去哪一页 -->
-    <div class="card block">
+    <div class="card">
       <div class="block-title">后台配置与使用顺序</div>
       <div class="flow-list">
         <div class="flow-item" v-for="(item, index) in flow" :key="item.title">
-          <div class="flow-index">{{ index + 1 }}</div>
+          <span class="flow-index">{{ index + 1 }}</span>
           <div class="flow-text">
             <div class="flow-title">{{ item.title }}</div>
             <div class="flow-desc">{{ item.desc }}</div>
@@ -78,114 +78,127 @@ const data = reactive({
 </script>
 
 <style scoped>
-.home-page {
-  padding-bottom: 10px;
-}
-
-.block {
-  margin-top: 12px;
-}
-
-/* 卡片标题统一加粗，不加任何装饰线条 */
-.block-title {
-  margin-bottom: 14px;
-  font-size: 16px;
-  font-weight: bold;
-  line-height: 20px;
-  color: #333;
-}
-
+/* 快捷入口：浅色图标块 + 标题 + 一句说明，hover 时整块抬起 */
 .quick-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
+
 .quick-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px;
-  border: 1px solid #DFECEB;
-  border-radius: 8px;
-  background-color: #fff;
+  padding: 14px 16px;
+  border: 1px solid var(--pb-line);
+  border-radius: var(--pb-radius-sm);
+  background: var(--pb-surface-2);
   cursor: pointer;
-  transition: all .2s;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
+
 .quick-item:hover {
-  border-color: #1F6F6B;
-  box-shadow: 0 8px 16px rgba(31, 111, 107, .14);
+  border-color: rgba(37, 99, 235, 0.32);
+  background: var(--pb-brand-soft);
+  box-shadow: var(--pb-shadow-card-hover);
   transform: translateY(-2px);
 }
+
 .quick-icon {
   flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 19px;
-  color: #1F6F6B;
-  background-color: rgba(31, 111, 107, .1);
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--pb-brand-soft);
+  color: var(--pb-brand);
+  font-size: 18px;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
 }
+
+.quick-item:hover .quick-icon {
+  background: var(--pb-surface);
+  box-shadow: var(--pb-glow);
+}
+
 .quick-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
+
 .quick-name {
   font-size: 14px;
-  font-weight: 500;
-  color: #333;
+  font-weight: 600;
+  color: var(--pb-text);
 }
+
 .quick-desc {
-  margin-top: 2px;
-  font-size: 12px;
-  color: #999;
   overflow: hidden;
+  font-size: 12px;
+  color: var(--pb-muted);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-
+/* 配置顺序：带编号的 soft 步骤列表 */
 .flow-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
+
 .flow-item {
   display: flex;
+  align-items: flex-start;
   gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--pb-line);
+  border-radius: 12px;
+  background: var(--pb-surface-2);
 }
+
 .flow-index {
   flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.22);
+  color: var(--pb-surface);
   font-size: 12px;
-  line-height: 22px;
-  text-align: center;
-  color: #fff;
-  background: linear-gradient(135deg, #1F6F6B 0%, #2A7F7A 100%);
+  font-weight: 700;
 }
+
 .flow-text {
+  flex: 1;
   min-width: 0;
 }
+
 .flow-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--pb-text);
 }
+
 .flow-desc {
-  margin-top: 2px;
-  font-size: 12px;
+  margin-top: 3px;
+  font-size: 12.5px;
   line-height: 20px;
-  color: #999;
+  color: var(--pb-muted);
 }
 
-
-/* 卡片区改成两列之后，窄屏下退回一列，避免说明文字被挤成一列单词 */
 @media (max-width: 1280px) {
-  .quick-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  .quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .quick-grid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

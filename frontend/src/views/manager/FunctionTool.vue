@@ -1,17 +1,39 @@
 <template>
-  <div>
-    <div class="card" style="margin-bottom: 5px">
-      <div class="card-title">工具一览</div>
-      <div class="stat-line">
-        <el-tag type="info">工具 {{ data.summary.total }} 个</el-tag>
-        <el-tag type="success">启用中 {{ data.summary.enabled_count }} 个</el-tag>
-        <el-tag type="info">只读 {{ data.summary.read_only_count }} 个 / 写入 {{ data.summary.write_count }} 个</el-tag>
-        <el-tag v-for="item in data.summary.groups" :key="item.tool_group" type="info">
+  <div class="page-wrap">
+    <div class="page-head with-action">
+      <div class="page-head-main">
+        <h2>工具中心</h2>
+        <p class="page-tip">工具是四个角色能做的全部事情；每个工具的说明会原样发给模型，停用之后模型手上的清单里直接没有它。</p>
+      </div>
+      <div class="page-head-action">
+        <el-button v-if="data.codeOptions.length" type="primary" @click="handleAdd">新增工具</el-button>
+      </div>
+    </div>
+
+    <!-- 工具概览：总数、启停、只读/写入，以及需要提前处理的问题 -->
+    <div class="card">
+      <div class="block-title">工具一览</div>
+      <div class="metric-grid summary-grid">
+        <div class="metric-tile">
+          <div class="metric-label">工具总数</div>
+          <div class="metric-value">{{ data.summary.total }} <small>个</small></div>
+        </div>
+        <div class="metric-tile">
+          <div class="metric-label">启用中</div>
+          <div class="metric-value">{{ data.summary.enabled_count }} <small>个</small></div>
+        </div>
+        <div class="metric-tile">
+          <div class="metric-label">只读 / 写入</div>
+          <div class="metric-value">{{ data.summary.read_only_count }} <small>/ {{ data.summary.write_count }}</small></div>
+        </div>
+      </div>
+      <div class="group-chips">
+        <span v-for="item in data.summary.groups" :key="item.tool_group" class="chip">
           {{ item.tool_group }}：启用 {{ item.tool_enabled }} / {{ item.tool_total }}
-        </el-tag>
+        </span>
       </div>
       <el-alert v-for="(item, index) in data.summary.problems" :key="index" type="warning"
-                :closable="false" show-icon style="margin-top: 8px" :title="item">
+                :closable="false" show-icon class="problem-alert" :title="item">
       </el-alert>
       <div class="table-tip">
         工具是四个角色能做的全部事情：查档案、查动态、检索候选、写候选池、回填审核结论。
@@ -23,139 +45,160 @@
       </div>
     </div>
 
-    <div class="card" style="margin-bottom: 5px">
-      <el-input v-model="data.keyword" style="width: 240px; margin-right: 10px"
-                placeholder="请输入工具名称或编码查询"></el-input>
-      <el-select v-model="data.toolGroup" clearable style="width: 150px; margin-right: 10px"
-                 placeholder="工具分组">
+    <div class="card filter-card">
+      <el-input v-model="data.keyword" class="filter-input" clearable placeholder="请输入工具名称或编码查询"></el-input>
+      <el-select v-model="data.toolGroup" clearable class="filter-select" placeholder="工具分组">
         <el-option v-for="item in data.groupOptions" :key="item.tool_group"
                    :label="item.tool_group" :value="item.tool_group"></el-option>
       </el-select>
-      <el-select v-model="data.enabled" clearable style="width: 140px; margin-right: 10px"
-                 placeholder="启用状态">
+      <el-select v-model="data.enabled" clearable class="filter-select" placeholder="启用状态">
         <el-option label="已启用" value="是"></el-option>
         <el-option label="已停用" value="否"></el-option>
       </el-select>
-      <el-button type="info" plain @click="search">查询</el-button>
-      <el-button type="warning" plain style="margin-left: 10px" @click="reset">重置</el-button>
-      <el-button v-if="data.codeOptions.length" type="primary" plain
-                 style="margin-left: 10px" @click="handleAdd">新增工具</el-button>
+      <div class="filter-actions">
+        <el-button type="primary" @click="search">查询</el-button>
+        <el-button @click="reset">重置</el-button>
+      </div>
     </div>
 
-    <div class="card" style="margin-bottom: 5px">
-      <el-table stripe :data="data.tableData">
-        <el-table-column label="工具" width="200">
+    <!-- 工具配置卡片：说明 / 分组 / 运行限制，操作按钮右对齐 -->
+    <div class="config-table-card">
+      <el-table :data="data.tableData" :show-header="false" class="config-table">
+        <el-table-column>
           <template #default="scope">
-            <div class="name-line">{{ scope.row.tool_name }}</div>
-            <div class="code-line">{{ scope.row.tool_code }}</div>
+            <div class="config-card">
+              <div class="config-head">
+                <span class="config-name">{{ scope.row.tool_name }}</span>
+                <span class="mono tool-code">{{ scope.row.tool_code }}</span>
+                <span class="chip chip-blue">{{ scope.row.tool_group }}</span>
+                <span class="chip" :class="scope.row.enabled === '是' ? 'chip-green' : ''">
+                  {{ scope.row.enabled === '是' ? '已启用' : '已停用' }}
+                </span>
+                <span class="chip" :class="scope.row.read_only ? 'chip-cyan' : 'chip-violet'">
+                  {{ scope.row.read_only ? '只读' : '写入' }}
+                </span>
+              </div>
+
+              <div class="tool-desc">{{ scope.row.description }}</div>
+
+              <div class="config-meta">
+                <div class="meta-item">
+                  <span class="meta-label">返回上限</span>
+                  <span class="mono meta-value">{{ scope.row.max_return_rows ? scope.row.max_return_rows + ' 行' : '不限制' }}</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">实现状态</span>
+                  <span class="chip" :class="scope.row.has_implementation ? 'chip-green' : 'chip-red'">
+                    {{ scope.row.has_implementation ? '已接入' : '找不到实现' }}
+                  </span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">排序</span>
+                  <span class="mono meta-value">{{ scope.row.sort }}</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">更新时间</span>
+                  <span class="meta-value muted">{{ scope.row.update_time }}</span>
+                </div>
+              </div>
+
+              <div class="config-actions">
+                <el-button type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
+                <el-button v-if="scope.row.read_only" type="success" link
+                           @click="openTest(scope.row)">试跑</el-button>
+                <el-button v-if="scope.row.enabled === '是'" type="warning" link
+                           @click="updateEnabled(scope.row, '否')">停用</el-button>
+                <el-button v-else type="success" link @click="updateEnabled(scope.row, '是')">启用</el-button>
+                <el-button type="danger" link @click="handleDelete(scope.row)">删除</el-button>
+              </div>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="用途说明" min-width="320" show-overflow-tooltip>
-          <template #default="scope">
-            <span>{{ scope.row.description }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="tool_group" label="分组" width="90" />
-        <el-table-column label="返回上限" width="100">
-          <template #default="scope">
-            {{ scope.row.max_return_rows ? scope.row.max_return_rows + ' 行' : '不限制' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="实现状态" width="110">
-          <template #default="scope">
-            <el-tag size="small" :type="scope.row.has_implementation ? 'success' : 'danger'">
-              {{ scope.row.has_implementation ? '已接入' : '找不到实现' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="启用状态" width="100">
-          <template #default="scope">
-            <el-tag :type="scope.row.enabled === '是' ? 'success' : 'info'">
-              {{ scope.row.enabled === '是' ? '已启用' : '已停用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="sort" label="排序" width="70" />
-        <el-table-column label="操作" width="220" fixed="right">
-          <template #default="scope">
-            <el-button type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button v-if="scope.row.read_only" type="success" link
-                       @click="openTest(scope.row)">试跑</el-button>
-            <el-button v-if="scope.row.enabled === '是'" type="warning" link
-                       @click="updateEnabled(scope.row, '否')">停用</el-button>
-            <el-button v-else type="success" link @click="updateEnabled(scope.row, '是')">启用</el-button>
-            <el-button type="danger" link @click="handleDelete(scope.row)">删除</el-button>
-          </template>
-        </el-table-column>
+        <template #empty>
+          <div class="empty-card">
+            <div class="empty-title">还没有登记工具</div>
+            <div class="empty-desc">点右上角「新增工具」，把程序里已实现的工具登记进来。</div>
+          </div>
+        </template>
       </el-table>
       <div class="table-tip">
         编码是模型、步骤记录和调用日志找这个工具的依据，登记之后不能改；工具本身也不建议频繁增删，
         调整行为优先改说明和参数。八个工具各自归在画像、筛选、审核三个分组里，分组决定它被哪个角色拿去用。
       </div>
-    </div>
-
-    <div class="card" v-if="data.total">
-      <el-pagination
-          v-model:current-page="data.pageNum"
-          background
-          layout="prev, pager, next"
-          :page-size="data.pageSize"
-          :total="data.total"
-          @current-change="load"
-      />
+      <div class="pager-card card" v-if="data.total">
+        <el-pagination
+            v-model:current-page="data.pageNum"
+            background
+            layout="prev, pager, next, total"
+            :page-size="data.pageSize"
+            :total="data.total"
+            @current-change="load"
+        />
+      </div>
     </div>
 
     <el-dialog :title="data.form.id ? '编辑工具' : '新增工具'" v-model="data.formVisible"
-               width="720px" destroy-on-close>
-      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="110px">
-        <el-form-item prop="tool_code" label="工具编码">
-          <el-select v-if="!data.form.id" v-model="data.form.tool_code" style="width: 320px">
-            <el-option v-for="item in data.codeOptions" :key="item.tool_code"
-                       :label="item.tool_code" :value="item.tool_code"></el-option>
-          </el-select>
-          <span v-else class="readonly-text">
-            {{ data.form.tool_code }}
-            <span class="form-tip">编码和程序里的实现对不上时就取不到工具，所以登记后不能改</span>
-          </span>
-        </el-form-item>
-        <el-form-item prop="tool_name" label="工具名称">
-          <el-input v-model="data.form.tool_name" maxlength="255" style="width: 320px"></el-input>
-        </el-form-item>
-        <el-form-item prop="description" label="用途说明">
-          <el-input v-model="data.form.description" type="textarea" :rows="4" maxlength="1000"
-                    show-word-limit
-                    placeholder="写清什么时候该调、什么时候不该调、参数能填什么"></el-input>
-        </el-form-item>
-        <el-form-item prop="input_schema" label="参数 Schema">
-          <el-input v-model="data.form.input_schema" type="textarea" :rows="6"
-                    placeholder='{"type": "object", "properties": {}}'></el-input>
-          <div class="form-tip">
-            写成 JSON 对象，type 是 object，properties 里每个参数名对应一项；
-            没有参数也要写成空对象。写坏了模型传参时才会报错，所以保存时会先校验一遍。
-          </div>
-        </el-form-item>
-        <el-form-item prop="tool_group" label="所属分组">
-          <el-select v-model="data.form.tool_group" style="width: 200px">
-            <el-option v-for="item in data.groupOptions" :key="item.tool_group"
-                       :label="item.tool_group" :value="item.tool_group"></el-option>
-          </el-select>
-          <div class="form-tip">分组决定这个工具被哪个角色拿去用。</div>
-        </el-form-item>
-        <el-form-item label="返回上限">
-          <el-input-number v-model="data.form.max_return_rows" :min="1" :max="200" :precision="0"
-                           controls-position="right" style="width: 180px"></el-input-number>
-          <div class="form-tip">一次调用最多返回多少行，留空表示由工具自己决定。填得太大容易把上下文撑满。</div>
-        </el-form-item>
-        <el-form-item label="启用状态">
-          <el-radio-group v-model="data.form.enabled">
-            <el-radio value="是">启用</el-radio>
-            <el-radio value="否">停用</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="排序号">
-          <el-input-number v-model="data.form.sort" :min="0" :max="999" :precision="0"
-                           controls-position="right" style="width: 180px"></el-input-number>
-        </el-form-item>
+               width="760px" destroy-on-close>
+      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="110px" class="dialog-form">
+        <div class="soft-panel form-group">
+          <div class="section-title">工具标识</div>
+          <el-form-item prop="tool_code" label="工具编码">
+            <el-select v-if="!data.form.id" v-model="data.form.tool_code" style="width: 320px">
+              <el-option v-for="item in data.codeOptions" :key="item.tool_code"
+                         :label="item.tool_code" :value="item.tool_code"></el-option>
+            </el-select>
+            <span v-else class="readonly-text">
+              <span class="mono">{{ data.form.tool_code }}</span>
+              <span class="inline-tip">编码和程序里的实现对不上时就取不到工具，所以登记后不能改</span>
+            </span>
+          </el-form-item>
+          <el-form-item prop="tool_name" label="工具名称">
+            <el-input v-model="data.form.tool_name" maxlength="255" style="width: 320px"></el-input>
+          </el-form-item>
+          <el-form-item prop="tool_group" label="所属分组">
+            <el-select v-model="data.form.tool_group" style="width: 200px">
+              <el-option v-for="item in data.groupOptions" :key="item.tool_group"
+                         :label="item.tool_group" :value="item.tool_group"></el-option>
+            </el-select>
+            <span class="inline-tip">分组决定这个工具被哪个角色拿去用。</span>
+          </el-form-item>
+        </div>
+
+        <div class="soft-panel form-group">
+          <div class="section-title">说明与参数</div>
+          <el-form-item prop="description" label="用途说明">
+            <el-input v-model="data.form.description" type="textarea" :rows="4" maxlength="1000"
+                      show-word-limit
+                      placeholder="写清什么时候该调、什么时候不该调、参数能填什么"></el-input>
+          </el-form-item>
+          <el-form-item prop="input_schema" label="参数 Schema">
+            <el-input v-model="data.form.input_schema" type="textarea" :rows="6" class="mono-input"
+                      placeholder='{"type": "object", "properties": {}}'></el-input>
+            <div class="tip-block">
+              写成 JSON 对象，type 是 object，properties 里每个参数名对应一项；
+              没有参数也要写成空对象。写坏了模型传参时才会报错，所以保存时会先校验一遍。
+            </div>
+          </el-form-item>
+        </div>
+
+        <div class="soft-panel form-group">
+          <div class="section-title">运行控制</div>
+          <el-form-item label="返回上限">
+            <el-input-number v-model="data.form.max_return_rows" :min="1" :max="200" :precision="0"
+                             controls-position="right" style="width: 180px"></el-input-number>
+            <span class="inline-tip">一次调用最多返回多少行，留空表示由工具自己决定。填得太大容易把上下文撑满。</span>
+          </el-form-item>
+          <el-form-item label="启用状态">
+            <el-radio-group v-model="data.form.enabled">
+              <el-radio value="是">启用</el-radio>
+              <el-radio value="否">停用</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="排序号">
+            <el-input-number v-model="data.form.sort" :min="0" :max="999" :precision="0"
+                             controls-position="right" style="width: 180px"></el-input-number>
+          </el-form-item>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="data.formVisible = false">取消</el-button>
@@ -165,28 +208,32 @@
 
     <el-dialog title="试跑工具" v-model="data.testVisible" width="720px" destroy-on-close>
       <div class="test-head">
-        <span class="name-line">{{ data.test.tool_name }}</span>
-        <span class="code-line">{{ data.test.tool_code }}</span>
+        <span class="config-name">{{ data.test.tool_name }}</span>
+        <span class="mono tool-code">{{ data.test.tool_code }}</span>
       </div>
-      <el-form label-width="90px">
-        <el-form-item label="租客上下文">
-          <el-select v-model="data.test.memberId" filterable remote clearable
-                     :remote-method="searchMembers" :loading="data.memberLoading"
-                     placeholder="输入昵称搜索租客，读档案这类工具要用" style="width: 320px">
-            <el-option v-for="item in data.memberOptions" :key="item.id"
-                       :label="item.nickname + '（' + item.audit_status + '）'" :value="item.id"></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="工具入参">
-          <el-input v-model="data.test.params" type="textarea" :rows="4"
-                    placeholder="按上面那份工具的说明传参数，写成 JSON 对象"></el-input>
-        </el-form-item>
-      </el-form>
-      <div class="test-result">
+      <div class="soft-panel form-group">
+        <div class="section-title">试跑参数</div>
+        <el-form label-width="90px">
+          <el-form-item label="租客上下文">
+            <el-select v-model="data.test.memberId" filterable remote clearable
+                       :remote-method="searchMembers" :loading="data.memberLoading"
+                       placeholder="输入昵称搜索租客，读档案这类工具要用" style="width: 320px">
+              <el-option v-for="item in data.memberOptions" :key="item.id"
+                         :label="item.nickname + '（' + item.audit_status + '）'" :value="item.id"></el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="工具入参">
+            <el-input v-model="data.test.params" type="textarea" :rows="4" class="mono-input"
+                      placeholder="按上面那份工具的说明传参数，写成 JSON 对象"></el-input>
+          </el-form-item>
+        </el-form>
+      </div>
+      <div class="soft-panel form-group">
+        <div class="section-title">试跑结果</div>
         <div class="form-tip">
           试跑用的上下文里没有匹配任务，所以只让只读类工具试跑；试跑的调用不写调用日志。
         </div>
-        <pre class="result-body">{{ data.test.result || '还没有试跑，点下面的按钮看结果' }}</pre>
+        <pre class="code-line result-body">{{ data.test.result || '还没有试跑，点下面的按钮看结果' }}</pre>
       </div>
       <template #footer>
         <el-button @click="data.testVisible = false">关闭</el-button>
@@ -418,54 +465,257 @@ loadCodeOptions()
 </script>
 
 <style scoped>
-.card-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 10px;
-}
-.stat-line .el-tag {
-  margin-right: 8px;
-}
-.name-line {
-  color: #303133;
-}
-.code-line {
-  color: #909399;
-  font-size: 12px;
-}
-.readonly-text {
-  color: #606266;
-}
-.form-tip {
-  color: #909399;
-  font-size: 12px;
-  line-height: 18px;
-  margin-top: 4px;
-}
-.table-tip {
-  color: #999;
-  font-size: 12px;
-  line-height: 20px;
-  padding: 10px 5px 0;
-}
-.test-head {
+.summary-grid {
   margin-bottom: 12px;
 }
-.test-head .code-line {
-  margin-left: 8px;
+
+.group-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
 }
+
+.problem-alert {
+  margin-top: 8px;
+}
+
+/* 配置页：筛选卡 + 一条工具一张卡 */
+.filter-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-input { width: 260px; }
+.filter-select { width: 160px; }
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.config-table-card {
+  padding: 0;
+}
+
+.config-table {
+  background: transparent;
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: transparent;
+  --el-table-border-color: transparent;
+}
+
+.config-table :deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+.config-table :deep(td.el-table__cell) {
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+.config-table :deep(tr.el-table__row),
+.config-table :deep(tr.el-table__row:hover > td.el-table__cell) {
+  background: transparent !important;
+}
+
+.config-table :deep(.el-table__empty-block) {
+  background: transparent;
+}
+
+.config-table :deep(.el-table__empty-text) {
+  width: 100%;
+  line-height: 1.6;
+}
+
+.config-table :deep(.empty-card) {
+  width: 100%;
+  margin: 6px 0;
+  padding: 40px 20px;
+}
+
+.config-card {
+  margin-bottom: 12px;
+  padding: 16px 18px;
+  background: var(--pb-surface);
+  border: 1px solid var(--pb-line);
+  border-radius: var(--pb-radius);
+  box-shadow: var(--pb-shadow-card);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.config-card:hover {
+  border-color: rgba(17, 24, 39, 0.12);
+  box-shadow: var(--pb-shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.config-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-name {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--pb-text);
+}
+
+.tool-code {
+  padding: 2px 8px;
+  border-radius: 7px;
+  background: var(--pb-surface-3);
+  color: var(--pb-muted);
+  font-size: 12px;
+}
+
+.tool-desc {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--pb-radius-sm);
+  background: var(--pb-surface-2);
+  border: 1px solid var(--pb-line);
+  color: var(--pb-muted);
+  font-size: 12.5px;
+  line-height: 20px;
+}
+
+.config-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 20px;
+  margin-top: 12px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.meta-label {
+  flex: none;
+  font-size: 12px;
+  color: var(--pb-faint);
+}
+
+.meta-value {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--pb-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.config-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--pb-line);
+}
+
+.pager-card {
+  margin-top: 4px;
+  padding: 12px 18px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 弹窗内分组 */
+.dialog-form {
+  max-height: 68vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.dialog-form :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.dialog-form :deep(.el-form-item:last-child) {
+  margin-bottom: 4px;
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.inline-tip {
+  margin-left: 10px;
+  color: var(--pb-faint);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.tip-block {
+  width: 100%;
+  margin-top: 4px;
+  color: var(--pb-faint);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.readonly-text {
+  color: var(--pb-text);
+}
+
+.mono-input :deep(.el-textarea__inner) {
+  font-family: var(--pb-mono);
+  font-size: 12.5px;
+}
+
+/* 试跑弹窗 */
+.test-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--pb-line);
+}
+
+.test-result {
+  margin-top: 4px;
+}
+
 .result-body {
-  margin: 6px 0 0;
   max-height: 320px;
-  overflow: auto;
-  background: #f7f7f7;
-  border-radius: 4px;
-  padding: 12px;
+  margin: 6px 0 0;
   white-space: pre-wrap;
   word-break: break-all;
-  font-size: 13px;
-  font-family: inherit;
-  line-height: 20px;
+}
+
+@media (max-width: 1200px) {
+  .config-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .filter-input,
+  .filter-select {
+    width: 100%;
+  }
+
+  .filter-actions {
+    margin-left: 0;
+  }
+
+  .config-meta { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

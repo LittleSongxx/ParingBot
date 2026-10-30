@@ -1,15 +1,22 @@
 <template>
-  <div class="main-content">
+  <div class="main-content page-wrap">
     <!-- 页头：说明这一页要填什么、填完会走到哪一步 -->
-    <div class="page-head">
-      <h2>租客档案</h2>
-      <p class="page-tip">
-        档案填得越全，画像越贴近你真实的生活习惯，匹配到的室友也越合拍。
-        保存后先由管理员审核，审核通过才会进入匹配候选池。
-      </p>
+    <div class="page-head with-action">
+      <div class="page-head-main">
+        <h2>租客档案</h2>
+        <p class="page-tip">
+          档案填得越全，画像越贴近你真实的生活习惯，匹配到的室友也越合拍。
+          保存后先由管理员审核，审核通过才会进入匹配候选池。
+        </p>
+      </div>
+      <div class="page-head-action">
+        <span class="chip chip-blue">
+          {{ data.profile ? '审核状态：' + (data.profile.audit_status || '待审核') : '档案未填写' }}
+        </span>
+      </div>
     </div>
 
-    <div class="card block state-card">
+    <div class="card state-card">
       <div class="block-title">档案审核状态</div>
       <!-- 还没填过档案时先把接下来要做什么说清楚，不直接甩一个空表单 -->
       <el-alert
@@ -51,7 +58,7 @@
       </template>
     </div>
 
-    <div class="card block form-card">
+    <div class="card form-card">
       <div class="block-title">填写档案</div>
       <el-form class="basic-form" ref="formRef" :rules="data.rules" :model="data.form" label-width="96px">
         <div class="sub-title full-span">基本信息</div>
@@ -156,8 +163,8 @@
           <div class="upload-tip">生活照不是必填项；最多 9 张，单张不超过 5MB。删掉的照片在保存之后才会从服务器一并清掉。</div>
         </el-form-item>
         <div class="form-actions full-span">
-          <el-button type="primary" @click="save">保存并提交审核</el-button>
-          <el-button @click="loadProfile">重新加载</el-button>
+          <el-button type="primary" size="large" class="save-btn" @click="save">保存并提交审核</el-button>
+          <el-button size="large" @click="loadProfile">重新加载</el-button>
         </div>
       </el-form>
     </div>
@@ -356,78 +363,111 @@ loadProfile()
 </script>
 
 <style scoped>
-/* .main-content 的宽度和留白在 front.css 里，这里只补底部留白 */
-.main-content {
-  padding-bottom: 10px;
+.page-wrap > .page-head { margin: 0; }
+.page-wrap > .card { margin-top: 0; }
+
+/* 审核状态卡：标题下直接放一条状态提示 */
+.state-card .el-alert { margin-top: 0; }
+.state-card .el-alert + .el-alert { margin-top: 10px; }
+
+/* 表单卡：两列排布，短字段一行两个，长文本和生活照占满整行 */
+.form-card {
+  padding: 22px 26px 26px;
+}
+.basic-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+}
+.basic-form .full-span { grid-column: 1 / -1; }
+.basic-form :deep(.el-form-item) { margin-bottom: 18px; }
+.basic-form :deep(.el-form-item__label) { font-weight: 500; }
+.fill { width: 100%; }
+
+/* 表单内分区标题：主题色竖条 + 虚线分隔 */
+.sub-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 14px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--pb-line-strong);
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--pb-text);
+}
+.sub-title::before {
+  content: "";
+  width: 4px;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #60a5fa, #2563eb);
+}
+.basic-form .sub-title:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
-.block {
-  margin-top: 12px;
-}
-
-/* 卡片标题统一加粗，不加任何装饰线条 */
-.block-title {
-  margin-bottom: 14px;
-  font-size: 16px;
-  font-weight: bold;
-  line-height: 20px;
-  color: #333;
+.unit-text {
+  margin-left: 10px;
+  font-size: 13px;
+  color: var(--pb-muted);
 }
 
 .empty-photo-tip {
   width: 100%;
-  margin-bottom: 10px;
-  color: #999;
-  line-height: 22px;
-}
-
-.form-card {
-  padding: 16px 24px 24px;
-}
-
-/* 表单分成两列排，短字段一行放两个，长文本和生活照各自占满一行 */
-.basic-form {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 24px;
-}
-.basic-form .full-span {
-  grid-column: 1 / -1;
-}
-.fill {
-  width: 100%;
-}
-
-/* 表单内部的分区标题，靠加粗和主题色区分，不加装饰线条 */
-.sub-title {
-  margin: 4px 0 16px;
-  font-size: 14px;
-  font-weight: bold;
-  color: #1F6F6B;
-}
-
-.form-actions {
-  margin-top: 6px;
-  padding-top: 18px;
-  border-top: 1px solid #DFECEB;
-  text-align: center;
-}
-
-.unit-text {
-  margin-left: 8px;
-  color: #666;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px dashed var(--pb-line-strong);
+  border-radius: var(--pb-radius-sm);
+  background: var(--pb-surface-2);
+  color: var(--pb-muted);
+  font-size: 12.5px;
+  line-height: 20px;
 }
 .upload-tip {
   width: 100%;
-  color: #999;
+  margin-top: 10px;
+  color: var(--pb-faint);
   font-size: 12px;
   line-height: 20px;
 }
 
-/* 窄屏下退回一列，两个字段并排会把输入框挤得太窄 */
+/* 生活照：圆角缩略图网格 */
+.form-card :deep(.el-upload--picture-card) {
+  width: 112px;
+  height: 112px;
+  border: 1px dashed var(--pb-line-strong);
+  border-radius: 12px;
+  background: var(--pb-surface-2);
+  transition: all 0.18s ease;
+}
+.form-card :deep(.el-upload--picture-card:hover) {
+  border-color: var(--pb-brand);
+  color: var(--pb-brand);
+  background: var(--pb-brand-soft);
+}
+.form-card :deep(.el-upload-list--picture-card .el-upload-list__item) {
+  width: 112px;
+  height: 112px;
+  border: 1px solid var(--pb-line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 20px;
+  border-top: 1px solid var(--pb-line);
+}
+.save-btn { min-width: 180px; }
+
 @media (max-width: 1000px) {
-  .basic-form {
-    grid-template-columns: 1fr;
-  }
+  .basic-form { grid-template-columns: 1fr; }
+  .form-card { padding: 18px 16px 20px; }
 }
 </style>

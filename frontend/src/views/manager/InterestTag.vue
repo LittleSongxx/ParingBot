@@ -1,22 +1,33 @@
 <template>
-  <div>
-    <div class="card" style="margin-bottom: 5px">
-      <el-input v-model="data.tagName" style="width: 200px; margin-right: 10px" placeholder="请输入标签名查询"></el-input>
-      <el-select v-model="data.category" clearable style="width: 140px; margin-right: 10px" placeholder="类目">
+  <div class="page-wrap">
+    <div class="page-head with-action">
+      <div class="page-head-main">
+        <h2>兴趣标签</h2>
+        <p class="page-tip">画像与匹配共用的标签词表；已被租客使用的标签不能删除，只能停用。</p>
+      </div>
+      <div class="page-head-action">
+        <el-button type="primary" @click="handleAdd">新增标签</el-button>
+        <el-button type="danger" plain @click="delBatch">批量删除</el-button>
+      </div>
+    </div>
+
+    <div class="card filter-card">
+      <el-input v-model="data.tagName" class="filter-input" clearable placeholder="请输入标签名查询"></el-input>
+      <el-select v-model="data.category" clearable class="filter-select" placeholder="类目">
         <el-option v-for="item in data.categories" :key="item" :label="item" :value="item"></el-option>
       </el-select>
-      <el-select v-model="data.enabled" clearable style="width: 140px; margin-right: 10px" placeholder="启用状态">
+      <el-select v-model="data.enabled" clearable class="filter-select" placeholder="启用状态">
         <el-option label="已启用" value="是"></el-option>
         <el-option label="已停用" value="否"></el-option>
       </el-select>
-      <el-button type="info" plain @click="load">查询</el-button>
-      <el-button type="warning" plain style="margin: 0 10px" @click="reset">重置</el-button>
-      <el-button type="primary" plain @click="handleAdd">新增</el-button>
-      <el-button type="danger" plain @click="delBatch">批量删除</el-button>
+      <div class="filter-actions">
+        <el-button type="primary" @click="load">查询</el-button>
+        <el-button @click="reset">重置</el-button>
+      </div>
     </div>
 
-    <div class="card" style="margin-bottom: 5px">
-      <el-table stripe :data="data.tableData" @selection-change="handleSelectionChange">
+    <div class="card table-card">
+      <el-table :data="data.tableData" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" />
         <el-table-column prop="tag_name" label="标签名" min-width="140" />
         <el-table-column prop="category" label="类目" width="100" />
@@ -28,9 +39,9 @@
         </el-table-column>
         <el-table-column prop="enabled" label="启用状态" width="100">
           <template #default="scope">
-            <el-tag :type="scope.row.enabled === '是' ? 'success' : 'info'">
+            <span class="chip" :class="scope.row.enabled === '是' ? 'chip-green' : ''">
               {{ scope.row.enabled === '是' ? '已启用' : '已停用' }}
-            </el-tag>
+            </span>
           </template>
         </el-table-column>
         <el-table-column prop="sort" label="排序号" width="90" />
@@ -43,6 +54,12 @@
             <el-button type="danger" link @click="del(scope.row)">删除</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <div class="empty-card">
+            <div class="empty-title">词表里还没有标签</div>
+            <div class="empty-desc">点右上角「新增标签」补一条，或者调整筛选条件再查。</div>
+          </div>
+        </template>
       </el-table>
       <!-- 词表是画像和匹配共用的取值来源，删和停用各有什么影响先说清楚 -->
       <div class="table-tip">
@@ -50,42 +67,48 @@
         已经被租客档案用到的标签不能删除，只能停用：停用之后新提交的档案不再提供这个标签，
         已经有租客在用的不受影响；删除会把租客档案里的那个词变成词表外的取值。
       </div>
+      <div class="pager-row" v-if="data.total">
+        <el-pagination
+            v-model:current-page="data.pageNum"
+            background
+            layout="prev, pager, next, total"
+            :page-size="data.pageSize"
+            :total="data.total"
+            @current-change="load"
+        />
+      </div>
     </div>
 
-    <div class="card" v-if="data.total">
-      <el-pagination
-          v-model:current-page="data.pageNum"
-          background
-          layout="prev, pager, next"
-          :page-size="data.pageSize"
-          :total="data.total"
-          @current-change="load"
-      />
-    </div>
+    <el-dialog :title="data.form.id ? '编辑标签' : '新增标签'" v-model="data.formVisible" width="500px" destroy-on-close>
+      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="90px" class="dialog-form">
+        <div class="soft-panel form-group">
+          <div class="section-title">标签信息</div>
+          <el-form-item prop="tag_name" label="标签名">
+            <el-input v-model="data.form.tag_name" maxlength="50" placeholder="例如：跑步、下厨"></el-input>
+          </el-form-item>
+          <el-form-item prop="category" label="类目">
+            <el-select v-model="data.form.category" placeholder="请选择类目" style="width: 100%">
+              <el-option v-for="item in data.categories" :key="item" :label="item" :value="item"></el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="排序号">
+            <el-input-number v-model="data.form.sort" :min="0" :max="999" controls-position="right" style="width: 160px"></el-input-number>
+            <span class="inline-tip">同类标签按这个数字从小到大排</span>
+          </el-form-item>
+        </div>
 
-    <el-dialog :title="data.form.id ? '编辑标签' : '新增标签'" v-model="data.formVisible" width="460px" destroy-on-close>
-      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="90px">
-        <el-form-item prop="tag_name" label="标签名">
-          <el-input v-model="data.form.tag_name" maxlength="50" placeholder="例如：跑步、下厨"></el-input>
-        </el-form-item>
-        <el-form-item prop="category" label="类目">
-          <el-select v-model="data.form.category" placeholder="请选择类目" style="width: 100%">
-            <el-option v-for="item in data.categories" :key="item" :label="item" :value="item"></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="排序号">
-          <el-input-number v-model="data.form.sort" :min="0" :max="999" controls-position="right" style="width: 160px"></el-input-number>
-          <span class="form-tip">同类标签按这个数字从小到大排</span>
-        </el-form-item>
-        <el-form-item label="启用状态">
-          <el-radio-group v-model="data.form.enabled">
-            <el-radio value="是">启用</el-radio>
-            <el-radio value="否">停用</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <div v-if="data.form.id && data.form.used_count" class="form-warn">
-          已有 {{ data.form.used_count }} 位租客的档案用了这个标签，改名字或换类目会被拦下，
-          需要调整请新增一个标签再把这一条停用。
+        <div class="soft-panel form-group">
+          <div class="section-title">启用状态</div>
+          <el-form-item label="状态">
+            <el-radio-group v-model="data.form.enabled">
+              <el-radio value="是">启用</el-radio>
+              <el-radio value="否">停用</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <div v-if="data.form.id && data.form.used_count" class="summary-box form-warn">
+            已有 {{ data.form.used_count }} 位租客的档案用了这个标签，改名字或换类目会被拦下，
+            需要调整请新增一个标签再把这一条停用。
+          </div>
         </div>
       </el-form>
       <template #footer>
@@ -263,24 +286,96 @@ load()
 </script>
 
 <style scoped>
-.table-tip {
-  color: #999;
-  font-size: 12px;
-  line-height: 20px;
-  padding: 10px 5px 0;
+.filter-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
+
+.filter-input { width: 240px; }
+.filter-select { width: 150px; }
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.table-card {
+  padding: 18px 20px 16px;
+}
+
+.table-card :deep(.el-table__empty-block) {
+  background: transparent;
+}
+
+.table-card :deep(.el-table__empty-text) {
+  width: 100%;
+  line-height: 1.6;
+}
+
+.table-card :deep(.empty-card) {
+  width: 100%;
+  margin: 6px 0;
+  padding: 38px 20px;
+}
+
 .used-count {
-  color: #1F6F6B;
+  color: var(--pb-brand);
+  font-weight: 600;
 }
-.form-tip {
+
+.pager-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.dialog-form {
+  max-height: 68vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.dialog-form :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.dialog-form :deep(.el-form-item:last-child) {
+  margin-bottom: 4px;
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.inline-tip {
   margin-left: 10px;
-  color: #999;
+  color: var(--pb-faint);
   font-size: 12px;
 }
+
 .form-warn {
-  color: #1F6F6B;
-  font-size: 12px;
-  line-height: 20px;
-  padding: 0 0 6px 90px;
+  margin-top: 2px;
+  color: #b45309;
+  background: var(--pb-warn-soft);
+  border-color: rgba(245, 158, 11, 0.24);
+}
+
+@media (max-width: 768px) {
+  .filter-input,
+  .filter-select {
+    width: 100%;
+  }
+
+  .filter-actions {
+    margin-left: 0;
+  }
 }
 </style>

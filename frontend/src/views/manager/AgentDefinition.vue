@@ -1,15 +1,34 @@
 <template>
-  <div>
-    <!-- 角色概览：四个角色各自绑了哪套提示词、手上有什么工具、能不能上场 -->
-    <div class="card" style="margin-bottom: 5px">
-      <div class="card-title">角色一览</div>
-      <div class="stat-line">
-        <el-tag type="info">角色 {{ data.summary.total }} 个</el-tag>
-        <el-tag type="success">启用中 {{ data.summary.enabled_count }} 个</el-tag>
-        <el-tag type="info">未单独设置时跟随系统参数：{{ data.summary.default_max_tool_call }} 次</el-tag>
+  <div class="page-wrap">
+    <div class="page-head with-action">
+      <div class="page-head-main">
+        <h2>子 Agent 定义</h2>
+        <p class="page-tip">一个角色就是一套人格提示词加一组工具：提示词决定它站在什么立场说话，工具决定它能查到什么。</p>
+      </div>
+      <div class="page-head-action">
+        <span class="chip chip-blue">四个角色 · 同一套执行器</span>
+      </div>
+    </div>
+
+    <!-- 角色概览：总数、启用数、默认工具调用上限，以及需要提前处理的问题 -->
+    <div class="card">
+      <div class="block-title">角色一览</div>
+      <div class="metric-grid summary-grid">
+        <div class="metric-tile">
+          <div class="metric-label">角色总数</div>
+          <div class="metric-value">{{ data.summary.total }} <small>个</small></div>
+        </div>
+        <div class="metric-tile">
+          <div class="metric-label">启用中</div>
+          <div class="metric-value">{{ data.summary.enabled_count }} <small>个</small></div>
+        </div>
+        <div class="metric-tile">
+          <div class="metric-label">单次工具调用默认上限</div>
+          <div class="metric-value">{{ data.summary.default_max_tool_call }} <small>次</small></div>
+        </div>
       </div>
       <el-alert v-for="(item, index) in data.summary.problems" :key="index" type="warning"
-                :closable="false" show-icon style="margin-top: 8px" :title="item">
+                :closable="false" show-icon class="problem-alert" :title="item">
       </el-alert>
       <div class="table-tip">
         一个角色就是一套人格提示词加一组工具：提示词决定它站在什么立场上说话，工具决定它能查到什么。
@@ -19,101 +38,117 @@
       </div>
     </div>
 
-    <div class="card">
-      <el-table stripe :data="data.tableData">
-        <el-table-column label="角色" width="180">
+    <!-- 角色配置卡片：提示词 / 工具分组 / 调用上限，操作按钮右对齐 -->
+    <div class="config-table-card">
+      <el-table :data="data.tableData" :show-header="false" class="config-table">
+        <el-table-column>
           <template #default="scope">
-            <div class="name-line">{{ scope.row.agent_name }}</div>
-            <div class="code-line">{{ scope.row.agent_code }}</div>
+            <div class="config-card">
+              <div class="config-head">
+                <span class="config-name">{{ scope.row.agent_name }}</span>
+                <span class="mono role-code">{{ scope.row.agent_code }}</span>
+                <span class="chip" :class="scope.row.enabled === '是' ? 'chip-green' : ''">
+                  {{ scope.row.enabled === '是' ? '已启用' : '已停用' }}
+                </span>
+              </div>
+
+              <div class="config-meta">
+                <div class="meta-item">
+                  <span class="meta-label">人格提示词</span>
+                  <span class="meta-value">{{ scope.row.prompt_name || scope.row.prompt_code || '未设置' }}</span>
+                  <span class="chip" :class="scope.row.prompt_state === '正常' ? 'chip-green' : 'chip-red'">
+                    {{ scope.row.prompt_state }}
+                  </span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">工具分组</span>
+                  <span v-if="scope.row.is_supervisor" class="muted meta-value">不调用工具</span>
+                  <span v-else class="meta-value">
+                    {{ scope.row.tool_group || '未设置' }}
+                    <span class="chip" :class="scope.row.tool_enabled ? 'chip-green' : 'chip-red'">
+                      启用 {{ scope.row.tool_enabled }} / {{ scope.row.tool_total }}
+                    </span>
+                  </span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">单次工具调用上限</span>
+                  <span v-if="scope.row.is_supervisor" class="muted meta-value">不适用</span>
+                  <span v-else class="meta-value">
+                    {{ scope.row.effective_max_tool_call }} 次
+                    <span class="mono source-text">{{ scope.row.max_tool_call_source }}</span>
+                  </span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">更新时间</span>
+                  <span class="meta-value muted">{{ scope.row.update_time }}</span>
+                </div>
+              </div>
+
+              <div class="config-actions">
+                <el-button type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
+                <el-button v-if="scope.row.enabled === '是' && !scope.row.is_supervisor"
+                           type="warning" link @click="updateEnabled(scope.row, '否')">停用</el-button>
+                <el-button v-else-if="scope.row.enabled !== '是'" type="success" link
+                           @click="updateEnabled(scope.row, '是')">启用</el-button>
+              </div>
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="人格提示词" min-width="220">
-          <template #default="scope">
-            <div>{{ scope.row.prompt_name || scope.row.prompt_code || '未设置' }}</div>
-            <el-tag size="small" :type="scope.row.prompt_state === '正常' ? 'success' : 'danger'">
-              {{ scope.row.prompt_state }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="工具分组" width="180">
-          <template #default="scope">
-            <span v-if="scope.row.is_supervisor" class="muted-text">不调用工具</span>
-            <span v-else>
-              {{ scope.row.tool_group || '未设置' }}
-              <el-tag size="small" :type="scope.row.tool_enabled ? 'success' : 'danger'">
-                启用 {{ scope.row.tool_enabled }} / {{ scope.row.tool_total }}
-              </el-tag>
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="单次工具调用上限" width="180">
-          <template #default="scope">
-            <span v-if="scope.row.is_supervisor" class="muted-text">不适用</span>
-            <span v-else>
-              {{ scope.row.effective_max_tool_call }} 次
-              <div class="code-line">{{ scope.row.max_tool_call_source }}</div>
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="启用状态" width="100">
-          <template #default="scope">
-            <el-tag :type="scope.row.enabled === '是' ? 'success' : 'info'">
-              {{ scope.row.enabled === '是' ? '已启用' : '已停用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="update_time" label="更新时间" width="170" />
-        <el-table-column label="操作" width="150" fixed="right">
-          <template #default="scope">
-            <el-button type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button v-if="scope.row.enabled === '是' && !scope.row.is_supervisor"
-                       type="warning" link @click="updateEnabled(scope.row, '否')">停用</el-button>
-            <el-button v-else-if="scope.row.enabled !== '是'" type="success" link
-                       @click="updateEnabled(scope.row, '是')">启用</el-button>
-          </template>
-        </el-table-column>
+        <template #empty>
+          <div class="empty-card">
+            <div class="empty-title">还没有角色定义</div>
+            <div class="empty-desc">角色由程序固定，正常初始化后这里会出现四个 Agent 角色。</div>
+          </div>
+        </template>
       </el-table>
     </div>
 
-    <el-dialog title="编辑角色" v-model="data.formVisible" width="620px" destroy-on-close>
-      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="130px">
-        <el-form-item label="角色编码">
-          <span class="readonly-text">{{ data.form.agent_code }}</span>
-        </el-form-item>
-        <el-form-item prop="agent_name" label="角色名称">
-          <el-input v-model="data.form.agent_name" maxlength="100" style="width: 260px"></el-input>
-        </el-form-item>
-        <el-form-item prop="prompt_code" label="人格提示词">
-          <el-select v-model="data.form.prompt_code" filterable style="width: 320px">
-            <el-option v-for="item in data.promptOptions" :key="item.code"
-                       :label="item.name + '（' + item.code + '）'" :value="item.code"></el-option>
-          </el-select>
-          <div class="form-tip">这里只能选启用中且内容非空的模板，换一套提示词等于换这个角色的立场。</div>
-        </el-form-item>
-        <el-form-item label="工具分组">
-          <span v-if="data.form.is_supervisor" class="readonly-text">
-            不调用工具：主管只决定这一轮派谁，查数据的事交给子角色
-          </span>
-          <el-select v-else v-model="data.form.tool_group" style="width: 320px">
-            <el-option v-for="item in data.groupOptions" :key="item.tool_group"
-                       :label="item.tool_group + '（启用 ' + item.tool_enabled + ' / ' + item.tool_total + '）'"
-                       :value="item.tool_group"></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="单次工具调用上限">
-          <el-input-number v-if="!data.form.is_supervisor" v-model="data.form.max_tool_call"
-                           :min="1" :max="200" :precision="0" controls-position="right"
-                           style="width: 180px"></el-input-number>
-          <span v-if="!data.form.is_supervisor" class="form-tip">
-            留空表示跟随系统参数里的 {{ data.summary.default_max_tool_call }} 次。到达上限这个角色会中断，
-            把原因作为结论交给主管，不会静默继续
-          </span>
-        </el-form-item>
-        <el-form-item label="排序号">
-          <el-input-number v-model="data.form.sort" :min="0" :max="999" :precision="0"
-                           controls-position="right" style="width: 180px"></el-input-number>
-          <div class="form-tip">只影响这一页的显示顺序。</div>
-        </el-form-item>
+    <el-dialog title="编辑角色" v-model="data.formVisible" width="660px" destroy-on-close>
+      <el-form ref="formRef" :rules="data.rules" :model="data.form" label-width="130px" class="dialog-form">
+        <div class="soft-panel form-group">
+          <div class="section-title">角色信息</div>
+          <el-form-item label="角色编码">
+            <span class="mono readonly-text">{{ data.form.agent_code }}</span>
+          </el-form-item>
+          <el-form-item prop="agent_name" label="角色名称">
+            <el-input v-model="data.form.agent_name" maxlength="100" style="width: 260px"></el-input>
+          </el-form-item>
+          <el-form-item label="排序号">
+            <el-input-number v-model="data.form.sort" :min="0" :max="999" :precision="0"
+                             controls-position="right" style="width: 180px"></el-input-number>
+            <span class="inline-tip">只影响这一页的显示顺序。</span>
+          </el-form-item>
+        </div>
+
+        <div class="soft-panel form-group">
+          <div class="section-title">提示词与工具</div>
+          <el-form-item prop="prompt_code" label="人格提示词">
+            <el-select v-model="data.form.prompt_code" filterable style="width: 320px">
+              <el-option v-for="item in data.promptOptions" :key="item.code"
+                         :label="item.name + '（' + item.code + '）'" :value="item.code"></el-option>
+            </el-select>
+            <div class="tip-block">这里只能选启用中且内容非空的模板，换一套提示词等于换这个角色的立场。</div>
+          </el-form-item>
+          <el-form-item label="工具分组">
+            <span v-if="data.form.is_supervisor" class="readonly-text">
+              不调用工具：主管只决定这一轮派谁，查数据的事交给子角色
+            </span>
+            <el-select v-else v-model="data.form.tool_group" style="width: 320px">
+              <el-option v-for="item in data.groupOptions" :key="item.tool_group"
+                         :label="item.tool_group + '（启用 ' + item.tool_enabled + ' / ' + item.tool_total + '）'"
+                         :value="item.tool_group"></el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="单次工具调用上限">
+            <el-input-number v-if="!data.form.is_supervisor" v-model="data.form.max_tool_call"
+                             :min="1" :max="200" :precision="0" controls-position="right"
+                             style="width: 180px"></el-input-number>
+            <span v-if="!data.form.is_supervisor" class="inline-tip">
+              留空表示跟随系统参数里的 {{ data.summary.default_max_tool_call }} 次。到达上限这个角色会中断，
+              把原因作为结论交给主管，不会静默继续
+            </span>
+          </el-form-item>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="data.formVisible = false">取消</el-button>
@@ -230,38 +265,181 @@ loadOptions()
 </script>
 
 <style scoped>
-.card-title {
+.summary-grid {
+  margin-bottom: 12px;
+}
+
+.problem-alert {
+  margin-top: 8px;
+}
+
+/* 角色配置卡片列表：单列 el-table 去表头，承载卡片 */
+.config-table-card {
+  padding: 0;
+}
+
+.config-table {
+  background: transparent;
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: transparent;
+  --el-table-border-color: transparent;
+}
+
+.config-table :deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+.config-table :deep(td.el-table__cell) {
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+.config-table :deep(tr.el-table__row),
+.config-table :deep(tr.el-table__row:hover > td.el-table__cell) {
+  background: transparent !important;
+}
+
+.config-table :deep(.el-table__empty-block) {
+  background: transparent;
+}
+
+.config-table :deep(.el-table__empty-text) {
+  width: 100%;
+  line-height: 1.6;
+}
+
+.config-table :deep(.empty-card) {
+  width: 100%;
+  margin: 6px 0;
+  padding: 40px 20px;
+}
+
+.config-card {
+  margin-bottom: 12px;
+  padding: 16px 18px;
+  background: var(--pb-surface);
+  border: 1px solid var(--pb-line);
+  border-radius: var(--pb-radius);
+  box-shadow: var(--pb-shadow-card);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.config-card:hover {
+  border-color: rgba(17, 24, 39, 0.12);
+  box-shadow: var(--pb-shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.config-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-name {
   font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 10px;
+  font-weight: 650;
+  color: var(--pb-text);
 }
-.stat-line .el-tag {
-  margin-right: 8px;
-}
-.name-line {
-  color: #303133;
-}
-.code-line {
-  color: #909399;
+
+.role-code {
+  padding: 2px 8px;
+  border-radius: 7px;
+  background: var(--pb-surface-3);
+  color: var(--pb-muted);
   font-size: 12px;
 }
-.muted-text {
-  color: #909399;
+
+.config-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 24px;
+  margin-top: 12px;
 }
-.readonly-text {
-  color: #606266;
+
+.meta-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
-.form-tip {
-  color: #909399;
+
+.meta-label {
+  flex: none;
+  font-size: 12px;
+  color: var(--pb-faint);
+}
+
+.meta-value {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--pb-muted);
+  text-overflow: ellipsis;
+}
+
+.source-text {
+  font-size: 11.5px;
+  color: var(--pb-faint);
+}
+
+.config-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--pb-line);
+}
+
+/* 弹窗内分组 */
+.dialog-form {
+  max-height: 68vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.dialog-form :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.dialog-form :deep(.el-form-item:last-child) {
+  margin-bottom: 4px;
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.inline-tip {
+  margin-left: 10px;
+  color: var(--pb-faint);
   font-size: 12px;
   line-height: 18px;
-  margin-top: 4px;
 }
-.table-tip {
-  color: #999;
+
+.tip-block {
+  width: 100%;
+  margin-top: 4px;
+  color: var(--pb-faint);
   font-size: 12px;
-  line-height: 20px;
-  padding: 10px 5px 0;
+  line-height: 18px;
+}
+
+.readonly-text {
+  color: var(--pb-text);
+}
+
+@media (max-width: 960px) {
+  .config-meta { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

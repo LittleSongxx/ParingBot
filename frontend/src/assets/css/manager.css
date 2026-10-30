@@ -1,99 +1,112 @@
-.manager-container {
-    background-color: #f8f8ff;
+/* 管理端：浅色工作台布局（参考 NewsClaw） */
+
+.manager-shell {
     min-height: 100vh;
-}
-
-.manager-header {
-    height: 60px;
-    background-color: #1F6F6B;
     display: flex;
-    align-items: center;
-    box-shadow: 0 1px 4px rgba(0, 21, 41, .08);
+    flex-direction: column;
 }
 
-/* 宽度按标题内容撑开、标题不换行：平台名较长，固定宽度会把标题挤成两行 */
-.manager-header-left {
-    background-color: #1F6F6B;
+.manager-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    height: 64px;
     flex: none;
-    min-width: 220px;
-    height: 100%;
-    padding: 0 24px 0 10px;
     display: flex;
     align-items: center;
+    gap: 20px;
+    padding: 0 22px;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--pb-line);
 }
 
-.manager-header-left img {
-    width: 30px;
+.manager-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 232px;
+    cursor: pointer;
+}
+
+.brand-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.24);
+}
+
+.brand-text { display: flex; flex-direction: column; line-height: 1.2; }
+.brand-name { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: var(--pb-text); }
+.brand-sub { font-size: 11px; color: var(--pb-muted); }
+
+.manager-topbar-center { flex: 1; min-width: 0; }
+
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+
+.env-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     height: 30px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: var(--pb-brand-soft);
+    border: 1px solid rgba(37, 99, 235, 0.14);
+    color: var(--pb-brand);
+    font-size: 12px;
+    font-weight: 550;
 }
 
-.manager-header-left .title {
-    white-space: nowrap;
-    font-weight: bold;
-    font-size: 20px;
-    margin-left: 10px;
-    color: white;
+.user-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 4px;
+    border-radius: 999px;
+    border: 1px solid var(--pb-line);
+    background: var(--pb-surface);
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+.user-chip:hover { border-color: rgba(37, 99, 235, 0.35); background: var(--pb-brand-soft); }
+.user-chip .user-name { font-size: 13px; font-weight: 550; color: var(--pb-text); }
+.user-chip .chev { color: var(--pb-faint); font-size: 12px; }
+
+.manager-body { flex: 1; display: flex; min-height: 0; }
+
+.manager-sidebar {
+    width: 234px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    padding: 14px 8px 16px;
+    background: rgba(255, 255, 255, 0.66);
+    backdrop-filter: blur(10px);
+    border-right: 1px solid var(--pb-line);
 }
 
-.manager-header-center {
+.sidebar-menu { flex: 1; overflow: auto; border: none; background: transparent; }
+
+.manager-sidebar .el-menu { background: transparent; }
+
+.sidebar-foot {
+    margin: 12px 10px 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--pb-surface-2);
+    border: 1px solid var(--pb-line);
+    font-size: 11px;
+    color: var(--pb-muted);
+    line-height: 1.7;
+}
+
+.sidebar-foot b { color: var(--pb-text); font-weight: 600; }
+
+.manager-content {
     flex: 1;
+    min-width: 0;
+    padding: 26px 30px 44px;
 }
 
-.manager-main-left {
-    width: 200px;
-    box-shadow: 0 0 6px rgba(0, 21, 41, .33);
-    min-height: calc(100vh - 60px);
-}
-
-.manager-main-right {
-    flex: 1;
-    width: 0;
-    background-color: #f8f8ff;
-    padding: 10px;
-}
-
-
-/* Element-Plus 样式覆盖 */
-.el-menu {
-    width: 200px;
-    height: 100%;
-    border: none;
-    background-color: #00162a;
-}
-:deep(.el-sub-menu__title) {
-    color: #ddd !important;
-    height: 50px;
-    line-height: 50px;
-    background-color: #011223 !important;
-}
-.el-sub-menu__title:hover {
-    color: #fff;
-}
-.el-menu-item {
-    color: #fff;
-    height: 50px;
-    line-height: 50px;
-    background-color: #000b17 !important;
-}
-.el-menu--inline .el-menu-item {
-    padding-left: 50px !important;
-}
-.el-menu .is-active {
-    color: #fff !important;
-    background-color: #1F6F6B !important;
-}
-.el-menu-item:not(.is-active):hover {
-    color: #fff !important;
-    background-color: #1F6F6B !important;
-}
-
-.el-tooltip__trigger {
-    outline: none;
-}
-:deep(.el-breadcrumb__inner) {
-    color: white !important;
-}
-:deep(.el-breadcrumb__separator) {
-    color: white !important;
-}
-
+.manager-content > * { width: 100%; }

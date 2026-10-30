@@ -1,7 +1,10 @@
+// Element Plus 主题色：与全局设计 token 保持一致（NewsClaw 风格浅色工作台）
+// primary 用品牌蓝，其它语义色用低饱和的绿/琥珀/红。
 @forward "element-plus/theme-chalk/src/common/var.scss" with ($colors: (
-  "primary": ("base": #0066bc),
-  "success": ("base": #46b61f),
-  "warning": ("base": #ffad00),
-  "danger": ("base": #e52f2f),
-  "info": ("base": #47afdc),
+  "primary": ("base": #2563eb),
+  "success": ("base": #10b981),
+  "warning": ("base": #f59e0b),
+  "danger": ("base": #ef4444),
+  "error": ("base": #ef4444),
+  "info": ("base": #64748b),
 ));
