@@ -1,4 +1,4 @@
-name: smartlect
+name: smartlect-app
 
 services:
   mysql:
@@ -57,6 +57,6 @@ services:
 
 volumes:
   mysql_data:
-    name: smartlect_mysql_data
+    name: smartlect_app_mysql_data
   uploads:
-    name: smartlect_uploads
+    name: smartlect_app_uploads
