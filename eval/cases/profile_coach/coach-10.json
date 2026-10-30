@@ -1,0 +1,84 @@
+{
+  "id": "coach-10",
+  "scene": "profile_coach",
+  "title": "门店范围写「不限」但期望里要求同门店",
+  "input": {
+    "profile": {
+      "nickname": "小宋",
+      "gender": "男",
+      "birth_date": "1998-12-16",
+      "rent_budget": 3500,
+      "tidiness": "洁癖",
+      "occupation": "公务员",
+      "lease_term": "6-12个月",
+      "store": "张江店",
+      "area": "浦东",
+      "store_id": 1,
+      "schedule_type": "早睡早起",
+      "has_pet": "无",
+      "smoking": "偶尔",
+      "self_intro": "做公务员的，公司离张江店不远。每天七点前起床晨跑，晚上很少熬夜。对卫生要求比较高，每周会给公共区域做一次深度清洁。偶尔会抽烟，但只在楼下抽，不在屋里。周末喜欢自己做饭，厨房用完会收拾干净。偶尔周末会有朋友来坐坐，会提前跟室友说一声。平时喜欢爬山、杂志、品酒、看电影。打算先签一年以内。",
+      "roommate_expectation": "希望室友作息规律，晚上十一点后尽量安静。希望室友爱干净，公共区域用完能及时收拾。最好就在同一家门店，通勤方便。相处简单一点，有事好商量。",
+      "interest_tags": [
+        "爬山",
+        "杂志",
+        "品酒",
+        "看电影",
+        "乒乓球"
+      ]
+    },
+    "preference": {
+      "age_min": 23,
+      "age_max": 31,
+      "age_required": "必须",
+      "budget_min": 2300,
+      "budget_max": 4300,
+      "budget_required": "必须",
+      "tidiness_min": "整洁",
+      "tidiness_required": "必须",
+      "store_scope": "不限",
+      "store_required": "加分",
+      "schedule_accept": "早睡早起",
+      "schedule_required": "加分",
+      "lease_min": null,
+      "lease_required": "加分",
+      "pet_accept": "无所谓",
+      "pet_required": "加分"
+    },
+    "moments": [
+      "周末在家自己炖了锅汤，厨房用完顺手收拾了。",
+      "卫生间又做了一遍深度清洁，地漏也拆下来刷了。",
+      "这周末去杂志了，很放松。",
+      "爬山真是解压的好办法。"
+    ]
+  },
+  "assertions": {
+    "max_questions": 5,
+    "must_include_fields": [
+      "store_scope"
+    ],
+    "must_not_include_fields": [
+      "gender"
+    ]
+  },
+  "reference": {
+    "questions": [
+      {
+        "field": "store_scope",
+        "question": "偏好里门店写的是「不限」，但期望里说最好同门店：同门店是硬性条件吗？"
+      }
+    ],
+    "suggestions": [
+      {
+        "field": "store_scope",
+        "value": "同门店",
+        "evidence": "最好就在同一家门店",
+        "reason": "室友期望原文点名同门店，和偏好里的「不限」不一致，建议按期望改成同门店"
+      }
+    ],
+    "intro_suggestion": null,
+    "warnings": [
+      "门店范围和室友期望的描述不一致，建议先确认哪一个是真实条件。"
+    ]
+  }
+}

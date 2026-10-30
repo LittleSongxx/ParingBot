@@ -26,3 +26,6 @@ files/
 # 临时文件
 .cache/
 *.bundle
+
+# AI 评测报告（本地生成，不入库）
+eval/report*.json

@@ -1,0 +1,44 @@
+{
+  "id": "brief-02",
+  "scene": "match_brief",
+  "title": "非交付候选必须拒绝生成简报",
+  "input": {
+    "applicant": {
+      "id": 1,
+      "nickname": "小宋",
+      "gender": "男",
+      "self_intro": "每天七点前起床晨跑，晚上很少熬夜。",
+      "roommate_expectation": "希望室友爱干净。",
+      "schedule_type": "早睡早起",
+      "store_id": 1,
+      "interest_tags": [
+        "爬山"
+      ],
+      "preference": {
+        "store_scope": "同门店",
+        "store_required": "必须",
+        "schedule_accept": "早睡早起",
+        "schedule_required": "加分"
+      }
+    },
+    "candidate": {
+      "id": 999,
+      "nickname": "测试未交付",
+      "gender": "男",
+      "self_intro": "我还在审核中。",
+      "roommate_expectation": "暂无。"
+    },
+    "delivered": false
+  },
+  "assertions": {
+    "eligible": false,
+    "must_not_mention": [
+      "微信"
+    ]
+  },
+  "reference": {
+    "candidate_id": 999,
+    "refused": true,
+    "reason": "该候选不在本次交付名单中，无法生成解读简报。"
+  }
+}

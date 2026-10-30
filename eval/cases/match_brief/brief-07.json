@@ -1,0 +1,190 @@
+{
+  "id": "brief-07",
+  "scene": "match_brief",
+  "title": "已交付候选：候选方多条必须项都满足，需保留宠物共识",
+  "input": {
+    "applicant": {
+      "id": 1,
+      "nickname": "小宋",
+      "gender": "男",
+      "birth_date": "1998-12-16",
+      "rent_budget": 3500,
+      "tidiness": "洁癖",
+      "occupation": "公务员",
+      "lease_term": "6-12个月",
+      "store": "张江店",
+      "area": "浦东",
+      "store_id": 1,
+      "schedule_type": "早睡早起",
+      "has_pet": "无",
+      "smoking": "偶尔",
+      "self_intro": "做公务员的，公司离张江店不远。每天七点前起床晨跑，晚上很少熬夜。对卫生要求比较高，每周会给公共区域做一次深度清洁。偶尔会抽烟，但只在楼下抽，不在屋里。周末喜欢自己做饭，厨房用完会收拾干净。偶尔周末会有朋友来坐坐，会提前跟室友说一声。平时喜欢爬山、杂志、品酒、看电影。打算先签一年以内。",
+      "roommate_expectation": "希望室友作息规律，晚上十一点后尽量安静。希望室友爱干净，公共区域用完能及时收拾。最好就在同一家门店，通勤方便。相处简单一点，有事好商量。",
+      "interest_tags": [
+        "爬山",
+        "杂志",
+        "品酒",
+        "看电影",
+        "乒乓球"
+      ],
+      "preference": {
+        "age_min": 23,
+        "age_max": 31,
+        "age_required": "必须",
+        "budget_min": 2300,
+        "budget_max": 4300,
+        "budget_required": "必须",
+        "tidiness_min": "整洁",
+        "tidiness_required": "必须",
+        "store_scope": "同门店",
+        "store_required": "加分",
+        "schedule_accept": "早睡早起",
+        "schedule_required": "加分",
+        "lease_min": null,
+        "lease_required": "加分",
+        "pet_accept": "无所谓",
+        "pet_required": "加分"
+      },
+      "moments": [
+        "周末在家自己炖了锅汤，厨房用完顺手收拾了。",
+        "卫生间又做了一遍深度清洁，地漏也拆下来刷了。",
+        "这周末去杂志了，很放松。",
+        "爬山真是解压的好办法。"
+      ],
+      "portrait": {
+        "version": 2,
+        "summary": "小宋，男，27岁，公务员，租住张江店（浦东片区），预算3500元，计划租期6-12个月，无宠物、偶尔吸烟（只在楼下）。作息早睡早起、每天七点前起床晨跑、晚上很少熬夜；卫生要求高，属洁癖型，每周给公共区域做深度清洁，动态里还拆洗地漏、做完饭顺手收拾厨房。周末自己做饭，偶尔有朋友来会提前告知室友。兴趣为爬山、杂志、品酒、看电影、乒乓球。合住上希望室友作息规律、爱干净、晚上十一点后安静，最好同门店通勤方便，相处简单、有事好商量。",
+        "personality_tags": [
+          "自律",
+          "爱干净",
+          "好商量",
+          "生活规律"
+        ],
+        "lifestyle_tags": [
+          "早睡早起",
+          "洁癖式清洁",
+          "自己做饭",
+          "偶尔吸烟（楼下）",
+          "偶尔有访客",
+          "安静不熬夜"
+        ],
+        "cohabit_need_tags": [
+          "希望室友作息规律",
+          "希望室友爱干净",
+          "希望室友夜间安静",
+          "希望同门店通勤方便",
+          "相处简单好商量"
+        ]
+      }
+    },
+    "candidate": {
+      "id": 66,
+      "nickname": "涵轩",
+      "gender": "男",
+      "birth_date": "1997-05-14",
+      "rent_budget": 3000,
+      "tidiness": "整洁",
+      "occupation": "民警",
+      "lease_term": "1-2年",
+      "store": "金桥店",
+      "area": "浦东",
+      "store_id": 2,
+      "schedule_type": "早睡早起",
+      "has_pet": "无",
+      "smoking": "不吸烟",
+      "self_intro": "我在浦东这边上班，做民警。作息很规律，一般十点半前睡，早上六点多就起了。东西习惯分类收纳，厨房用完当天就擦干净。不抽烟，也闻不惯烟味。会做几个家常菜，愿意和室友一起分摊买菜。很少带朋友回来。平时喜欢撸狗、手游、手工、古镇游。工作稳定，计划在这边住一到两年。",
+      "roommate_expectation": "希望室友作息规律，晚上十一点后尽量安静。对动物毛发过敏，不能接受室友养宠物。希望能长期稳定住，不要频繁换人。希望室友不在屋里抽烟。能互相尊重彼此的空间就好。",
+      "interest_tags": [
+        "撸狗",
+        "手游",
+        "手工",
+        "古镇游"
+      ],
+      "preference": {
+        "age_min": 23,
+        "age_max": 32,
+        "age_required": "加分",
+        "budget_min": 2200,
+        "budget_max": 4000,
+        "budget_required": "加分",
+        "tidiness_min": "一般",
+        "tidiness_required": "必须",
+        "store_scope": "同片区",
+        "store_required": "必须",
+        "schedule_accept": "早睡早起,正常作息",
+        "schedule_required": "加分",
+        "lease_min": "1-2年",
+        "lease_required": "加分",
+        "pet_accept": "不接受",
+        "pet_required": "加分"
+      },
+      "moments": [
+        "又点了外卖，最近太忙没空做饭。",
+        "给衣柜做了个分类收纳，找东西方便多了。"
+      ],
+      "audit": {
+        "audit_status": "通过",
+        "reject_code": null,
+        "reject_reason": null
+      },
+      "portrait": null,
+      "portrait_missing": "这位候选还没有生成画像"
+    },
+    "delivered": true,
+    "task": {
+      "task_id": 78,
+      "task_no": "MATCH-20261006225835-24aadc",
+      "status": "已完成"
+    }
+  },
+  "assertions": {
+    "eligible": true,
+    "max_icebreakers": 3,
+    "must_mention": [
+      "同片区"
+    ],
+    "must_not_mention": [
+      "微信",
+      "手机号"
+    ]
+  },
+  "reference": {
+    "candidate_id": 66,
+    "matches": [
+      {
+        "point": "双方都在浦东，张江店与金桥店同属浦东片区。",
+        "evidence": "浦东"
+      },
+      {
+        "point": "作息都是早睡早起，睡眠时间接近。",
+        "evidence": "早睡早起"
+      },
+      {
+        "point": "都习惯分类收纳，对整洁有共识。",
+        "evidence": "分类收纳"
+      }
+    ],
+    "conditions": [
+      {
+        "item": "对方把同片区门店标为必须，你在张江店、他在金桥店，同属浦东。",
+        "evidence": "同片区"
+      },
+      {
+        "item": "对方不接受室友养宠，你目前不养宠，双方一致。",
+        "evidence": "不接受"
+      }
+    ],
+    "risks": [
+      {
+        "issue": "对方对动物毛发过敏且不接受养宠，未来养宠计划需要先对齐。",
+        "evidence": "对动物毛发过敏",
+        "suggestion": "先确认双方对宠物的长期打算。"
+      }
+    ],
+    "icebreakers": [
+      "你平时喜欢玩什么手游？",
+      "你周末会去古镇走走吗？"
+    ],
+    "disclaimer": "以上是建议，最终以你和对方沟通为准。"
+  }
+}

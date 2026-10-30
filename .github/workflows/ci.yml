@@ -48,6 +48,8 @@ jobs:
       - name: pytest
         working-directory: backend
         run: pytest -q
+      - name: AI 能力评测（Phase 0 fixtures）
+        run: python eval/run_eval.py --fixtures --bad eval/fixtures/bad
 
   frontend:
     runs-on: ubuntu-latest

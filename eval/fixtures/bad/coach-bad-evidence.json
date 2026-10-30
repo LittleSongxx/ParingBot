@@ -1,0 +1,27 @@
+{
+  "case_id": "coach-01",
+  "output": {
+    "questions": [
+      {
+        "field": "schedule_type",
+        "question": "你写的「作息规律」具体是几点睡、几点起？"
+      }
+    ],
+    "suggestions": [
+      {
+        "field": "schedule_type",
+        "value": "早睡早起",
+        "evidence": "我在北京",
+        "reason": "原文能确认作息习惯"
+      },
+      {
+        "field": "budget_required",
+        "value": "加分",
+        "evidence": "需补充",
+        "reason": "目前必须项有 3 个，若预算可浮动建议改成加分，给筛选官留放宽空间"
+      }
+    ],
+    "intro_suggestion": null,
+    "warnings": []
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "id": "brief-14",
+  "scene": "match_brief",
+  "title": "非交付候选：性别硬规则未通过，必须拒绝",
+  "input": {
+    "applicant": {
+      "id": 1,
+      "nickname": "小宋",
+      "gender": "男",
+      "birth_date": "1998-12-16",
+      "rent_budget": 3500,
+      "tidiness": "洁癖",
+      "occupation": "公务员",
+      "lease_term": "6-12个月",
+      "store": "张江店",
+      "area": "浦东",
+      "store_id": 1,
+      "schedule_type": "早睡早起",
+      "has_pet": "无",
+      "smoking": "偶尔",
+      "self_intro": "做公务员的，公司离张江店不远。每天七点前起床晨跑，晚上很少熬夜。对卫生要求比较高，每周会给公共区域做一次深度清洁。偶尔会抽烟，但只在楼下抽，不在屋里。周末喜欢自己做饭，厨房用完会收拾干净。偶尔周末会有朋友来坐坐，会提前跟室友说一声。平时喜欢爬山、杂志、品酒、看电影。打算先签一年以内。",
+      "roommate_expectation": "希望室友作息规律，晚上十一点后尽量安静。希望室友爱干净，公共区域用完能及时收拾。最好就在同一家门店，通勤方便。相处简单一点，有事好商量。",
+      "interest_tags": [
+        "爬山",
+        "杂志",
+        "品酒",
+        "看电影",
+        "乒乓球"
+      ],
+      "preference": {
+        "age_min": 23,
+        "age_max": 31,
+        "age_required": "必须",
+        "budget_min": 2300,
+        "budget_max": 4300,
+        "budget_required": "必须",
+        "tidiness_min": "整洁",
+        "tidiness_required": "必须",
+        "store_scope": "同门店",
+        "store_required": "加分",
+        "schedule_accept": "早睡早起",
+        "schedule_required": "加分",
+        "lease_min": null,
+        "lease_required": "加分",
+        "pet_accept": "无所谓",
+        "pet_required": "加分"
+      },
+      "moments": [
+        "周末在家自己炖了锅汤，厨房用完顺手收拾了。",
+        "卫生间又做了一遍深度清洁，地漏也拆下来刷了。",
+        "这周末去杂志了，很放松。",
+        "爬山真是解压的好办法。"
+      ],
+      "portrait": {
+        "version": 2,
+        "summary": "小宋，男，27岁，公务员，租住张江店（浦东片区），预算3500元，计划租期6-12个月，无宠物、偶尔吸烟（只在楼下）。作息早睡早起、每天七点前起床晨跑、晚上很少熬夜；卫生要求高，属洁癖型，每周给公共区域做深度清洁，动态里还拆洗地漏、做完饭顺手收拾厨房。周末自己做饭，偶尔有朋友来会提前告知室友。兴趣为爬山、杂志、品酒、看电影、乒乓球。合住上希望室友作息规律、爱干净、晚上十一点后安静，最好同门店通勤方便，相处简单、有事好商量。",
+        "personality_tags": [
+          "自律",
+          "爱干净",
+          "好商量",
+          "生活规律"
+        ],
+        "lifestyle_tags": [
+          "早睡早起",
+          "洁癖式清洁",
+          "自己做饭",
+          "偶尔吸烟（楼下）",
+          "偶尔有访客",
+          "安静不熬夜"
+        ],
+        "cohabit_need_tags": [
+          "希望室友作息规律",
+          "希望室友爱干净",
+          "希望室友夜间安静",
+          "希望同门店通勤方便",
+          "相处简单好商量"
+        ]
+      }
+    },
+    "candidate": {
+      "id": 387,
+      "nickname": "汐禾",
+      "gender": "女",
+      "birth_date": "2001-03-16",
+      "rent_budget": 4300,
+      "tidiness": "整洁",
+      "occupation": "编辑",
+      "lease_term": "6-12个月",
+      "store": "五角场店",
+      "area": "杨浦",
+      "store_id": 9,
+      "schedule_type": "早睡早起",
+      "has_pet": "无",
+      "smoking": "不吸烟",
+      "self_intro": "做编辑的，公司离五角场店不远。我习惯早睡早起，晚上十一点之后基本就不出声了。比较爱干净，公共区域用完马上收拾。不吸烟不酗酒。会做几个家常菜，愿意和室友一起分摊买菜。偶尔周末会有朋友来坐坐，会提前跟室友说一声。平时喜欢密室逃脱、听相声、咖啡。打算先签一年以内。",
+      "roommate_expectation": "希望室友作息规律，晚上十一点后尽量安静。希望室友爱干净，公共区域用完能及时收拾。对动物毛发过敏，不能接受室友养宠物。最好就在同一家门店，通勤方便。能互相尊重彼此的空间就好。",
+      "interest_tags": [
+        "密室逃脱",
+        "听相声",
+        "咖啡"
+      ],
+      "preference": {
+        "age_min": 20,
+        "age_max": 29,
+        "age_required": "必须",
+        "budget_min": 3100,
+        "budget_max": 5800,
+        "budget_required": "必须",
+        "tidiness_min": "整洁",
+        "tidiness_required": "必须",
+        "store_scope": "同门店",
+        "store_required": "加分",
+        "schedule_accept": "早睡早起",
+        "schedule_required": "加分",
+        "lease_min": "3-6个月",
+        "lease_required": "加分",
+        "pet_accept": "不接受",
+        "pet_required": "加分"
+      },
+      "moments": [
+        "今天六点半起床跑了五公里，回来冲个澡正好去上班。",
+        "周末也是七点自然醒，下楼买了早饭顺便逛了逛菜市场。",
+        "晚上十点就困了，早睡的感觉真好，明天还要早起。"
+      ],
+      "audit": {
+        "audit_status": "否决",
+        "reject_code": "MISMATCH_HARD",
+        "reject_reason": "合租只找同性，候选方与申请方性别不同"
+      },
+      "portrait": null,
+      "portrait_missing": "这位候选还没有生成画像"
+    },
+    "delivered": false,
+    "task": {
+      "task_id": 40,
+      "task_no": "MATCH-20261004124819-8ce9b7",
+      "status": "已完成"
+    }
+  },
+  "assertions": {
+    "eligible": false,
+    "must_not_mention": [
+      "微信"
+    ]
+  },
+  "reference": {
+    "candidate_id": 387,
+    "refused": true,
+    "reason": "该候选不在本次交付名单中（性别硬规则复核未通过），不能生成解读简报。"
+  }
+}
