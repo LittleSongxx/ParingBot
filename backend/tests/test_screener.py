@@ -360,6 +360,45 @@ async def test_round_rows_keep_a_round_that_found_nobody(db, monkeypatch):
     assert rounds[1]["relax_note"] == "门店+1级"
 
 
+async def test_round_note_uses_step_round_not_model_found_round(db):
+    """放宽说明按步骤上的调度轮次归轮：模型自报的 found_round 不能拿去对轮。"""
+    member = await _make_applicant()
+    first = await _make_candidate()
+    task = await _open_task(member)
+    run = await _open_run(task)
+    await AgentStep.create(
+        run_id=run.id, round_no=5, step_index=1, agent_code=screener_service.AGENT_CODE,
+        step_type="工具调用", step_name="调用工具 save_candidates",
+        tool_code="save_candidates",
+        request_params=json.dumps({"candidates": [], "found_round": 1,
+                                   "relax_note": "年龄上限+2"}),
+        response_result=json.dumps({"written": 1}, ensure_ascii=False))
+    await MatchCandidate.create(task_id=task.id, candidate_member_id=first.id,
+                                found_round=5, audit_status="待审核")
+
+    assert await screener_service._round_note(run.id, 5) == "年龄上限+2"
+    assert await screener_service._round_note(run.id, 1) is None
+    rounds = await screener_service.round_rows(task)
+    assert [item["round"] for item in rounds] == [5]
+    assert rounds[0]["relax_note"] == "年龄上限+2" and rounds[0]["added"] == 1
+
+
+async def test_save_candidates_rolls_back_when_a_row_is_invalid(db):
+    """一批里有一条不合法时整批不落库：不能留下上一次被拒的半批候选。"""
+    member = await _make_applicant()
+    first = await _make_candidate()
+    wrong = await _make_candidate(gender="女")
+    task = await _open_task(member)
+    run = await _open_run(task)
+    context = await _context(member, task, run)
+    with pytest.raises(CustomException):
+        await tool_box.invoke("save_candidates", {
+            "candidates": [{"candidate_member_id": first.id},
+                           {"candidate_member_id": wrong.id}],
+            "found_round": 1}, context)
+    assert await MatchCandidate.filter(task_id=task.id).count() == 0
+
+
 async def test_stops_when_a_round_relaxes_nothing(db, monkeypatch):
     """放宽轮没有放宽条件时收尾：再来一轮还是同一批人，白跑一次。"""
     member = await _make_applicant()

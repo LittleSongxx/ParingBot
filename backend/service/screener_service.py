@@ -223,7 +223,10 @@ async def _round_note(run_id: int | None, round_no: int) -> str | None:
         run_id=run_id, tool_code=SAVE_TOOL).order_by("step_index")
     for step in steps:
         params = _step_params(step)
-        if params.get("found_round") != round_no:
+        # 以步骤记录上的调度轮次为准：save_candidates 落库的 found_round 已经是
+        # context.round_no，步骤入参里的 found_round 仍是模型自报值，不能拿来对轮。
+        effective = step.round_no or params.get("found_round")
+        if effective != round_no:
             continue
         current = str(params.get("relax_note") or "").strip()
         if current:
@@ -613,7 +616,8 @@ async def round_rows(task: MatchTask) -> list[dict]:
         run_id=task.run_id, tool_code=SAVE_TOOL).order_by("step_index")
     for step in steps:
         params = _step_params(step)
-        found = params.get("found_round")
+        # 轮次同样以步骤上的 round_no 为准，模型自报的 found_round 只在老数据里兜底
+        found = step.round_no or params.get("found_round")
         if found is None:
             continue
         notes[found] = str(params.get("relax_note") or "").strip() or None

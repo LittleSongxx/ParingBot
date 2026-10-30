@@ -18,6 +18,8 @@ from dataclasses import dataclass, replace
 from datetime import date
 from typing import Any, Callable
 
+from tortoise.transactions import in_transaction
+
 from common.exception_handler import CustomException
 from common.text import split_values
 from common.times import cost_millis, format_datetime, now, precise_now
@@ -753,47 +755,50 @@ async def save_candidates(context: ToolContext, candidates: list | None,
     written = 0
     skipped = 0
     seen: set[int] = set()
-    for item in rows:
-        if not isinstance(item, dict):
-            raise CustomException("候选列表里每一条都要是对象，至少带上候选租客编号")
-        raw_id = item.get("candidate_member_id")
-        try:
-            candidate_id = int(raw_id)
-        except (TypeError, ValueError):
-            raise CustomException("候选列表里有一条没填候选租客编号")
-        if candidate_id in seen:
-            skipped += 1
-            continue
-        seen.add(candidate_id)
-        if candidate_id == context.member_id:
-            raise CustomException("候选里出现了申请方本人，请把它去掉再写")
-        member = await MemberProfile.get_or_none(id=candidate_id)
-        if member is None:
-            raise CustomException(f"租客 {candidate_id} 没有档案，写不进候选池")
-        if member.audit_status != "已通过":
-            raise CustomException(
-                f"租客「{member.nickname}」的档案还没有通过审核，不能进候选池")
-        if applicant is not None and applicant.gender and member.gender != applicant.gender:
-            raise CustomException(
-                f"租客「{member.nickname}」和申请方性别不同，合租只找同性，不能进候选池")
-        exists = await MatchCandidate.get_or_none(
-            task_id=context.task_id, candidate_member_id=candidate_id)
-        if exists:
-            skipped += 1
-            continue
-        score = item.get("screen_score")
-        if score is not None:
-            score = _check_int(score, 0, 100, "初筛得分")
-        await MatchCandidate.create(
-            task_id=context.task_id,
-            candidate_member_id=candidate_id,
-            found_round=round_no,
-            screen_score=score,
-            # 放宽说明挂在这一轮的每一条上，页面上按候选看就能看出它是哪一轮、放宽了什么进来的
-            relax_note=note or None,
-            audit_status="待审核",
-        )
-        written += 1
+    # 整批写入放在一个事务里：第 N 条校验失败时，前 N-1 条不能留在候选池里，
+    # 否则模型改一版参数重试，池子里就混进了上一次被拒的半批候选
+    async with in_transaction():
+        for item in rows:
+            if not isinstance(item, dict):
+                raise CustomException("候选列表里每一条都要是对象，至少带上候选租客编号")
+            raw_id = item.get("candidate_member_id")
+            try:
+                candidate_id = int(raw_id)
+            except (TypeError, ValueError):
+                raise CustomException("候选列表里有一条没填候选租客编号")
+            if candidate_id in seen:
+                skipped += 1
+                continue
+            seen.add(candidate_id)
+            if candidate_id == context.member_id:
+                raise CustomException("候选里出现了申请方本人，请把它去掉再写")
+            member = await MemberProfile.get_or_none(id=candidate_id)
+            if member is None:
+                raise CustomException(f"租客 {candidate_id} 没有档案，写不进候选池")
+            if member.audit_status != "已通过":
+                raise CustomException(
+                    f"租客「{member.nickname}」的档案还没有通过审核，不能进候选池")
+            if applicant is not None and applicant.gender and member.gender != applicant.gender:
+                raise CustomException(
+                    f"租客「{member.nickname}」和申请方性别不同，合租只找同性，不能进候选池")
+            exists = await MatchCandidate.get_or_none(
+                task_id=context.task_id, candidate_member_id=candidate_id)
+            if exists:
+                skipped += 1
+                continue
+            score = item.get("screen_score")
+            if score is not None:
+                score = _check_int(score, 0, 100, "初筛得分")
+            await MatchCandidate.create(
+                task_id=context.task_id,
+                candidate_member_id=candidate_id,
+                found_round=round_no,
+                screen_score=score,
+                # 放宽说明挂在这一轮的每一条上，页面上按候选看就能看出它是哪一轮、放宽了什么进来的
+                relax_note=note or None,
+                audit_status="待审核",
+            )
+            written += 1
     return {"written": written, "skipped": skipped, "relax_note": note, "returned": written}
 
 

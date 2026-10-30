@@ -271,3 +271,26 @@ async def test_empty_content_cannot_be_rendered(db):
         assert "内容是空的" in error.value.message
     finally:
         await PromptTemplate.filter(id=template.id).delete()
+
+
+
+async def test_seed_prompts_are_readable_utf8(db):
+    """四套种子提示词必须是可读中文且带运行时契约关键字。
+
+    历史教训：02 号种子 SQL 少了 SET NAMES，导入后审核官提示词变成
+    UTF-8→latin1 双重编码乱码，真实模型读到的是乱码而 FakeModel 测试毫无察觉。
+    """
+    rows = await PromptTemplate.filter(code__in=SEED_CODES)
+    assert len(rows) == len(SEED_CODES)
+    contract = {
+        "SUPERVISOR_PROMPT": "next_agent",
+        "PORTRAIT_PROMPT": "evidence",
+        "SCREENER_PROMPT": "candidates",
+        "AUDITOR_PROMPT": "audited",
+    }
+    for row in rows:
+        content = row.content or ""
+        chinese = [ch for ch in content if "\u4e00" <= ch <= "\u9fff"]
+        assert len(chinese) >= 50, (row.code, len(chinese))
+        assert contract[row.code] in content, row.code
+        assert "Ã" not in content and "ä½" not in content, row.code
