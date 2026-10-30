@@ -471,7 +471,7 @@ async def test_code_recheck_turns_an_opposite_gender_pass_into_a_reject(db, monk
     assert stored.reject_code == "MISMATCH_HARD"
     assert "合租只找同性" in stored.reject_reason
     assert stored.audit_round == 2
-    assert "代码复核改判 1 人" in result.batches[0].conclusion
+    assert "代码复核改判 1 人" in result.conclusion
 
 
 async def test_disabled_role_is_refused_before_anything_is_written(db, monkeypatch):
