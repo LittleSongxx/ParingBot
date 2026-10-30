@@ -479,6 +479,7 @@ async def search_members(context: ToolContext, gender: str | None = None,
     返回条数按注册表里写的上限截断，避免一次把上下文塞满。
     """
     query = MemberProfile.filter(audit_status="已通过", enabled="是")
+    applicant = None
     if context.member_id:
         query = query.exclude(id=context.member_id)
         # 合租只找同性：性别以申请方档案为准，不靠模型自己传。
@@ -532,9 +533,14 @@ async def search_members(context: ToolContext, gender: str | None = None,
                 f"请从这几项里选：{'、'.join(member_service.SCHEDULE_TYPES)}")
         query = query.filter(schedule_type__in=accept)
     if store_scope in ("同门店", "同片区"):
+        # 门店范围是相对申请方的：模型不需要猜门店编码，优先用申请方档案里的意向门店。
+        # 显式传了 store_id 时仍按传入值处理（保留了给工具调用方留的覆盖能力）。
+        if not store_id:
+            store_id = applicant.store_id if applicant is not None else None
         if not store_id:
             raise CustomException(
-                f"门店范围选了「{store_scope}」，请把要看的是哪家门店一起传进来")
+                f"门店范围选了「{store_scope}」，但申请方档案里没有可用的门店编码，"
+                f"请先让申请方在档案里选择意向门店")
         if store_scope == "同门店":
             query = query.filter(store_id=int(store_id))
         else:

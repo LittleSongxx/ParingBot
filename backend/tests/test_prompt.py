@@ -11,7 +11,7 @@ import pytest
 
 from ai import prompt_loader
 from common.exception_handler import CustomException
-from models import PromptTemplate
+from models import FunctionTool, PromptTemplate
 
 TEST_MARK = "单元测试专用"
 # 初始化数据里的模板
@@ -295,3 +295,20 @@ async def test_seed_prompts_are_readable_utf8(db):
         assert contract[row.code] in content, row.code
         assert "Ã" not in content and "ä½" not in content, row.code
         assert "【安全约束】" in content, row.code
+
+
+async def test_agent_tool_hardening_blocks_are_in_seed(db):
+    """真实评测暴露的工具误用，要在种子 Prompt/工具描述里有明确约束。"""
+    screener = await PromptTemplate.get(code="SCREENER_PROMPT")
+    supervisor = await PromptTemplate.get(code="SUPERVISOR_PROMPT")
+    content = screener.content or ""
+    assert "工具调用纪律" in content
+    assert "每轮最多调用 2 次" in content
+    assert "一轮只能放宽一个维度" in content or "relax_note 只写一个维度" in content
+    assert "被闸拦下" in (supervisor.content or "")
+
+    search = await FunctionTool.get(tool_code="search_members")
+    assert "默认使用申请方" in (search.description or "")
+    assert "默认使用申请方自己的门店编码" in (search.input_schema or "")
+    save = await FunctionTool.get(tool_code="save_candidates")
+    assert "一轮只能放宽一个维度" in (save.description or "")

@@ -403,6 +403,21 @@ async def test_save_candidates_rolls_back_when_a_row_is_invalid(db):
     assert await MatchCandidate.filter(task_id=task.id).count() == 0
 
 
+async def test_search_members_defaults_to_applicant_store(db):
+    """门店范围是相对申请方的：模型没传 store_id 时用申请方自己的门店，不用它猜。"""
+    member = await _make_applicant()
+    same = await _make_candidate(store_id=member.store_id)
+    other = await _make_candidate(store_id=20)
+    task = await _open_task(member)
+    run = await _open_run(task)
+    context = await _context(member, task, run)
+    result = await tool_box.invoke(
+        "search_members", {"store_scope": "同门店"}, context)
+    ids = {row["member_id"] for row in result["candidates"]}
+    assert same.id in ids
+    assert other.id not in ids
+
+
 async def test_stops_when_a_round_relaxes_nothing(db, monkeypatch):
     """放宽轮没有放宽条件时收尾：再来一轮还是同一批人，白跑一次。"""
     member = await _make_applicant()

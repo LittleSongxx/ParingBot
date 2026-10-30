@@ -1,52 +1,50 @@
-# 真实模型评测结果（2026-10-30）
+# 真实模型评测结果（2026-10-31 更新）
 
-> 环境：本机 Docker Compose 栈（`http://127.0.0.1:8080`），租客 `member02`，四个用途（调度/画像/筛选/审核）统一使用同一模型。
-> 方式：`python eval/run_live_eval.py` → 真实发起 `/match/rerun` → 轮询到结束 → 读取管理端调度详情。
-> 原始报告：`eval/reports/`（已 gitignore；不包含 API Key 与租客联系方式）。
-> 说明：这是**过程评测**，记录轮次/候选/否决/交付/耗时/失败步骤；匹配质量仍需人工阅读运行总结与候选。
+> 环境：本机 Docker Compose 栈（`http://127.0.0.1:8080`），租客 `member02`，四个用途统一 **DeepSeek `deepseek-flash`**（max_tokens 8192）。
+> 方式：`python eval/run_live_eval.py --env-file .env.eval --trials N`：真实发起 `/match/rerun` → 轮询 → 拉管理端调度详情。
+> 原始报告：`eval/reports/`（gitignore，不含 API Key 与联系方式）。
+> 说明：这些是**过程指标**（轮次/候选/否决/交付/耗时/失败步骤），匹配质量仍需人工阅读运行总结与候选。
 
-## 一、运行结果
+## 一、修复 Agent 工具调用后的最终 3 次运行
 
-| # | 模型 | max_tokens | 状态 | 轮次 | 候选 | 通过 | 否决 | 待审 | 交付 | 墙钟 | 工具调用 | 步骤 | 失败步骤 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | DeepSeek `deepseek-flash` | 2048 | ✅ 已完成 | 4 | 11 | 8 | 3 | 0 | 8 | 85.1s | 36 | 47 | 1 |
-| 2 | DeepSeek `deepseek-flash` | 8192 | ✅ 已完成 | 11 | 42 | 10 | 32 | 0 | 8 | 360.5s | 124 | 157 | 8 |
-| 3 | Qwen `qwen3.7-plus` | 2048 | ❌ 失败（输出截断） | 1 | 0 | 0 | 0 | 0 | 0 | 73s | 2 | 3 | 0 |
-| 4 | Qwen `qwen3.7-plus` | 8192 | ❌ 失败（600s 超时） | 2 | 30 | 7 | 22 | — | — | 600s | 61 | 67 | — |
-| 5 | Qwen `qwen3.7-plus` | 8192 | ❌ 失败（连接超时） | 5 | 41 | 7 | 30 | 4 | 7 | 945.7s | 88 | 103 | 1 |
-| 6 | Qwen `qwen3.8-flash`（fallback） | 4096 | ✅ 已完成 | 7 | 13 | 8 | 5 | 0 | 8 | 780.4s | 56 | 76 | 14 |
+修复内容：`search_members` 门店范围未传 `store_id` 时默认用申请方门店；筛选 Prompt/工具描述补充工具调用纪律与示例（见 `backend/ai/tools.py`、`deploy/mysql/init/06-agent-tool-hardening.sql`）。
 
-> 第 4 次 600s 超时为首次尝试（未生成报告，数据来自数据库）；第 5 次在 945s 时失败，错误为「连不上接口地址」，属于模型服务网络/延迟问题，不是代码 crash。
-> Qwen3.7-plus 的两次失败都发生在多轮/多批次处理中；Qwen3.8-flash 能完成，但比 DeepSeek 慢得多。
+| # | 模型 | 状态 | 轮次 | 候选 | 通过 | 否决 | 交付 | 耗时 | 工具调用 | 步骤 | 失败步骤 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | DeepSeek flash | ✅ 完成 | 3 | 14 | 9 | 5 | **8** | 90.7s | 39 | 47 | 2 |
+| 2 | DeepSeek flash | ✅ 完成 | 7 | 11 | 8 | 3 | **8** | 145.2s | 47 | 67 | 6 |
+| 3 | DeepSeek flash | ✅ 完成 | 5 | 14 | 9 | 5 | **8** | 102.8s | 39 | 53 | 0 |
+| 均值 | — | 3/3 成功 | 5.0 | 13.0 | 8.7 | 4.3 | **8.0** | 112.9s | 41.7 | 55.7 | 2.7 |
 
-## 二、结论（针对本项目）
+**结论**：3/3 完成并交付 8/8；门店缺参、`search_members` 连续调用这两类问题在修复后未再出现。剩余失败步骤集中在「同一轮第二次 `save_candidates` 又放宽了另一个维度」——代码已拒绝并提示，但模型仍会重试 1–2 次；属于模型行为，不影响最终交付。
 
-1. **DeepSeek `deepseek-flash` 可以作为当前评测基线**：两次真实运行都完成并交付 8/8；当前 Prompt/工具链在它上面可用。
-2. **同一模型、同一配置下运行方差很大**：两次 DeepSeek 分别是 4 轮 / 11 候选 / 85 秒和 11 轮 / 42 候选 / 360 秒；单次运行不能代表质量，至少需要 3 次 trial 或固定更大的轮次/样本再比较。
-3. **Qwen3.7-plus 在当前百炼 endpoint 上不适合直接做本项目的在线评测**：
-   - 2048 max_tokens 时首个角色就因输出截断失败；
-   - 提到 8192 后，一次 600s 超时、一次 945s 连接失败；5 轮共 41 候选、7 通过、30 否决，未能跑完；
-   - 请求延迟明显高于 DeepSeek（88 次工具调用用了 945 秒），不适合当前 1200s 的评测预算。
-4. **Qwen3.8-flash 可以作为快速替代做交叉**：能完成（7 轮 / 780 秒 / 13 候选 / 交付 8），但耗时约为 DeepSeek 第二次运行的 2 倍、第一次运行的 9 倍，且失败步骤 14 个（DeepSeek 8 个）；交叉评测时需要固定相同 max_tokens/超时/轮次上限，否则不可比。
-5. **失败步骤暴露的是 Prompt/工具接口问题，不只是模型差异**：DeepSeek 第二次运行出现「search_members 连续 11 次被拦」「门店范围缺 store 参数」「一轮放宽多个维度」「放宽说明缺幅度」等错误；这些是下一轮 Prompt/工具说明优化的直接输入，不应只归因于模型。
+> 曾尝试把这类「同轮重复放宽」改成 no-op 成功返回以消除失败步骤，但 3 次试跑交付降到 6/7/7，明显变差，已回滚。保留拒绝语义，失败步骤作为已知模型行为记录，后续再单独优化。
 
-## 三、建议的后续评测配置
+## 二、修复前的对照（历史）
 
-- 基线模型：`deepseek-flash`（省钱、跑通）；重要评测可用 `deepseek-v4-pro` 做对照。
-- 固定评测条件：同一 `EVAL_MAX_TOKENS`、同一 `MATCH_TIMEOUT_SECONDS`、同一 `SUPERVISOR_MAX_ROUND`、同一租客账号/种子数据；每个模型至少 3 trials。
-- Qwen 交叉：优先用离本机更近的地域/Workspace endpoint，或 `qwen3.8-flash`；`qwen3.7-plus` 等端点稳定后再用。
-- 每次运行后人工阅读 `output_summary` 与候选名单；过程指标（轮次/否决分布/失败步骤）只用于发现异常与回归。
+| # | 模型 | 状态 | 轮次 | 候选 | 通过 | 否决 | 交付 | 耗时 | 工具调用 | 失败步骤 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | DeepSeek flash | ✅ | 4 | 11 | 8 | 3 | 8 | 85.1s | 36 | 1 |
+| 2 | DeepSeek flash | ✅ | 11 | 42 | 10 | 32 | 8 | 360.5s | 124 | 8 |
+| 3 | Qwen3.7-plus | ❌ 截断 | 1 | 0 | 0 | 0 | 0 | 73s | 2 | 0 |
+| 4 | Qwen3.7-plus | ❌ 600s 超时 | 2 | 30 | 7 | 22 | — | 600s | 61 | — |
+| 5 | Qwen3.7-plus | ❌ 连接失败 | 5 | 41 | 7 | 30 | 7 | 945.7s | 88 | 1 |
+| 6 | Qwen3.8-flash | ✅ | 7 | 13 | 8 | 5 | 8 | 780.4s | 56 | 14 |
 
-## 四、可复现命令
+- Qwen 已按「只用 DeepSeek」收敛，历史结果仅保留作对照；Qwen 本地配置与 Key 已移除。
+- 修复前 DeepSeek 两次失败步骤 1 和 8，主要错误：门店范围缺 `store_id`、`search_members` 连续 11 次被闸拦、一轮放宽多个维度、放宽说明缺幅度。
+- 另有一次额外批次因 DeepSeek 账户「余额或额度不足」中断（1 次失败 + 2 次完成，交付 7/8）；后续评测前需确认账户余额。
+
+## 三、怎么复现
 
 ```bash
-# DeepSeek 基线（.env.eval）
+# 固定使用 DeepSeek（本机 .env.eval）
 python eval/configure_models.py --env-file .env.eval
-python eval/run_live_eval.py --env-file .env.eval --label deepseek-flash-baseline
-
-# Qwen 交叉（.env.eval.qwen）
-python eval/configure_models.py --env-file .env.eval.qwen
-python eval/run_live_eval.py --env-file .env.eval.qwen --label qwen3.7-plus-crosscheck
+python eval/run_live_eval.py --env-file .env.eval --trials 3 --label deepseek-final-3trials
 ```
 
-Qwen 3.7 超时/连接失败时，可先试 `.env.eval.qwen-flash`（qwen3.8-flash）；若仍失败，检查该 endpoint 的网络与地域，以及是否把 `EVAL_MAX_TOKENS`/`MATCH_TIMEOUT_SECONDS` 调够。
+## 四、下一步
+
+1. 剩余「同轮重复放宽」失败步骤：不改代码语义的前提下，进一步改筛选 Prompt 或在执行器里限制；需要重新跑 3 次验证，避免再次降低交付。
+2. 人工质量评分：每次抽 8 个交付候选，按硬条件/证据/解释/边界 1–5 分；过程指标不能替代质量判断。
+3. 评测前确认 DeepSeek 账户余额；每次 3 trial 约消耗数万–十几万 token。
