@@ -517,6 +517,22 @@ async def test_recheck_rows_checks_both_directions(db):
     assert "候选方不满足申请方" in records[0].rejected_because()
 
 
+async def test_lease_term_gap_is_a_bidirectional_hard_conflict(db):
+    """计划租期相差两档及以上判硬冲突；相邻档位仍可协商。"""
+    applicant = await _make_applicant()  # 1-2年
+    far = await _make_candidate(lease_term="3个月以下")
+    adjacent = await _make_candidate(lease_term="6-12个月")
+    task = await _open_task(applicant)
+    far_row = await _put(task, far, audit_status=auditor_service.AUDIT_PASS)
+    adjacent_row = await _put(task, adjacent, audit_status=auditor_service.AUDIT_PASS)
+
+    records = await auditor_service.recheck_rows(applicant, [far_row, adjacent_row])
+
+    assert [item.row.id for item in records] == [far_row.id]
+    assert records[0].lease_conflict is True
+    assert "计划租期" in records[0].rejected_because()
+
+
 async def test_disabled_role_is_refused_before_anything_is_written(db, monkeypatch):
     """审核官被停用时直接拦住，提示指回子 Agent 定义，候选池一条都不动。"""
     member = await _make_applicant()

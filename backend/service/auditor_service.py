@@ -75,6 +75,10 @@ RUN_FAILED = "运行失败"
 
 # 候选刚进池子时的审核状态，以及审核官能给出的两种结论
 AUDIT_WAIT = "待审核"
+
+# 双方计划租期按档位比较：相邻档位视为可协商，相差 2 档及以上视为硬冲突。
+# 例：3个月以下 vs 3-6个月 可协商；3个月以下 vs 6-12个月/1-2年/2年以上 不可。
+LEASE_TERM_GAP_LIMIT = 2
 AUDIT_PASS = tool_box.AUDIT_PASS
 AUDIT_REJECT = tool_box.AUDIT_REJECT
 # 三种否决分类的人话说明和下一步该做什么，页面和结论都读这两份
@@ -139,11 +143,15 @@ class Recheck:
     violations: list[str] = field(default_factory=list)
     reverse_violations: list[str] = field(default_factory=list)
     gender_conflict: bool = False
+    lease_conflict: bool = False
+    lease_detail: str = ""
 
     def _detail(self) -> str:
         parts: list[str] = []
         if self.gender_conflict:
             parts.append("合租只找同性：申请方与候选方性别不同")
+        if self.lease_conflict:
+            parts.append(self.lease_detail or "双方计划租期档位相差过大，不适合合租")
         if self.violations:
             parts.append(f"申请方不满足候选方标为必须的「{'、'.join(self.violations)}」项")
         if self.reverse_violations:
@@ -386,6 +394,31 @@ def gender_conflict(applicant: MemberProfile, candidate: MemberProfile) -> bool:
                 and applicant.gender != candidate.gender)
 
 
+def lease_term_gap(applicant: MemberProfile, candidate: MemberProfile) -> int | None:
+    """双方计划租期在档位表里的距离；缺值或非法值返回 None（交给模型判断）。
+
+    计划租期是「打算签多久」，不是偏好里的「最短租期」。两个人合租要签同一份合同，
+    相差两档及以上（例如一方 3 个月以下、另一方 6-12 个月）没法共用一份合同，
+    只有相邻档位（例如 6-12 个月与 1-2 年）才可能协商。
+    """
+    try:
+        left = member_service.LEASE_TERMS.index(applicant.lease_term)
+        right = member_service.LEASE_TERMS.index(candidate.lease_term)
+    except (ValueError, AttributeError):
+        return None
+    return abs(left - right)
+
+
+def lease_term_conflict(applicant: MemberProfile, candidate: MemberProfile) -> bool:
+    gap = lease_term_gap(applicant, candidate)
+    return gap is not None and gap >= LEASE_TERM_GAP_LIMIT
+
+
+def lease_term_conflict_text(applicant: MemberProfile, candidate: MemberProfile) -> str:
+    return (f"双方计划租期相差过大：申请方「{applicant.lease_term}」"
+            f"vs 候选方「{candidate.lease_term}」，不适合合租")
+
+
 def must_need(preference: RoommatePreference) -> list[dict]:
     """候选方标为必须、而且确实有约束的条件，连带它要求的内容。
 
@@ -460,11 +493,15 @@ async def recheck_rows(applicant: MemberProfile, rows: list,
         if applicant_preference is not None:
             reverse = hard_violations(candidate, applicant, applicant_preference)
         conflict = gender_conflict(applicant, candidate)
-        if violations or reverse or conflict:
-            records.append(Recheck(row=row, candidate=candidate,
-                                   violations=violations,
-                                   reverse_violations=reverse,
-                                   gender_conflict=conflict))
+        lease_bad = lease_term_conflict(applicant, candidate)
+        if violations or reverse or conflict or lease_bad:
+            records.append(Recheck(
+                row=row, candidate=candidate,
+                violations=violations,
+                reverse_violations=reverse,
+                gender_conflict=conflict,
+                lease_conflict=lease_bad,
+                lease_detail=lease_term_conflict_text(applicant, candidate) if lease_bad else ""))
     return records
 
 
@@ -918,11 +955,14 @@ async def candidate_detail(current_user: User, candidate_id: int) -> dict:
         return data
     data["preference_text"] = screener_service.preference_text(_preference_dict(preference))
     bad = hard_violations(member, candidate, preference)
+    lease_bad = lease_term_conflict(member, candidate)
+    if lease_bad:
+        bad = list(bad) + ["计划租期"]
     data["must_need"] = must_need(preference)
     if bad:
-        note = (f"代码按候选方标为必须的条件复核申请方：{'、'.join(bad)}这几项不满足，"
+        note = (f"代码按当前硬规则复核：{'、'.join(bad)}这几项不满足，"
                 f"这几项正是判 MISMATCH_HARD 的依据")
     else:
-        note = "代码按候选方标为必须的条件复核申请方：验得清的几项都对得上"
+        note = "代码按当前硬规则复核：验得清的几项都对得上"
     data["recheck"] = {"violations": bad, "note": note}
     return data

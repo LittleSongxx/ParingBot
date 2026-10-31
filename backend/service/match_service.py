@@ -285,7 +285,7 @@ async def deliverable(task_id: int) -> tuple[list, str | None]:
                 blocked = {item.row.id for item in records}
                 passed = [row for row in passed if row.id not in blocked]
                 note = (f"通过审核的候选里有 {len(records)} 人按当前规则不可交付"
-                        f"（性别或双向必须项复核不通过），已从交付名单里剔除")
+                        f"（性别、双向必须项或计划租期复核不通过），已从交付名单里剔除")
     return sorted(passed, key=_deliverable_sort_key), note
 
 
