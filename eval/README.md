@@ -227,5 +227,6 @@ python eval/regression_report.py --bundle analysis/quality-bundles/expanded-late
 ```
 
 一次输出：质量检查（硬规则/summary/证据）、heuristic golden、consensus golden、
-两种 gold 的一致度；可加 `--min-precision` / `--min-consensus` 作为门禁。
+两种 gold 的一致度，以及 `eval/reports/scenario-matrix-*` 的 20 场景最新摘要；
+可加 `--min-precision` / `--min-consensus` 作为门禁。
 CI 用 fixture 跑同一脚本，阈值 0.7。

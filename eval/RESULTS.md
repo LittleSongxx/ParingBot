@@ -322,3 +322,8 @@ S14 修复后 3 trials：**8/8、8/8、8/8**（轮次 9/8/11，233/157/254s）�
 | Jaccard | 80.76% |
 
 CI 已用 fixture 跑同一脚本，heuristic/consensus 阈值均为 0.7。报告：`analysis/regression-report.md`。
+
+### 报告合并场景矩阵摘要（02:10）
+
+`regression_report.py` 默认扫描 `eval/reports/scenario-matrix-*/matrix.json`，把 20 场景最新运行/阻断
+与 bundle 指标合并成一份报告；本地真实报告已包含 S1–S20 摘要。CI 无历史报告时自动跳过该段，不影响门禁。
