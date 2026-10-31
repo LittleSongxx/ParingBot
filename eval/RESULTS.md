@@ -327,3 +327,8 @@ CI 已用 fixture 跑同一脚本，heuristic/consensus 阈值均为 0.7。报�
 
 `regression_report.py` 默认扫描 `eval/reports/scenario-matrix-*/matrix.json`，把 20 场景最新运行/阻断
 与 bundle 指标合并成一份报告；本地真实报告已包含 S1–S20 摘要。CI 无历史报告时自动跳过该段，不影响门禁。
+
+### 压力场景门禁与 CI 报告 artifact（02:15）
+
+`regression_report.py` 增加压力场景门禁：默认检查 S6/S14/S16/S20，要求最新运行「已完成且交付 ≥7 人」；
+CI 同时上传 `regression-report.md/json` artifact。无历史场景报告时跳过压力门禁，不影响 fixture 质量门禁。

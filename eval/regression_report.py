@@ -84,6 +84,12 @@ def build_report(bundle_path: Path, labels_path: Path, consensus_path: Path,
     consensus_metrics = golden_matching.evaluate(bundle_path, consensus_path)
     agreement = agreement_rows(bundle, labels, consensus)
     scenarios = load_scenario_summary(scenario_dir) if scenario_dir else []
+    pressure_keys = [item.strip() for item in getattr(build_report, "_pressure", "") .split(",") if item.strip()]
+    pressure_min = getattr(build_report, "_pressure_min", 7)
+    pressure_rows = [item for item in scenarios if item["key"] in pressure_keys]
+    pressure_failures = [item for item in pressure_rows
+                         if item.get("run_status") != "已完成"
+                         or (item.get("delivered") or 0) < pressure_min]
     result = {
         "bundle": str(bundle_path),
         "runs": len(bundle.get("runs", [])),
@@ -103,6 +109,9 @@ def build_report(bundle_path: Path, labels_path: Path, consensus_path: Path,
         },
         "rows": agreement,
         "scenarios": scenarios,
+        "pressure": {"keys": pressure_keys, "min_delivery": pressure_min,
+                     "rows": pressure_rows,
+                     "failures": [item["key"] for item in pressure_failures]},
     }
     lines = ["# ParingBot 质量回归报告", "", f"- 数据包：`{bundle_path}`", f"- runs：{result['runs']}", "",
              "## 质量检查", "",
@@ -118,6 +127,18 @@ def build_report(bundle_path: Path, labels_path: Path, consensus_path: Path,
              f"- 覆盖 runs：{result['agreement']['runs']}",
              f"- top8 平均重合：**{result['agreement']['avg_overlap']}/8**",
              f"- 平均 Jaccard：**{result['agreement']['avg_jaccard']:.2%}**", ""]
+    if pressure_keys:
+        lines += ["## 压力场景门禁", "", f"阈值：已完成且交付 ≥ {pressure_min} 人", "",
+                  "| 场景 | 运行 | 交付 | 结果 |", "|---|---|---|---|"]
+        for item in pressure_rows:
+            prefix = "通过" if item not in pressure_failures else "**失败**"
+            delivered = item.get("delivered")
+            requested = item.get("requested")
+            lines.append(f"| {item['key']} | {item.get('run_status') or '—'} | "
+                         f"{(str(delivered) + '/' + str(requested)) if delivered is not None and requested else '—'} | {prefix} |")
+        if not pressure_rows:
+            lines.append("| — | 无场景报告 | — | 跳过 |")
+        lines.append("")
     if scenarios:
         lines += ["## 场景矩阵摘要", "", "| 场景 | 标题 | readiness | 运行 | 轮次 | 交付 | 耗时 |",
                   "|---|---|---|---|---|---|---|"]
@@ -144,7 +165,11 @@ def main(argv=None):
     parser.add_argument("--min-precision", type=float, default=0.0)
     parser.add_argument("--min-consensus", type=float, default=0.0)
     parser.add_argument("--scenario-dir", type=Path, default=Path("eval/reports"))
+    parser.add_argument("--pressure-scenarios", default="S6,S14,S16,S20")
+    parser.add_argument("--pressure-min-delivery", type=int, default=7)
     args = parser.parse_args(argv)
+    build_report._pressure = args.pressure_scenarios
+    build_report._pressure_min = args.pressure_min_delivery
     result, markdown = build_report(args.bundle, args.labels, args.consensus, args.scenario_dir)
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
@@ -155,6 +180,9 @@ def main(argv=None):
         args.out.write_text(markdown, encoding="utf-8")
         print(f"Markdown 报告：{args.out}")
     failed = bool(result["quality"]["errors"])
+    if result["pressure"]["failures"]:
+        failed = True
+        print("压力场景门禁失败：" + "、".join(result["pressure"]["failures"]))
     if result["heuristic"]["avg_precision_at_k"] < args.min_precision:
         failed = True
         print(f"heuristic Precision {result['heuristic']['avg_precision_at_k']:.2%} < {args.min_precision:.2%}")
