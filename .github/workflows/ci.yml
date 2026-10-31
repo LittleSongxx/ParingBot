@@ -58,8 +58,12 @@ jobs:
           python eval/regression_report.py --bundle eval/fixtures/quality_bundle_sample.json \
             --out /tmp/regression-report.md --json /tmp/regression-report.json \
             --min-precision 0.7 --min-consensus 0.7
+          python eval/safety_checks.py --bundle eval/fixtures/quality_bundle_sample.json
+          if python eval/safety_checks.py --bundle eval/fixtures/safety_bundle_bad.json; then
+            echo "安全自检 fixture 应报错但没有报错"; exit 1
+          fi
           python -m py_compile eval/configure_models.py eval/run_live_eval.py eval/quality_checks.py \
-            eval/golden_matching.py eval/calibrate_golden.py eval/build_quality_bundle.py eval/regression_report.py
+            eval/golden_matching.py eval/calibrate_golden.py eval/build_quality_bundle.py eval/regression_report.py eval/safety_checks.py
 
       - name: Upload regression report
         if: always()

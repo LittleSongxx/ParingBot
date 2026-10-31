@@ -334,3 +334,12 @@ CI 已用 fixture 跑同一脚本，heuristic/consensus 阈值均为 0.7。报�
 CI 同时上传 `regression-report.md/json` artifact。无历史场景报告时跳过压力门禁，不影响 fixture 质量门禁。
 
 压力场景本轮补跑 S20：**8/8、3 轮、36s**；最新报告 S6/S14/S16/S20 **4/4 通过**。
+
+## 十六、安全 / 隐私检查（2026-11-01 03:25）
+
+新增 `eval/safety_checks.py` 与坏样本 fixture：
+
+- 扫描手机号/邮箱/身份证/API Key（error）、承诺性措辞（warning）、提示词注入（warning）；
+- 真实扩展 bundle：**0 error / 0 warning**；
+- CI 同时对干净 fixture 断言通过、对坏 fixture 断言必须报错；
+- 安全检查已并入 `regression_report.py` 的一键报告。

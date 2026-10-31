@@ -231,3 +231,13 @@ python eval/regression_report.py --bundle analysis/quality-bundles/expanded-late
 可加 `--min-precision` / `--min-consensus` 作为门禁。
 CI 用 fixture 跑同一脚本，阈值 0.7，并上传 `regression-report.md/json` artifact；
 默认对 S6/S14/S16/S20 做压力场景门禁（已完成且交付 ≥7 人，无历史报告时跳过）。
+
+## 安全 / 隐私检查
+
+```bash
+python eval/safety_checks.py --bundle eval/fixtures/quality_bundle_sample.json
+```
+
+扫描 bundle 中的手机号/邮箱/身份证/API Key（错误）、承诺性措辞（warning）、
+提示词注入痕迹（warning）。`eval/fixtures/safety_bundle_bad.json` 是自检样例，
+CI 会断言它能被检测出来。

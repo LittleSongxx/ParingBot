@@ -17,6 +17,7 @@ sys.path.insert(0, str(HERE))
 
 import golden_matching  # noqa: E402
 import quality_checks  # noqa: E402
+import safety_checks  # noqa: E402
 
 
 def load_labels(path: Path) -> dict:
@@ -80,6 +81,9 @@ def build_report(bundle_path: Path, labels_path: Path, consensus_path: Path,
     consensus = load_labels(consensus_path)
     checks = [quality_checks.check_run(item) for item in bundle.get("runs", [])]
     quality_errors = [error for check in checks for error in check["errors"]]
+    safety_findings = safety_checks.scan_bundle(bundle)
+    safety_errors = [item for item in safety_findings if item["severity"] == "error"]
+    safety_warnings = [item for item in safety_findings if item["severity"] == "warning"]
     heuristic = golden_matching.evaluate(bundle_path, labels_path)
     consensus_metrics = golden_matching.evaluate(bundle_path, consensus_path)
     agreement = agreement_rows(bundle, labels, consensus)
@@ -100,6 +104,8 @@ def build_report(bundle_path: Path, labels_path: Path, consensus_path: Path,
             "evidence_missing": sum(item["evidence"]["delivered"] - item["evidence"]["with_evidence"] for item in checks),
             "errors": quality_errors,
         },
+        "safety": {"errors": len(safety_errors), "warnings": len(safety_warnings),
+                   "findings": safety_findings},
         "heuristic": heuristic["aggregate"],
         "consensus": consensus_metrics["aggregate"],
         "agreement": {
@@ -114,6 +120,8 @@ def build_report(bundle_path: Path, labels_path: Path, consensus_path: Path,
                      "failures": [item["key"] for item in pressure_failures]},
     }
     lines = ["# ParingBot 质量回归报告", "", f"- 数据包：`{bundle_path}`", f"- runs：{result['runs']}", "",
+             "## 安全 / 隐私", "",
+             f"- PII/secret 错误：**{len(safety_errors)}**；warning：{len(safety_warnings)}", "",
              "## 质量检查", "",
              "| 指标 | 值 |", "|---|---|",
              f"| 硬规则违规 | {result['quality']['hard_rule_violations']} |",
@@ -179,7 +187,7 @@ def main(argv=None):
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(markdown, encoding="utf-8")
         print(f"Markdown 报告：{args.out}")
-    failed = bool(result["quality"]["errors"])
+    failed = bool(result["quality"]["errors"]) or bool(result["safety"]["errors"])
     if result["pressure"]["failures"]:
         failed = True
         print("压力场景门禁失败：" + "、".join(result["pressure"]["failures"]))
