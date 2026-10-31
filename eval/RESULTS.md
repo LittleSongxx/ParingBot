@@ -242,3 +242,15 @@ Golden 标签扩到 19 位申请人，指标脚本无需改；有真实运行 bu
 
 20 场景中，除 S14（短租+吸烟，3 次 4/8/7 + 一次 8）外，所有正向场景补供给后均可交付 8/8。
 Golden 标注已按新候选池重算（heuristic-v3，19 位申请人）。
+
+## 十一、扩展场景 quality bundle 指标（2026-11-01 01:10）
+
+新增 `eval/build_quality_bundle.py`（在 backend 容器内运行，导出 member02 + TEST_SCENARIO_* 最新匹配），
+对 16 个有运行数据的申请人计算 golden 指标（heuristic-v4，19 位标注）：
+
+- 平均 **Precision@K 67.97% / Recall@K 67.97%**；
+- 高的场景（如 S3/S5/S6/S10 替代场景）100%，低的集中在 S13/S16/S18/S20 等窄供给场景；
+- 指标用于找「交付与合适候选的偏差」，不是审判模型：heuristic gold 仍需人工/规则校准。
+
+同批质量检查：16 个 run **硬规则违规 0、summary 不一致 0**；候选画像/证据覆盖不完整，仍是最优先质量项。
+完整报告：`analysis/golden-expanded.md`、`analysis/quality-checks-expanded.md`。

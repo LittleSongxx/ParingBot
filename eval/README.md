@@ -188,7 +188,7 @@ python eval/scenario_matrix.py --only S1,S3 --trials 2
 
 ## Golden 匹配质量标注
 
-`eval/golden/matching_labels.json` 是规则启发式 v3 标注（19 位场景申请人，候选池已含扩展供给）：按硬条件 + 门店/作息/预算/整洁/租期/兴趣算分，
+`eval/golden/matching_labels.json` 是规则启发式 v4 标注（19 位场景申请人，候选池已含扩展供给）：按硬条件 + 门店/作息/预算/整洁/租期/兴趣算分，
 每位申请人取前 8 个 gold 候选。它不是人工逐人打分，先解决「可重复量化」，后续要抽检校准。
 
 ```bash
@@ -197,3 +197,12 @@ python eval/golden_matching.py --bundle analysis/quality-bundles/runs-947-949.js
 ```
 
 输出 Precision@K / Recall@K；当前评估器只读 bundle，不连数据库、不调用模型。
+
+## 从数据库导出 quality bundle
+
+```bash
+# 在 backend 容器内运行；导出 member02 + TEST_SCENARIO_* 的最新匹配任务
+docker compose exec -T backend python - < eval/build_quality_bundle.py > /tmp/bundle.json
+python eval/golden_matching.py --bundle /tmp/bundle.json --out /tmp/golden.md
+python eval/quality_checks.py --bundle /tmp/bundle.json --out /tmp/qc.md
+```

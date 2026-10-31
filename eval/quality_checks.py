@@ -209,7 +209,8 @@ def check_run(run_bundle):
         "hard_rule_violations": violations,
         "evidence": {"delivered": len(delivered),
                      "with_portrait": len(delivered) - len(evidence_missing),
-                     "with_evidence": sum(1 for row in delivered if row.get("evidence")),
+                     "with_evidence": sum(1 for row in delivered
+                                          if row.get("portrait") or row.get("evidence")),
                      "missing_portrait": len(evidence_missing)},
         "shortfall": {"requested": counts["task_deliver_count"],
                       "delivered": counts["delivered_to_user"],
