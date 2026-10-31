@@ -332,3 +332,5 @@ CI 已用 fixture 跑同一脚本，heuristic/consensus 阈值均为 0.7。报�
 
 `regression_report.py` 增加压力场景门禁：默认检查 S6/S14/S16/S20，要求最新运行「已完成且交付 ≥7 人」；
 CI 同时上传 `regression-report.md/json` artifact。无历史场景报告时跳过压力门禁，不影响 fixture 质量门禁。
+
+压力场景本轮补跑 S20：**8/8、3 轮、36s**；最新报告 S6/S14/S16/S20 **4/4 通过**。
