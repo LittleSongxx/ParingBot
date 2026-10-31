@@ -830,6 +830,8 @@ def match_evidence(applicant: MemberProfile, candidate: MemberProfile,
         evidence.append(f"计划租期档位相近（{candidate.lease_term}）")
     if row.relax_note:
         evidence.append(f"放宽记录：{row.relax_note}")
+    if applicant.smoking or candidate.smoking:
+        evidence.append(f"吸烟：申请方{applicant.smoking or '未填'} / 候选方{candidate.smoking or '未填'}（软冲突，需租客确认）")
     if applicant_preference is not None and not hard_violations(candidate, applicant, applicant_preference):
         evidence.append("候选方满足申请方标为必须的条件")
     if candidate_preference is not None and not hard_violations(applicant, candidate, candidate_preference):

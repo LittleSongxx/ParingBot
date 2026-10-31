@@ -206,3 +206,13 @@ docker compose exec -T backend python - < eval/build_quality_bundle.py > /tmp/bu
 python eval/golden_matching.py --bundle /tmp/bundle.json --out /tmp/golden.md
 python eval/quality_checks.py --bundle /tmp/bundle.json --out /tmp/qc.md
 ```
+
+## Golden 双评分器交叉校准
+
+```bash
+python eval/calibrate_golden.py --bundle analysis/quality-bundles/expanded-latest.json
+```
+
+评分器 A 是 heuristic-v4 gold；评分器 B 用不同权重（作息/租期优先）重排 top8，
+输出重合度/Jaccard。当前 16 runs：平均重合 5.25/8、Jaccard 59.95%、完全一致 8/16，
+说明 heuristic gold 排序不稳定，只能当回归基线，不能当人工真值。

@@ -254,3 +254,18 @@ Golden 标注已按新候选池重算（heuristic-v3，19 位申请人）。
 
 同批质量检查：16 个 run **硬规则违规 0、summary 不一致 0**；候选画像/证据覆盖不完整，仍是最优先质量项。
 完整报告：`analysis/golden-expanded.md`、`analysis/quality-checks-expanded.md`。
+
+## 十二、S14 吸烟软冲突修复 + 双评分器校准（2026-11-01 01:35）
+
+新增 `13-auditor-smoking-soft-conflict.sql`：吸烟是软冲突，申请方偶尔吸烟且只在楼下/室外抽、
+候选方只是自己不吸烟时可通过但提示确认；只有候选明确要求室友不吸烟且申请方经常/在屋里抽才判冲突。
+补充 `match_evidence` 吸烟依据行。
+
+S14 修复后 3 trials：**8/8、8/8、8/8**（轮次 9/8/11，233/157/254s），此前为 4/8、8/8、7/8。
+
+同批重建扩展 bundle（16 位申请人）：
+
+- Golden（heuristic-v4）：平均 Precision@K / Recall@K **68.75%**；
+- 质量检查：硬规则违规 0、summary 不一致 0；
+- 双评分器校准：top8 平均重合 **5.25/8**、Jaccard **59.95%**、完全一致 **8/16**。
+  说明 heuristic gold 排序不稳定，只能当可重复回归基线，不能当人工真值。
