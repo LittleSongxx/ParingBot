@@ -214,7 +214,7 @@ python eval/calibrate_golden.py --bundle analysis/quality-bundles/expanded-lates
   --consensus-out eval/golden/consensus_labels.json
 ```
 
-评分器 A 是 heuristic-v4 gold；B 用不同权重（作息/租期优先），C 用摩擦风险优先；
+评分器 A 是 heuristic-v4 gold；B 用不同权重（作息/租期优先），C 用摩擦风险优先；共识标签可直接用于 CI：
 共识 gold 用 A(权重2)+B+C 的 Borda 前 8。当前 16 runs：A/B 平均重合 5.25/8、
 Jaccard 59.95%、完全一致 8/16，A∩共识平均 7/8，说明单一 heuristic 不稳定，
 共识 gold 更适合做回归基线，但仍不是人工真值。

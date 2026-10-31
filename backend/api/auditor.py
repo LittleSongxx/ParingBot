@@ -21,3 +21,9 @@ async def my_audit(current_user: User = Depends(get_current_user)):
 async def select_candidate(candidate_id: int, current_user: User = Depends(get_current_user)):
     """一位候选的审核详情，带他在意的条件和代码复核，在弹窗里看。"""
     return Result.success(await auditor_service.candidate_detail(current_user, candidate_id))
+
+
+@router.post("/candidatePortrait")
+async def candidate_portrait(candidate_id: int, current_user: User = Depends(get_current_user)):
+    """按需生成候选画像（只允许自己候选池里的候选）。"""
+    return Result.success(await auditor_service.generate_candidate_portrait(current_user, candidate_id))

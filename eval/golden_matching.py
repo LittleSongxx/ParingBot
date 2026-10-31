@@ -95,6 +95,7 @@ def main(argv=None):
     parser.add_argument("--labels", type=Path, default=DEFAULT_LABELS)
     parser.add_argument("--json", type=Path)
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--min-precision", type=float, default=0.0)
     args = parser.parse_args(argv)
     result = evaluate(args.bundle, args.labels)
     if args.json:
@@ -105,7 +106,12 @@ def main(argv=None):
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(render(result), encoding="utf-8")
         print(f"Markdown 报告：{args.out}")
-    print(json.dumps(result["aggregate"], ensure_ascii=False))
+    aggregate = result["aggregate"]
+    print(json.dumps(aggregate, ensure_ascii=False))
+    if aggregate["avg_precision_at_k"] < args.min_precision:
+        print(f"质量门禁失败：Precision@K {aggregate['avg_precision_at_k']:.2%} "
+              f"低于阈值 {args.min_precision:.2%}")
+        return 1
     return 0
 
 

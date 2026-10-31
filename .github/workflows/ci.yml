@@ -53,7 +53,10 @@ jobs:
           python eval/run_eval.py --fixtures --bad eval/fixtures/bad
           python eval/quality_checks.py --bundle eval/fixtures/quality_bundle_sample.json
           python eval/golden_matching.py --bundle eval/fixtures/quality_bundle_sample.json
-          python -m py_compile eval/configure_models.py eval/run_live_eval.py eval/quality_checks.py eval/golden_matching.py
+          python eval/golden_matching.py --bundle eval/fixtures/quality_bundle_sample.json \
+            --labels eval/golden/consensus_labels.json --min-precision 0.7
+          python -m py_compile eval/configure_models.py eval/run_live_eval.py eval/quality_checks.py \
+            eval/golden_matching.py eval/calibrate_golden.py eval/build_quality_bundle.py
 
   frontend:
     runs-on: ubuntu-latest

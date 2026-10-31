@@ -264,6 +264,13 @@
           </div>
           <div class="muted evidence-note">画像标签均由候选人的公开动态与自我介绍提取，标签依据可查看画像详情。</div>
         </div>
+        <div class="detail-block" v-else>
+          <div class="section-title">候选画像</div>
+          <div class="muted evidence-note">这位候选还没有画像；有公开动态时可以让画像师按需生成一版，不会自动批量生成。</div>
+          <el-button size="small" type="primary" plain :loading="data.portraitLoading" @click="generatePortrait">
+            生成候选画像
+          </el-button>
+        </div>
         <div class="detail-block">
           <div class="section-title">他在意的全部条件</div>
           <div class="summary-box">{{ data.detail.preference_text || '这位候选还没有填合住偏好。' }}</div>
@@ -302,7 +309,8 @@ const data = reactive({
   candidates: [],
   rejected: [],
   detailVisible: false,
-  detail: null
+  detail: null,
+  portraitLoading: false
 })
 
 const load = () => {
@@ -330,6 +338,21 @@ const auditType = (status) => {
 }
 
 const solutionOf = (code) => SOLUTIONS[code] || '—'
+
+const generatePortrait = () => {
+  if (!data.detail || data.portraitLoading) return
+  data.portraitLoading = true
+  request.post('/auditor/candidatePortrait', null, { params: { candidate_id: data.detail.id } }).then(res => {
+    if (res.code === '200') {
+      data.detail.candidate_portrait = res.data.portrait
+      ElMessage.success(res.data.generated ? '候选画像已生成' : '这位候选已经有画像')
+    } else {
+      ElMessage.error(res.msg)
+    }
+  }).finally(() => {
+    data.portraitLoading = false
+  })
+}
 
 const showDetail = (row) => {
   request.get('/auditor/selectCandidate', { params: { candidate_id: row.id } }).then(res => {

@@ -291,3 +291,11 @@ S14 修复后 3 trials：**8/8、8/8、8/8**（轮次 9/8/11，233/157/254s）�
 
 结论：单一 heuristic 排序不稳定，共识 gold 与 A 重合 7/8、更适合做回归基线；
 两者都不是人工真值，质量结论仍需谨慎表述。
+
+## 十四、共识 Gold 进 CI + 候选画像按需生成（2026-11-01 01:55）
+
+- CI 新增共识指标门禁：`golden_matching.py --labels eval/golden/consensus_labels.json --min-precision 0.7`（fixture 上 87.5%）；
+- `calibrate_golden.py` 输出 `eval/golden/consensus_labels.json`（A/B/C Borda 共识）；
+- 候选画像新增按需接口 `POST /api/auditor/candidatePortrait`：只允许自己候选池里的候选，
+  有公开动态才生成，已有画像直接返回；审核详情新增「生成候选画像」按钮；
+- 新增归属校验测试，后端测试 356→**357 passed**。

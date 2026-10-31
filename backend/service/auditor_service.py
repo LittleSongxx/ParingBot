@@ -980,6 +980,32 @@ async def my_page(current_user: User) -> dict:
     }
 
 
+async def generate_candidate_portrait(current_user: User, candidate_id: int) -> dict:
+    """按需给候选生成画像；只允许查看自己候选池里的候选人调用。
+
+    这是一次显式的用户动作（审核详情里点「生成候选画像」），不是每轮匹配自动跑：
+    没有公开动态的候选会明确报错，不硬造画像。
+    """
+    member = await member_service.get_my_member(current_user, "生成候选画像")
+    row = await MatchCandidate.get_or_none(id=candidate_id)
+    if row is None:
+        raise CustomException("没有找到这位候选，请刷新页面后重试")
+    task = await MatchTask.get_or_none(id=row.task_id)
+    if task is None or task.member_id != member.id:
+        raise CustomException("这位候选不在你的候选池里，请从自己的候选池里打开")
+    candidate = await MemberProfile.get_or_none(id=row.candidate_member_id)
+    if candidate is None:
+        raise CustomException("这位候选的档案已经查不到了")
+    existing = await MemberPortrait.filter(
+        member_id=candidate.id).order_by("-version", "-id").first()
+    if existing is not None:
+        return {"portrait": portrait_service.portrait_dict(existing), "generated": False}
+    portrait = await portrait_service.generate_for_candidate(candidate.id)
+    if portrait is None:
+        raise CustomException("这位候选没有公开动态，暂时生成不了画像；可以先让 TA 补充动态")
+    return {"portrait": portrait_service.portrait_dict(portrait), "generated": True}
+
+
 async def candidate_detail(current_user: User, candidate_id: int) -> dict:
     """看一位候选的审核详情：他在意的条件、审核结论与代码复核，走弹窗看。"""
     member = await member_service.get_my_member(current_user, "查看审核详情")

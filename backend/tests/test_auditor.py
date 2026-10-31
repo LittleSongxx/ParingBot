@@ -706,6 +706,19 @@ async def test_candidate_detail_lists_the_must_need(db):
     assert data["self_intro"] == candidate.self_intro
 
 
+async def test_candidate_portrait_rejects_another_pool(db):
+    """按需生成候选画像前先验归属：不能拿别人的候选 id 让模型干活。"""
+    owner = await _make_applicant()
+    other = await _make_applicant()
+    candidate = await _make_candidate()
+    task = await _open_task(owner)
+    row = await _put(task, candidate)
+    other_user = await User.get(id=other.user_id)
+    with pytest.raises(CustomException) as error:
+        await auditor_service.generate_candidate_portrait(other_user, row.id)
+    assert "候选池" in error.value.message
+
+
 async def test_detail_of_another_pool_is_refused(db):
     """拿别人的候选编号来查看会被挡住：只能看自己候选池里的人。"""
     owner = await _make_applicant()
