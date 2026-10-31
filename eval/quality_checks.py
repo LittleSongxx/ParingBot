@@ -191,8 +191,11 @@ def check_run(run_bundle):
     if summary_numbers.get("rounds") is not None and run.get("total_round") is not None \
             and summary_numbers["rounds"] != run["total_round"]:
         summary_errors.append(f"summary rounds={summary_numbers['rounds']}，库内 total_round={run['total_round']}")
-    evidence_missing = [row for row in delivered if not row.get("portrait")]
-    truncation_unrecorded = (counts["deliverable_passed"] or 0) > (counts["delivered_to_user"] or 0)
+    evidence_missing = [row for row in delivered if not (row.get("portrait") or row.get("evidence"))]
+    # 新版交付总结会在截断时写「未展示的候选」；旧 bundle 没有这句，按未记录处理
+    truncation_recorded = "未展示的候选" in str(run.get("summary") or "")
+    truncation_unrecorded = ((counts["deliverable_passed"] or 0) > (counts["delivered_to_user"] or 0)
+                             and not truncation_recorded)
     errors = []
     if violations:
         errors.append(f"{len(violations)} 条交付候选违反硬规则")
@@ -204,8 +207,14 @@ def check_run(run_bundle):
         "counts": counts, "summary_numbers": summary_numbers,
         "summary_errors": summary_errors,
         "hard_rule_violations": violations,
-        "evidence": {"delivered": len(delivered), "with_portrait": len(delivered) - len(evidence_missing),
+        "evidence": {"delivered": len(delivered),
+                     "with_portrait": len(delivered) - len(evidence_missing),
+                     "with_evidence": sum(1 for row in delivered if row.get("evidence")),
                      "missing_portrait": len(evidence_missing)},
+        "shortfall": {"requested": counts["task_deliver_count"],
+                      "delivered": counts["delivered_to_user"],
+                      "partial": bool(counts["task_deliver_count"] and counts["delivered_to_user"] is not None
+                                      and counts["delivered_to_user"] < counts["task_deliver_count"])},
         "truncation": {"passed": counts["deliverable_passed"], "delivered_to_user": counts["delivered_to_user"],
                         "unrecorded": truncation_unrecorded},
         "errors": errors,
@@ -239,13 +248,13 @@ def main(argv=None):
         print(f"JSON 报告：{args.json}")
     if args.out:
         lines = ["# 质量检查报告", "", f"数据包：`{args.bundle}`", "", "## 总览", "",
-                 "| run | 状态 | 交付时/展示 | 硬规则违规 | summary 不一致 | 无画像/交付 |",
+                 "| run | 状态 | 交付时/展示 | 硬规则违规 | summary 不一致 | 有证据/交付 |",
                  "|---|---|---|---|---|---|"]
         for run in runs:
             lines.append(f"| {run['run_id']} | {run['status']} | "
                          f"{run['counts']['deliverable_passed']}/{run['counts']['delivered_to_user']} | "
                          f"{len(run['hard_rule_violations'])} | {len(run['summary_errors'])} | "
-                         f"{run['evidence']['missing_portrait']}/{run['evidence']['delivered']} |")
+                         f"{run['evidence']['with_evidence']}/{run['evidence']['delivered']} |")
             if run["hard_rule_violations"] or run["summary_errors"]:
                 lines += ["", "### 问题", ""]
                 lines += [f"- 硬规则：{item['candidate']}：{'；'.join(item['problems'])}"

@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/MySQL-8-4479A1?style=flat-square&logo=mysql&logoColor=white" />
   <img src="https://img.shields.io/badge/Vue-3.4-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white" />
   <img src="https://img.shields.io/badge/Docker%20Compose-3%20services-2496ED?style=flat-square&logo=docker&logoColor=white" />
-  <img src="https://img.shields.io/badge/tests-354%20passed-2ea44f?style=flat-square" />
+  <img src="https://img.shields.io/badge/tests-356%20passed-2ea44f?style=flat-square" />
 </p>
 
 <p align="center">
@@ -90,7 +90,7 @@
 | **代码复核会翻案** | 模型判「通过」后，代码按候选方标为必须的条件复核申请方；验不过（含同性硬规则）的候选当场改判否决，而不是只写一条备注。 |
 | **每一步可复盘** | `agent_run` / `agent_step` / `tool_call_log` 三张账本；调度时间线 + 候选漏斗；异常一律翻译成「去哪个页面改哪一项」。 |
 | **配置中台** | 模型、Prompt、角色、工具、7 项闸门参数全部入库，运行时现查、改完下一步生效；停用一个工具，模型手里真的没有它。 |
-| **可部署、可测试** | Docker Compose 三服务（MySQL + FastAPI + Nginx/Vue）；266 条原有用例 + 新增回归共 **354 条**，AI 流程用 FakeModel 回放，不需要真实 API Key。 |
+| **可部署、可测试** | Docker Compose 三服务（MySQL + FastAPI + Nginx/Vue）；266 条原有用例 + 新增回归共 **356 条**，AI 流程用 FakeModel 回放，不需要真实 API Key。 |
 
 ## 架构
 
@@ -168,7 +168,7 @@ python scripts/smoke_check.py --base http://127.0.0.1:8080
 
 # 后端全量测试：真实 MySQL + FakeModel，不需要模型 API Key
 docker compose exec -T backend pytest -q
-# -> 354 passed
+# -> 356 passed
 
 # AI 能力评测（Phase 0）：40 条 golden case + 坏输出自检，不需要模型 Key
 python eval/run_eval.py --fixtures --bad eval/fixtures/bad
@@ -177,7 +177,7 @@ python eval/run_eval.py --fixtures --bad eval/fixtures/bad
 docker compose build web
 ```
 
-当前基线：**354 项后端测试，0 失败**（2026-10-30，本机 Docker Compose 栈内实测）。测试数量来自 `pytest -q` 尾行统计；AI 相关用例用 FakeModel 按脚本回放，不依赖真实模型。
+当前基线：**356 项后端测试，0 失败**（2026-10-30，本机 Docker Compose 栈内实测）。测试数量来自 `pytest -q` 尾行统计；AI 相关用例用 FakeModel 按脚本回放，不依赖真实模型。
 
 ## 实测与边界
 

@@ -52,7 +52,7 @@ test.describe('只读接口契约（readiness / 管理端列表）', () => {
       const leaseCheck = readiness.checks.find((check) => check.key === 'lease_pool')
       expect(leaseCheck).toBeTruthy()
       expect(leaseCheck.ok).toBe(true)
-      expect(leaseCheck.message).toMatch(/\d+ 位租期接近的候选/)
+      expect(leaseCheck.message).toMatch(/\d+ 位可能进入匹配的候选/)
     }
   })
 
