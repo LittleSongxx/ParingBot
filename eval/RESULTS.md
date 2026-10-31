@@ -299,3 +299,26 @@ S14 修复后 3 trials：**8/8、8/8、8/8**（轮次 9/8/11，233/157/254s）�
 - 候选画像新增按需接口 `POST /api/auditor/candidatePortrait`：只允许自己候选池里的候选，
   有公开动态才生成，已有画像直接返回；审核详情新增「生成候选画像」按钮；
 - 新增归属校验测试，后端测试 356→**357 passed**。
+
+## 十五、一键质量回归报告（2026-11-01 02:00）
+
+新增 `eval/regression_report.py`，一次跑完：
+
+- 质量检查：硬规则违规、summary 不一致、交付缺证据；
+- heuristic golden Precision@K / Recall@K；
+- consensus golden 指标；
+- heuristic vs consensus 的 top8 重合/Jaccard。
+
+对 16 个最新 run 的结果：
+
+| 指标 | 值 |
+|---|---|
+| 硬规则违规 | 0 |
+| summary 不一致 | 0 |
+| 交付缺证据 | **0** |
+| heuristic Precision@K | 68.75% |
+| consensus Precision@K | 64.84% |
+| heuristic vs consensus 重合 | **7.0/8** |
+| Jaccard | 80.76% |
+
+CI 已用 fixture 跑同一脚本，heuristic/consensus 阈值均为 0.7。报告：`analysis/regression-report.md`。

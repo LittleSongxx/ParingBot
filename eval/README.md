@@ -218,3 +218,14 @@ python eval/calibrate_golden.py --bundle analysis/quality-bundles/expanded-lates
 共识 gold 用 A(权重2)+B+C 的 Borda 前 8。当前 16 runs：A/B 平均重合 5.25/8、
 Jaccard 59.95%、完全一致 8/16，A∩共识平均 7/8，说明单一 heuristic 不稳定，
 共识 gold 更适合做回归基线，但仍不是人工真值。
+
+## 一键质量回归报告
+
+```bash
+python eval/regression_report.py --bundle analysis/quality-bundles/expanded-latest.json \
+  --out analysis/regression-report.md --json analysis/regression-report.json
+```
+
+一次输出：质量检查（硬规则/summary/证据）、heuristic golden、consensus golden、
+两种 gold 的一致度；可加 `--min-precision` / `--min-consensus` 作为门禁。
+CI 用 fixture 跑同一脚本，阈值 0.7。
