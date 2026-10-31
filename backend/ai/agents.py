@@ -345,6 +345,9 @@ async def run_agent(agent_code: str, context: tool_box.ToolContext, *,
     last_tool = ""
     same_streak = 0
     called_tools: list[str] = []
+    # 一次角色执行就是一轮调度。同一轮里模型换个维度反复放宽，是同一件事
+    # 重复被拒：时间线只留第一条失败步骤，逐次被拒的完整审计在 tool_call_log。
+    relax_conflicts = 0
     corrections = 0
     max_rounds = max_tool_call + EXTRA_ROUNDS
 
@@ -386,11 +389,18 @@ async def run_agent(agent_code: str, context: tool_box.ToolContext, *,
                     result = await tool_box.invoke(name, args, context)
                 except CustomException as exc:
                     # 工具失败不中断这一轮：把原因回给模型，让它改参数或者换个工具
-                    await write_step(
-                        context, round_no, step_index, STEP_TOOL,
-                        step_name=f"调用工具 {name}", tool_code=name,
-                        request_params=args, step_status=STEP_FAILED,
-                        error_message=exc.message, started=call_started)
+                    # 同轮重复放宽只记第一条失败步骤：模型仍然收到完整的拒绝原因，
+                    # 后面的每一次被拒都在 tool_call_log 里有记录，不丢审计。
+                    record_step = True
+                    if exc.code == tool_box.RELAX_ROUND_CONFLICT:
+                        relax_conflicts += 1
+                        record_step = relax_conflicts == 1
+                    if record_step:
+                        await write_step(
+                            context, round_no, step_index, STEP_TOOL,
+                            step_name=f"调用工具 {name}", tool_code=name,
+                            request_params=args, step_status=STEP_FAILED,
+                            error_message=exc.message, started=call_started)
                     messages.append(ToolMessage(
                         content=f"这次调用没有成功：{exc.message}", tool_call_id=call_id))
                     continue

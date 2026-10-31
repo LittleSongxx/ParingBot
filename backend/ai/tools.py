@@ -70,6 +70,10 @@ RELAX_RULES = (
 # 放宽次数上限的参数编码，和系统参数里那一项一致
 RELAX_LIMIT_KEY = "SCREENER_MAX_RELAX"
 RELAX_LIMIT_DEFAULT = 3
+# 同一调度轮次里第二次放宽另一个维度时用的错误码。
+# 执行器按它识别「同一件事重复被拒」，时间线只记一条失败步骤；
+# 工具本身仍然拒绝写库，逐次被拒的审计留在 tool_call_log 里。
+RELAX_ROUND_CONFLICT = "RELAX_ROUND_CONFLICT"
 # 可放宽的维度清单与写法示例，模型写歪了按这两句回正。
 # 示例按规则表拼出来，规则改了示例跟着改，不会对不上
 RELAX_DIMENSION_HINT = "、".join(item["name"] for item in RELAX_RULES)
@@ -720,8 +724,11 @@ async def _check_relax(context: ToolContext, note: str, round_no: int) -> None:
     relaxed = await _relax_used(context)
     before = relaxed.get(round_no)
     if before and before["name"] != rule["name"]:
+        # 错误文案保持原样：实验表明给模型额外的「本轮结束」提示会改变它的
+        # 检索行为、减少候选；这里只加错误码，执行器据此去重失败步骤。
         raise CustomException(
-            f"第 {round_no} 轮已经放宽过「{before['name']}」了，一轮最多放宽一个维度")
+            f"第 {round_no} 轮已经放宽过「{before['name']}」了，一轮最多放宽一个维度",
+            code=RELAX_ROUND_CONFLICT)
     used = sum(item["amount"] for item in relaxed.values() if item["name"] == rule["name"])
     if used + parsed["amount"] > rule["total"]:
         raise CustomException(

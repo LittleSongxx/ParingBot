@@ -681,6 +681,8 @@ async def test_one_round_can_only_relax_one_dimension(db):
             "candidates": [{"candidate_member_id": people[1].id, "screen_score": 70}],
             "found_round": 1, "relax_note": "预算下限-200"}, context)
     assert "一轮最多放宽一个维度" in error.value.message
+    # 错误码供执行器识别「同一件事重复被拒」，文案对模型保持原样
+    assert error.value.code == tool_box.RELAX_ROUND_CONFLICT
 
 
 async def test_found_round_follows_the_schedule_round(db):
@@ -706,6 +708,51 @@ async def test_found_round_follows_the_schedule_round(db):
         await tool_box.invoke("save_candidates", {
             "candidates": [], "found_round": 9, "relax_note": "年龄上限+2"}, context)
     assert "第 4 轮已经放宽过「预算」" in error.value.message
+
+
+async def test_repeated_relax_conflict_keeps_one_failed_step(db, monkeypatch):
+    """同一角色执行里重复的同轮放宽冲突只记一条失败步骤，候选仍可继续写入。"""
+    member = await _make_applicant()
+    first, second = await _make_candidate(), await _make_candidate()
+    task = await _open_task(member)
+    run = await _open_run(task)
+    context = await _context(member, task, run)
+    script = [
+        _tool_call("read_roommate_preference", {}, "read1"),
+        _tool_call("save_candidates", {
+            "candidates": [{"candidate_member_id": first.id, "screen_score": 80}],
+            "found_round": 1, "relax_note": "年龄上限+2"}, "save1"),
+        _tool_call("save_candidates", {
+            "candidates": [{"candidate_member_id": second.id, "screen_score": 80}],
+            "found_round": 2, "relax_note": "预算下限-200"}, "save2"),
+        _tool_call("save_candidates", {
+            "candidates": [{"candidate_member_id": second.id, "screen_score": 80}],
+            "found_round": 3, "relax_note": "门店+1级"}, "save3"),
+        _tool_call("save_candidates", {
+            "candidates": [{"candidate_member_id": second.id, "screen_score": 80}],
+            "found_round": 4, "relax_note": ""}, "save4"),
+        _json_reply({"candidates": [{"candidate_member_id": first.id, "screen_score": 80}],
+                     "relax_note": "年龄上限+2", "summary": "筛出 2 人"}),
+    ]
+    _use_fake_model(monkeypatch, script)
+    outcome = await agents.run_agent(
+        "SCREENER", context,
+        prompt_values={"preference": "申请方偏好", "instruction": "筛候选",
+                       "relax_history": "还没有放宽过"},
+        instruction="筛候选", required_tools=(), summarize=None)
+    assert outcome.gate is None
+    # 两次冲突都被拒绝，但时间线只留一条失败步骤；逐次被拒仍在 tool_call_log
+    failed = await AgentStep.filter(run_id=run.id, step_status="运行失败")
+    assert len(failed) == 1
+    assert "一轮最多放宽一个维度" in failed[0].error_message
+    logs = await ToolCallLog.filter(run_id=run.id, tool_code="save_candidates")
+    assert len(logs) == 4
+    assert sum(1 for log in logs if log.success == "否") == 2
+    # 后两次写入没有换维度，第二条候选仍然正常落库，没有被静默丢掉
+    assert await MatchCandidate.filter(task_id=task.id).count() == 2
+    stored = await MatchCandidate.get(task_id=task.id, candidate_member_id=second.id)
+    assert stored.found_round == 1
+    assert stored.relax_note is None
 
 
 async def test_relax_note_must_be_readable(db):
