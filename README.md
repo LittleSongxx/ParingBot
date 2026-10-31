@@ -207,6 +207,8 @@ docker compose build web
 - 真实模型评测指南（Key/模型怎么填、怎么跑）：[eval/RUNBOOK.md](eval/RUNBOOK.md)
 - 真实模型评测结果（DeepSeek / Qwen 对比）：[eval/RESULTS.md](eval/RESULTS.md)
 - 前端 Playwright 冒烟：[e2e/README.md](e2e/README.md)
+- 发布前质量检查单：[docs/release-checklist.md](docs/release-checklist.md)
+- 真实模型评测工作流：`.github/workflows/live-eval.yml`（手动触发，需 DEEPSEEK_API_KEY secret）
 - 自动质量检查（硬规则/汇总一致性/证据覆盖）：[eval/quality_checks.py](eval/quality_checks.py)
 - Golden 匹配质量指标（Precision@K / Recall@K）：[eval/golden_matching.py](eval/golden_matching.py)
 
