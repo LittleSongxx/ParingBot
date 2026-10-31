@@ -208,6 +208,7 @@ docker compose build web
 - 真实模型评测结果（DeepSeek / Qwen 对比）：[eval/RESULTS.md](eval/RESULTS.md)
 - 前端 Playwright 冒烟：[e2e/README.md](e2e/README.md)
 - 自动质量检查（硬规则/汇总一致性/证据覆盖）：[eval/quality_checks.py](eval/quality_checks.py)
+- Golden 匹配质量指标（Precision@K / Recall@K）：[eval/golden_matching.py](eval/golden_matching.py)
 
 ## 截图
 

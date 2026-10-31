@@ -185,3 +185,15 @@ python eval/scenario_matrix.py --only S1,S3 --trials 2
 
 场景包含短租/长租/养宠/吸烟/预算紧/远门店/缺档案/缺动态/租期池为空等；
 新建账号统一 `TEST_SCENARIO_*` 且保持待审核，不会污染演示候选池；结果写入 `eval/reports/scenario-matrix-*`。
+
+## Golden 匹配质量标注
+
+`eval/golden/matching_labels.json` 是规则启发式 v1 标注：按硬条件 + 门店/作息/预算/整洁/租期/兴趣算分，
+每位申请人取前 8 个 gold 候选。它不是人工逐人打分，先解决「可重复量化」，后续要抽检校准。
+
+```bash
+python eval/golden_matching.py --bundle eval/fixtures/quality_bundle_sample.json
+python eval/golden_matching.py --bundle analysis/quality-bundles/runs-947-949.json --out /tmp/golden.md
+```
+
+输出 Precision@K / Recall@K；当前评估器只读 bundle，不连数据库、不调用模型。
