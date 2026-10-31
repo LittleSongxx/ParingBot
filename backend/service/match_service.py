@@ -186,7 +186,7 @@ async def readiness(member: MemberProfile | None) -> dict:
                 f"短期过渡可以理解，但硬规则不允许跨档合租；请调整计划租期，或等新的短租租客再发起。",
                 "/front/memberProfile", "去调整计划租期"))
         checks.append(_check("lease_pool", "租期匹配候选", True,
-                             f"{pool} 位租期接近的候选"))
+                             f"{pool} 位可能进入匹配的候选（只按性别、租期档位和您的必须项粗筛，不代表最终可交付人数）"))
     return {"checks": checks, "blocker": None, "can_run": True}
 
 
