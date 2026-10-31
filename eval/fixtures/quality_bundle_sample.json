@@ -1,0 +1,945 @@
+{
+ "generated_at": "2026-10-31",
+ "note": "CI 质量检查用的小样本（仅 run 947，数据为演示种子）",
+ "runs": [
+  {
+   "run": {
+    "id": 947,
+    "run_no": "MATCH-20261031153128-5afb2e",
+    "status": "已完成",
+    "total_round": 3,
+    "cost_millis": 46618,
+    "summary": "调度 3 轮，候选池累计 13 人，通过审核 10 人，否决 3 人，交付 8 人（要求 8 人）；收尾原因：主管判断可以收尾；最后一次交接：一共审了 2 批：通过 10 人，否决 3 人；否决分类：申请方不满足候选方标为必须的条件 3 人；模型报的和库里的对不上的地方：代码复核改判 3 人：「晚妍」双方计划租期相差过大：申请方「3个月以下」vs 候选方「6-12个月」，不适合合租；「安涵」双方计划租期相差过大：申请方「3个月以下」vs 候选方「6-12个月」，不适合合租；「以月」双方计划租期相差过大：申请方「3个月以下」vs 候选方「6-12个月」，不适合合租",
+    "error": null,
+    "start": "2026-10-31 15:31:28",
+    "end": "2026-10-31 15:32:15"
+   },
+   "task": {
+    "id": 1092,
+    "task_no": "MATCH-20261031153128-5e06ae",
+    "status": "已完成",
+    "deliver_count": 8,
+    "total_round": 3
+   },
+   "applicant": {
+    "id": 2,
+    "nickname": "禾瑾",
+    "gender": "女",
+    "rent_budget": 4000,
+    "tidiness": "整洁",
+    "occupation": "人力资源专员",
+    "lease_term": "3个月以下",
+    "store_id": 1,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "我在浦东这边上班，做人力资源专员。作息算正常，十二点左右睡，早上八点前起。东西习惯分类收纳，厨房用完当天就擦干净。不吸烟不酗酒。基本点外卖，很少用厨房。偶尔周末会有朋友来坐坐，会提前跟室友说一声。平时喜欢主机游戏、海岛游、撸狗、杂志。最近是过渡期，先住两三个月看看。",
+    "roommate_expectation": "希望室友作息规律，晚上十一点后尽量安静。希望室友爱干净，公共区域用完能及时收拾。最好就在同一家门店，通勤方便。希望室友不在屋里抽烟。如果能偶尔一起做饭就更好了。",
+    "interest_tags": "主机游戏,海岛游,撸狗,杂志,小说",
+    "birth_date": "2000-05-20 00:00:00",
+    "preference": {
+     "age_min": "23",
+     "age_max": "30",
+     "age_required": "必须",
+     "budget_min": "3200",
+     "budget_max": "5000",
+     "budget_required": "加分",
+     "tidiness_min": "整洁",
+     "tidiness_required": "加分",
+     "store_scope": "同门店",
+     "store_required": "加分",
+     "schedule_accept": "早睡早起,正常作息",
+     "schedule_required": "必须",
+     "lease_min": "None",
+     "lease_required": "加分",
+     "pet_accept": "无所谓",
+     "pet_required": "加分",
+     "create_time": "2026-10-03 21:10:17",
+     "update_time": "2026-10-03 21:10:17"
+    },
+    "portrait": {
+     "version": 20,
+     "personality_tags": "整洁有序,作息自律,随和好沟通,安静居家",
+     "lifestyle_tags": "作息规律,爱干净勤收纳,很少做饭常点外卖,偶尔有朋友来访且提前告知,不吸烟不酗酒",
+     "cohabit_need_tags": "短租2-3个月（过渡期，需要可接受短租的室友或房源）,希望室友作息规律、夜间安静,希望在公共区域用完及时收拾,希望室友不在室内吸烟,希望在同一门店、通勤方便,希望偶尔一起做饭",
+     "summary": "禾瑾，女，26岁，浦东上班的人力资源专员，预算4000元，意向张江店，不吸烟、无宠物、整洁度「整洁」。重点核实结果：档案里「计划租期」字段写的是「3个月以下」，本人自述「最近是过渡期，先住两三个月看看」，因此真实租期约为2到3个月的短租，不能按候选池里常见的6到12个月处理，筛选和对齐时都要按短租来匹配，并在合住需求里明确标注为短租。她的作息是十二点左右睡、早上八点前起，东西习惯分类收纳，厨房用完当天就擦干净；基本点外卖、很少做饭；周末偶尔有朋友来坐坐，会提前告知；不吸烟不酗酒。她希望室友作息规律、晚上十一点后保持安静、爱干净、不在室内抽烟、最好住在同一家门店，能偶尔一起做饭。她的兴趣爱好有主机游戏、海岛游、撸狗、杂志、小说。",
+     "evidence": "{\"整洁有序\": \"给衣柜做了个分类收纳，找东西方便多了。\", \"作息自律\": \"作息算正常，十二点左右睡，早上八点前起。\", \"随和好沟通\": \"偶尔周末会有朋友来坐坐，会提前跟室友说一声。\", \"安静居家\": \"下班回家做了个简单的晚饭，追了两集剧，十二点前睡下。\", \"作息规律\": \"下班回家做了个简单的晚饭，追了两集剧，十二点前睡下。\", \"爱干净勤收纳\": \"东西习惯分类收纳，厨房用完当天就擦干净。\", \"很少做饭常点外卖\": \"又点了外卖，最近太忙没空做饭。\", \"偶尔有朋友来访且提前告知\": \"偶尔周末会有朋友来坐坐，会提前跟室友说一声。\", \"不吸烟不酗酒\": \"不吸烟不酗酒。\", \"短租2-3个月（过渡期，需要可接受短租的室友或房源）\": \"最近是过渡期，先住两三个月看看。\", \"希望室友作息规律、夜间安静\": \"希望室友作息规律，晚上十一点后尽量安静。\", \"希望在公共区域用完及时收拾\": \"希望室友爱干净，公共区域用完能及时收拾。\", \"希望室友不在室内吸烟\": \"希望室友不在屋里抽烟。\", \"希望在同一门店、通勤方便\": \"最好就在同一家门店，通勤方便。\", \"希望偶尔一起做饭\": \"如果能偶尔一起做饭就更好了。\"}",
+     "focus_hint": "从租客 #2 的档案与动态核实其真实计划租期（合同起止或月数），把画像中的「3个月以下」改为真实值并与候选池常见的「6-12个月」对齐，同时复核预算、性别等硬性条件字段，若租期确为短租则在合住需求中明确标注以避免继续系统性冲突",
+     "run_id": 893,
+     "create_time": "2026-10-31 15:12:38"
+    },
+    "moments": [
+     {
+      "content": "这周末去海岛游了，很放松。",
+      "time": "2026-10-03 21:10:17"
+     },
+     {
+      "content": "下班回家做了个简单的晚饭，追了两集剧，十二点前睡下。",
+      "time": "2026-10-03 21:10:17"
+     },
+     {
+      "content": "给衣柜做了个分类收纳，找东西方便多了。",
+      "time": "2026-10-03 21:10:17"
+     },
+     {
+      "content": "又点了外卖，最近太忙没空做饭。",
+      "time": "2026-10-03 21:10:17"
+     }
+    ]
+   },
+   "deliverable_passed_count": 10,
+   "delivered_to_user": 8,
+   "delivery_cap_note": "deliverable 通过人数按 deliver_count 截断",
+   "candidates": [
+    {
+     "id": 12,
+     "nickname": "晚妍",
+     "gender": "女",
+     "rent_budget": 4100,
+     "tidiness": "整洁",
+     "occupation": "电商运营",
+     "lease_term": "6-12个月",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "不吸烟",
+     "self_intro": "我在浦东这边上班，做电商运营。工作日朝九晚六，晚上偶尔追剧到十二点左右。东西习惯分类收纳，厨房用完当天就擦干净。不吸烟不酗酒。基本点外卖，很少用厨房。偶尔周末会有朋友来坐坐，会提前跟室友说一声。平时喜欢追剧、古镇游、听相声、探店。打算先签一年以内。",
+     "roommate_expectation": "希望室友作息规律，晚上十一点后尽量安静。希望室友爱干净，公共区域用完能及时收拾。对动物毛发过敏，不能接受室友养宠物。如果能偶尔一起做饭就更好了。",
+     "interest_tags": "追剧,古镇游,听相声,探店,健身,陶艺",
+     "birth_date": "2002-05-23 00:00:00",
+     "preference": {
+      "age_min": "18",
+      "age_max": "32",
+      "age_required": "必须",
+      "budget_min": "3300",
+      "budget_max": "4600",
+      "budget_required": "加分",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同片区",
+      "store_required": "必须",
+      "schedule_accept": "早睡早起,正常作息",
+      "schedule_required": "加分",
+      "lease_min": "None",
+      "lease_required": "加分",
+      "pet_accept": "不接受",
+      "pet_required": "加分",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-03 21:10:17"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "这周作息还算规律，早上八点前起床，晚上十二点前睡。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "下班回家做了个简单的晚饭，追了两集剧，十二点前睡下。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "又点了外卖，最近太忙没空做饭。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1771,
+     "screen_score": 94,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "否决",
+     "reject_code": "MISMATCH_HARD",
+     "reject_reason": "代码复核改判：双方计划租期相差过大：申请方「3个月以下」vs 候选方「6-12个月」，不适合合租",
+     "audit_round": 2,
+     "delivered": false
+    },
+    {
+     "id": 14,
+     "nickname": "安涵",
+     "gender": "女",
+     "rent_budget": 4600,
+     "tidiness": "整洁",
+     "occupation": "小学教师",
+     "lease_term": "6-12个月",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "偶尔",
+     "self_intro": "做小学教师的，公司离张江店不远。一般十二点前睡觉，周末会稍微睡个懒觉。比较爱干净，公共区域用完马上收拾。偶尔会抽烟，但只在楼下抽，不在屋里。基本点外卖，很少用厨房。很少带朋友回来。平时喜欢健身、书法、绘画、养鸟。打算先签一年以内。",
+     "roommate_expectation": "希望室友爱干净，公共区域用完能及时收拾。对动物毛发过敏，不能接受室友养宠物。最好就在同一家门店，通勤方便。相处简单一点，有事好商量。",
+     "interest_tags": "健身,书法,绘画,养鸟",
+     "birth_date": "2000-07-07 00:00:00",
+     "preference": {
+      "age_min": "21",
+      "age_max": "29",
+      "age_required": "必须",
+      "budget_min": "3400",
+      "budget_max": "5400",
+      "budget_required": "必须",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同门店",
+      "store_required": "必须",
+      "schedule_accept": "早睡早起,正常作息,夜猫子",
+      "schedule_required": "加分",
+      "lease_min": "None",
+      "lease_required": "加分",
+      "pet_accept": "不接受",
+      "pet_required": "加分",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-03 21:10:17"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "这周末去绘画了，很放松。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "健身真是解压的好办法。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1770,
+     "screen_score": 94,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "否决",
+     "reject_code": "MISMATCH_HARD",
+     "reject_reason": "代码复核改判：双方计划租期相差过大：申请方「3个月以下」vs 候选方「6-12个月」，不适合合租",
+     "audit_round": 2,
+     "delivered": false
+    },
+    {
+     "id": 31,
+     "nickname": "以月",
+     "gender": "女",
+     "rent_budget": 4700,
+     "tidiness": "整洁",
+     "occupation": "人力资源专员",
+     "lease_term": "6-12个月",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "不吸烟",
+     "self_intro": "做人力资源专员的，公司离张江店不远。工作日朝九晚六，晚上偶尔追剧到十二点左右。东西习惯分类收纳，厨房用完当天就擦干净。不吸烟不酗酒。会做几个家常菜，愿意和室友一起分摊买菜。偶尔周末会有朋友来坐坐，会提前跟室友说一声。平时喜欢烘焙、散文、插画、桌游。打算先签一年以内。",
+     "roommate_expectation": "希望室友作息规律，晚上十一点后尽量安静。希望室友爱干净，公共区域用完能及时收拾。对动物毛发过敏，不能接受室友养宠物。最好就在同一家门店，通勤方便。如果能偶尔一起做饭就更好了。",
+     "interest_tags": "烘焙,散文,插画,桌游",
+     "birth_date": "1997-01-22 00:00:00",
+     "preference": {
+      "age_min": "25",
+      "age_max": "34",
+      "age_required": "必须",
+      "budget_min": "4200",
+      "budget_max": "6200",
+      "budget_required": "加分",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同门店",
+      "store_required": "必须",
+      "schedule_accept": "早睡早起,正常作息",
+      "schedule_required": "加分",
+      "lease_min": "None",
+      "lease_required": "加分",
+      "pet_accept": "不接受",
+      "pet_required": "必须",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-03 21:10:17"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "最近迷上了烘焙，有同好可以一起。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "这周末去散文了，很放松。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "这周作息还算规律，早上八点前起床，晚上十二点前睡。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1769,
+     "screen_score": 94,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "否决",
+     "reject_code": "MISMATCH_HARD",
+     "reject_reason": "代码复核改判：双方计划租期相差过大：申请方「3个月以下」vs 候选方「6-12个月」，不适合合租",
+     "audit_round": 2,
+     "delivered": false
+    },
+    {
+     "id": 32,
+     "nickname": "清语",
+     "gender": "女",
+     "rent_budget": 4000,
+     "tidiness": "整洁",
+     "occupation": "体育教练",
+     "lease_term": "3个月以下",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "不吸烟",
+     "self_intro": "在浦东上班，作息正常、不吸烟；近期是过渡期，计划先住两三个月。",
+     "roommate_expectation": "希望室友作息规律、爱干净，尽量同门店通勤，不在屋里抽烟。",
+     "interest_tags": "爬宠,游泳,日料,看纪录片,听播客,养仓鼠",
+     "birth_date": "2000-01-15 00:00:00",
+     "preference": {
+      "age_min": "23",
+      "age_max": "30",
+      "age_required": "必须",
+      "budget_min": "3200",
+      "budget_max": "5000",
+      "budget_required": "加分",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同门店",
+      "store_required": "加分",
+      "schedule_accept": "早睡早起,正常作息",
+      "schedule_required": "必须",
+      "lease_min": "3个月以下",
+      "lease_required": "加分",
+      "pet_accept": "无所谓",
+      "pet_required": "加分",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-31 15:30:58"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "朋友周六来家里坐了一会儿，提前跟室友打过招呼。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "游泳真是解压的好办法。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "最近迷上了日料，有同好可以一起。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1768,
+     "screen_score": 93,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "通过",
+     "reject_code": null,
+     "reject_reason": null,
+     "audit_round": 2,
+     "delivered": true
+    },
+    {
+     "id": 231,
+     "nickname": "莹南",
+     "gender": "女",
+     "rent_budget": 4000,
+     "tidiness": "整洁",
+     "occupation": "心理咨询师",
+     "lease_term": "3个月以下",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "不吸烟",
+     "self_intro": "在浦东上班，作息正常、不吸烟；近期是过渡期，计划先住两三个月。",
+     "roommate_expectation": "希望室友作息规律、爱干净，尽量同门店通勤，不在屋里抽烟。",
+     "interest_tags": "乒乓球,篮球,健身",
+     "birth_date": "1999-07-20 00:00:00",
+     "preference": {
+      "age_min": "23",
+      "age_max": "30",
+      "age_required": "必须",
+      "budget_min": "3200",
+      "budget_max": "5000",
+      "budget_required": "加分",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同门店",
+      "store_required": "加分",
+      "schedule_accept": "早睡早起,正常作息",
+      "schedule_required": "必须",
+      "lease_min": "3个月以下",
+      "lease_required": "加分",
+      "pet_accept": "无所谓",
+      "pet_required": "加分",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-31 15:30:58"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "又点了外卖，最近太忙没空做饭。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "周末睡到九点，起来把一周的衣服洗了。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "最近迷上了篮球，有同好可以一起。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1767,
+     "screen_score": 90,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "通过",
+     "reject_code": null,
+     "reject_reason": null,
+     "audit_round": 2,
+     "delivered": true
+    },
+    {
+     "id": 403,
+     "nickname": "雨南",
+     "gender": "女",
+     "rent_budget": 4000,
+     "tidiness": "整洁",
+     "occupation": "小学教师",
+     "lease_term": "3个月以下",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "不吸烟",
+     "self_intro": "在浦东上班，作息正常、不吸烟；近期是过渡期，计划先住两三个月。",
+     "roommate_expectation": "希望室友作息规律、爱干净，尽量同门店通勤，不在屋里抽烟。",
+     "interest_tags": "爬宠,撸狗,滑雪,书法,插画,宠物公益",
+     "birth_date": "2000-01-15 00:00:00",
+     "preference": {
+      "age_min": "23",
+      "age_max": "30",
+      "age_required": "必须",
+      "budget_min": "3200",
+      "budget_max": "5000",
+      "budget_required": "加分",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同门店",
+      "store_required": "加分",
+      "schedule_accept": "早睡早起,正常作息",
+      "schedule_required": "必须",
+      "lease_min": "3个月以下",
+      "lease_required": "加分",
+      "pet_accept": "无所谓",
+      "pet_required": "加分",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-31 15:30:58"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "又点了外卖，最近太忙没空做饭。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "周末在家自己炖了锅汤，厨房用完顺手收拾了。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "今天六点半起床跑了五公里，回来冲个澡正好去上班。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1766,
+     "screen_score": 93,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "通过",
+     "reject_code": null,
+     "reject_reason": null,
+     "audit_round": 2,
+     "delivered": true
+    },
+    {
+     "id": 458,
+     "nickname": "景彤",
+     "gender": "女",
+     "rent_budget": 4000,
+     "tidiness": "整洁",
+     "occupation": "人力资源专员",
+     "lease_term": "3个月以下",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "不吸烟",
+     "self_intro": "在浦东上班，作息正常、不吸烟；近期是过渡期，计划先住两三个月。",
+     "roommate_expectation": "希望室友作息规律、爱干净，尽量同门店通勤，不在屋里抽烟。",
+     "interest_tags": "城市漫步,陶艺,爬宠",
+     "birth_date": "1999-07-20 00:00:00",
+     "preference": {
+      "age_min": "23",
+      "age_max": "30",
+      "age_required": "必须",
+      "budget_min": "3200",
+      "budget_max": "5000",
+      "budget_required": "加分",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同门店",
+      "store_required": "加分",
+      "schedule_accept": "早睡早起,正常作息",
+      "schedule_required": "必须",
+      "lease_min": "3个月以下",
+      "lease_required": "加分",
+      "pet_accept": "无所谓",
+      "pet_required": "加分",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-31 15:30:58"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "今天六点半起床跑了五公里，回来冲个澡正好去上班。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "周末也是七点自然醒，下楼买了早饭顺便逛了逛菜市场。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1765,
+     "screen_score": 90,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "通过",
+     "reject_code": null,
+     "reject_reason": null,
+     "audit_round": 2,
+     "delivered": true
+    },
+    {
+     "id": 467,
+     "nickname": "芊宁",
+     "gender": "女",
+     "rent_budget": 4000,
+     "tidiness": "整洁",
+     "occupation": "产品经理",
+     "lease_term": "3个月以下",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "不吸烟",
+     "self_intro": "在浦东上班，作息正常、不吸烟；近期是过渡期，计划先住两三个月。",
+     "roommate_expectation": "希望室友作息规律、爱干净，尽量同门店通勤，不在屋里抽烟。",
+     "interest_tags": "下厨,主机游戏,小说",
+     "birth_date": "2000-01-15 00:00:00",
+     "preference": {
+      "age_min": "23",
+      "age_max": "30",
+      "age_required": "必须",
+      "budget_min": "3200",
+      "budget_max": "5000",
+      "budget_required": "加分",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同门店",
+      "store_required": "加分",
+      "schedule_accept": "早睡早起,正常作息",
+      "schedule_required": "必须",
+      "lease_min": "3个月以下",
+      "lease_required": "加分",
+      "pet_accept": "无所谓",
+      "pet_required": "加分",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-31 15:30:58"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "今天天气不错，出去走了走。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "今天天气不错，出去走了走。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1764,
+     "screen_score": 93,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "通过",
+     "reject_code": null,
+     "reject_reason": null,
+     "audit_round": 2,
+     "delivered": true
+    },
+    {
+     "id": 641,
+     "nickname": "薇若",
+     "gender": "女",
+     "rent_budget": 4000,
+     "tidiness": "整洁",
+     "occupation": "西点师",
+     "lease_term": "3个月以下",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "不吸烟",
+     "self_intro": "在浦东上班，作息正常、不吸烟；近期是过渡期，计划先住两三个月。",
+     "roommate_expectation": "希望室友作息规律、爱干净，尽量同门店通勤，不在屋里抽烟。",
+     "interest_tags": "看综艺,摄影旅行,看动漫,出境游,古镇游,听音乐会",
+     "birth_date": "1999-07-20 00:00:00",
+     "preference": {
+      "age_min": "23",
+      "age_max": "30",
+      "age_required": "必须",
+      "budget_min": "3200",
+      "budget_max": "5000",
+      "budget_required": "加分",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同门店",
+      "store_required": "加分",
+      "schedule_accept": "早睡早起,正常作息",
+      "schedule_required": "必须",
+      "lease_min": "3个月以下",
+      "lease_required": "加分",
+      "pet_accept": "无所谓",
+      "pet_required": "加分",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-31 15:30:58"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "周末在家自己炖了锅汤，厨房用完顺手收拾了。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "最近迷上了看综艺，有同好可以一起。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "最近迷上了摄影旅行，有同好可以一起。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "把厨房台面和灶台擦了一遍，看着清爽多了。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1763,
+     "screen_score": 88,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "通过",
+     "reject_code": null,
+     "reject_reason": null,
+     "audit_round": 2,
+     "delivered": true
+    },
+    {
+     "id": 719,
+     "nickname": "婉语",
+     "gender": "女",
+     "rent_budget": 4000,
+     "tidiness": "整洁",
+     "occupation": "医生",
+     "lease_term": "3-6个月",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "不吸烟",
+     "self_intro": "在浦东上班，作息正常、不吸烟；近期是过渡期，计划先住两三个月。",
+     "roommate_expectation": "希望室友作息规律、爱干净，尽量同门店通勤，不在屋里抽烟。",
+     "interest_tags": "甜品,出境游,追剧",
+     "birth_date": "2000-01-15 00:00:00",
+     "preference": {
+      "age_min": "23",
+      "age_max": "30",
+      "age_required": "必须",
+      "budget_min": "3200",
+      "budget_max": "5000",
+      "budget_required": "加分",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同门店",
+      "store_required": "加分",
+      "schedule_accept": "早睡早起,正常作息",
+      "schedule_required": "必须",
+      "lease_min": "3个月以下",
+      "lease_required": "加分",
+      "pet_accept": "无所谓",
+      "pet_required": "加分",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-31 15:30:58"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "周末在家自己炖了锅汤，厨房用完顺手收拾了。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "朋友周六来家里坐了一会儿，提前跟室友打过招呼。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1762,
+     "screen_score": 93,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "通过",
+     "reject_code": null,
+     "reject_reason": null,
+     "audit_round": 2,
+     "delivered": true
+    },
+    {
+     "id": 788,
+     "nickname": "尘林",
+     "gender": "女",
+     "rent_budget": 4000,
+     "tidiness": "整洁",
+     "occupation": "心理咨询师",
+     "lease_term": "3-6个月",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "不吸烟",
+     "self_intro": "在浦东上班，作息正常、不吸烟；近期是过渡期，计划先住两三个月。",
+     "roommate_expectation": "希望室友作息规律、爱干净，尽量同门店通勤，不在屋里抽烟。",
+     "interest_tags": "篮球,主机游戏,端游",
+     "birth_date": "1999-07-20 00:00:00",
+     "preference": {
+      "age_min": "23",
+      "age_max": "30",
+      "age_required": "必须",
+      "budget_min": "3200",
+      "budget_max": "5000",
+      "budget_required": "加分",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同门店",
+      "store_required": "加分",
+      "schedule_accept": "早睡早起,正常作息",
+      "schedule_required": "必须",
+      "lease_min": "3个月以下",
+      "lease_required": "加分",
+      "pet_accept": "无所谓",
+      "pet_required": "加分",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-31 15:30:58"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "今天六点半起床跑了五公里，回来冲个澡正好去上班。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "房间又有点乱了，周末找时间收拾一下。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "周末在家自己炖了锅汤，厨房用完顺手收拾了。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1761,
+     "screen_score": 90,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "通过",
+     "reject_code": null,
+     "reject_reason": null,
+     "audit_round": 2,
+     "delivered": true
+    },
+    {
+     "id": 817,
+     "nickname": "洛瑾",
+     "gender": "女",
+     "rent_budget": 4000,
+     "tidiness": "整洁",
+     "occupation": "西点师",
+     "lease_term": "3-6个月",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "不吸烟",
+     "self_intro": "在浦东上班，作息正常、不吸烟；近期是过渡期，计划先住两三个月。",
+     "roommate_expectation": "希望室友作息规律、爱干净，尽量同门店通勤，不在屋里抽烟。",
+     "interest_tags": "听播客,宠物摄影,卡牌,骑行,诗集",
+     "birth_date": "2000-01-15 00:00:00",
+     "preference": {
+      "age_min": "23",
+      "age_max": "30",
+      "age_required": "必须",
+      "budget_min": "3200",
+      "budget_max": "5000",
+      "budget_required": "加分",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同门店",
+      "store_required": "加分",
+      "schedule_accept": "早睡早起,正常作息",
+      "schedule_required": "必须",
+      "lease_min": "3个月以下",
+      "lease_required": "加分",
+      "pet_accept": "无所谓",
+      "pet_required": "加分",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-31 15:30:58"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "这周末去宠物摄影了，很放松。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "朋友周六来家里坐了一会儿，提前跟室友打过招呼。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1760,
+     "screen_score": 93,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "通过",
+     "reject_code": null,
+     "reject_reason": null,
+     "audit_round": 2,
+     "delivered": true
+    },
+    {
+     "id": 861,
+     "nickname": "尘瑾",
+     "gender": "女",
+     "rent_budget": 4000,
+     "tidiness": "整洁",
+     "occupation": "销售经理",
+     "lease_term": "3-6个月",
+     "store_id": 1,
+     "schedule_type": "正常作息",
+     "has_pet": "无",
+     "smoking": "不吸烟",
+     "self_intro": "在浦东上班，作息正常、不吸烟；近期是过渡期，计划先住两三个月。",
+     "roommate_expectation": "希望室友作息规律、爱干净，尽量同门店通勤，不在屋里抽烟。",
+     "interest_tags": "电竞,主机游戏,背包客,爬宠,养狗",
+     "birth_date": "1999-07-20 00:00:00",
+     "preference": {
+      "age_min": "23",
+      "age_max": "30",
+      "age_required": "必须",
+      "budget_min": "3200",
+      "budget_max": "5000",
+      "budget_required": "加分",
+      "tidiness_min": "整洁",
+      "tidiness_required": "加分",
+      "store_scope": "同门店",
+      "store_required": "加分",
+      "schedule_accept": "早睡早起,正常作息",
+      "schedule_required": "必须",
+      "lease_min": "3个月以下",
+      "lease_required": "加分",
+      "pet_accept": "无所谓",
+      "pet_required": "加分",
+      "create_time": "2026-10-03 21:10:17",
+      "update_time": "2026-10-31 15:30:58"
+     },
+     "portrait": null,
+     "moments": [
+      {
+       "content": "新买了几块分色抹布，厨房、卫生间各用各的。",
+       "time": "2026-10-03 21:10:17"
+      },
+      {
+       "content": "最近迷上了电竞，有同好可以一起。",
+       "time": "2026-10-03 21:10:17"
+      }
+     ],
+     "candidate_row_id": 1759,
+     "screen_score": 90,
+     "found_round": 1,
+     "relax_note": null,
+     "audit_status": "通过",
+     "reject_code": null,
+     "reject_reason": null,
+     "audit_round": 2,
+     "delivered": true
+    }
+   ],
+   "rounds": [
+    {
+     "round": 1,
+     "agent_code": "SCREENER",
+     "agent_name": "筛选官",
+     "instruction": "按张江店、女、26岁、正常作息等条件检索候选租客并写入候选池，优先补足可审核人数，必要时可放宽加分项。",
+     "reason": "当前累计候选0人、待审核0人、距交付还差8人，审核官无待办且画像未有缺失维度点名，应先派筛选官从0开始扩充候选池，筛选官放宽次数仍为0/3。",
+     "conclusion": "模型给出候选 13 个，没有放宽条件",
+     "tool_calls": 3,
+     "failed": false
+    },
+    {
+     "round": 2,
+     "agent_code": "AUDITOR",
+     "agent_name": "审核官",
+     "instruction": "对当前累计候选池里的 13 名待审核候选逐一读取偏好与画像并回填审核结论，重点核对性别、作息与张江店合住匹配度，明确给出通过或否决及理由。",
+     "reason": "当前累计候选 13 人、待审核 13 人、已通过 0 人，候选池里全是未处理项；按决策参考第 1 条应先把审核做完，确认其中有多少人真正可用，再决定是否需要筛选官放宽条件补量。",
+     "conclusion": "模型给出结论 10 条，其中通过 10 人、否决 0 人",
+     "tool_calls": 26,
+     "failed": false
+    },
+    {
+     "round": 3,
+     "agent_code": "FINISH",
+     "agent_name": "FINISH",
+     "instruction": "把已通过审核的 10 名候选交付给租客 #2，本次匹配到此结束",
+     "reason": "已通过审核 10 人，超过交付要求 8 人，还差 0 人；当前待审核 0 人，审核官已处理完 2 批，即已审 13 人、通过 10 人、否决 3 人，没有待审候选，符合「通过人数达到交付要求即收尾」的条件，不必再派筛选官或画像师。",
+     "conclusion": null,
+     "tool_calls": 0,
+     "failed": false
+    }
+   ],
+   "funnel": {
+    "available": true,
+    "task_id": 1092,
+    "task_no": "MATCH-20261031153128-5e06ae",
+    "deliver_count": 8,
+    "total": 13,
+    "rejected": 3,
+    "approved": 10,
+    "pending": 0,
+    "audited": true,
+    "stages": [
+     {
+      "key": "total",
+      "label": "筛出",
+      "value": 13,
+      "ratio": 100.0,
+      "desc": "筛选官写进候选池的人数，含后面被否决的和还没审的"
+     },
+     {
+      "key": "rejected",
+      "label": "否决",
+      "value": 3,
+      "ratio": 23.1,
+      "desc": "审核官站在候选人那一方重新看一遍，判为不合适的"
+     },
+     {
+      "key": "passed",
+      "label": "通过",
+      "value": 10,
+      "ratio": 76.9,
+      "desc": "通过审核、且按当前规则复核得上的"
+     },
+     {
+      "key": "delivered",
+      "label": "交付",
+      "value": 8,
+      "ratio": 61.5,
+      "desc": "最终交到发起人手上的，最多不超过要求的 8 人"
+     }
+    ],
+    "notes": [],
+    "reason": null
+   }
+  }
+ ]
+}

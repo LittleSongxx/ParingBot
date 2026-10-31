@@ -154,3 +154,34 @@ CI 在 backend 测试之后执行 `--fixtures --bad eval/fixtures/bad`；不通�
 - 用例基于合成种子数据与可控变体，不能替代真实用户分布；
 - 参考输出不是「标准答案」，只是符合规则的样例；真正上线前必须用真实模型输出跑一遍人工抽检；
 - 本目录不包含任何真实个人信息；新增用例请使用合成数据。
+
+## 自动质量检查（真实运行数据包）
+
+`eval/quality_checks.py` 对 quality bundle 做三类检查：
+
+- **硬规则**：交付候选的同性、双方 must、计划租期档位差；
+- **汇总一致性**：run summary 里的轮次/候选/通过/否决/交付数字 vs 库内字段；
+- **证据覆盖**：交付候选是否有画像/通过理由；通过人数 > 展示人数时是否记录截断。
+
+```bash
+# 离线样例（CI 用）
+python eval/quality_checks.py --bundle eval/fixtures/quality_bundle_sample.json
+
+# 真实运行数据包（由 quality bundle 构建脚本产出）
+python eval/quality_checks.py --bundle analysis/quality-bundles/runs-947-949.json --json /tmp/qc.json
+```
+
+硬规则或 summary 不一致时退出码 1；证据缺口当前只报告不阻断。
+
+## 场景矩阵（真实模型）
+
+```bash
+# 只做前置检查，不花 token
+python eval/scenario_matrix.py --phase ready
+
+# 指定场景跑真实匹配（会真实消耗 DeepSeek token）
+python eval/scenario_matrix.py --only S1,S3 --trials 2
+```
+
+场景包含短租/长租/养宠/吸烟/预算紧/远门店/缺档案/缺动态/租期池为空等；
+新建账号统一 `TEST_SCENARIO_*` 且保持待审核，不会污染演示候选池；结果写入 `eval/reports/scenario-matrix-*`。
