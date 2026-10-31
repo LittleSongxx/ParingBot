@@ -268,6 +268,9 @@ const load = () => {
       return
     }
     Object.assign(data, res.data)
+  }).catch(() => {
+    // 请求拦截器已经把可读错误提示给用户了；这里兜住 reject，
+    // 否则 500 会变成未处理的 Promise rejection（浏览器 pageerror）。
   }).finally(() => {
     loadingPage = false
     ensurePolling()

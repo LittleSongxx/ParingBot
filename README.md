@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/MySQL-8-4479A1?style=flat-square&logo=mysql&logoColor=white" />
   <img src="https://img.shields.io/badge/Vue-3.4-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white" />
   <img src="https://img.shields.io/badge/Docker%20Compose-3%20services-2496ED?style=flat-square&logo=docker&logoColor=white" />
-  <img src="https://img.shields.io/badge/tests-353%20passed-2ea44f?style=flat-square" />
+  <img src="https://img.shields.io/badge/tests-354%20passed-2ea44f?style=flat-square" />
 </p>
 
 <p align="center">
@@ -90,7 +90,7 @@
 | **代码复核会翻案** | 模型判「通过」后，代码按候选方标为必须的条件复核申请方；验不过（含同性硬规则）的候选当场改判否决，而不是只写一条备注。 |
 | **每一步可复盘** | `agent_run` / `agent_step` / `tool_call_log` 三张账本；调度时间线 + 候选漏斗；异常一律翻译成「去哪个页面改哪一项」。 |
 | **配置中台** | 模型、Prompt、角色、工具、7 项闸门参数全部入库，运行时现查、改完下一步生效；停用一个工具，模型手里真的没有它。 |
-| **可部署、可测试** | Docker Compose 三服务（MySQL + FastAPI + Nginx/Vue）；266 条原有用例 + 新增回归共 **353 条**，AI 流程用 FakeModel 回放，不需要真实 API Key。 |
+| **可部署、可测试** | Docker Compose 三服务（MySQL + FastAPI + Nginx/Vue）；266 条原有用例 + 新增回归共 **354 条**，AI 流程用 FakeModel 回放，不需要真实 API Key。 |
 
 ## 架构
 
@@ -168,7 +168,7 @@ python scripts/smoke_check.py --base http://127.0.0.1:8080
 
 # 后端全量测试：真实 MySQL + FakeModel，不需要模型 API Key
 docker compose exec -T backend pytest -q
-# -> 353 passed
+# -> 354 passed
 
 # AI 能力评测（Phase 0）：40 条 golden case + 坏输出自检，不需要模型 Key
 python eval/run_eval.py --fixtures --bad eval/fixtures/bad
@@ -177,7 +177,7 @@ python eval/run_eval.py --fixtures --bad eval/fixtures/bad
 docker compose build web
 ```
 
-当前基线：**353 项后端测试，0 失败**（2026-10-30，本机 Docker Compose 栈内实测）。测试数量来自 `pytest -q` 尾行统计；AI 相关用例用 FakeModel 按脚本回放，不依赖真实模型。
+当前基线：**354 项后端测试，0 失败**（2026-10-30，本机 Docker Compose 栈内实测）。测试数量来自 `pytest -q` 尾行统计；AI 相关用例用 FakeModel 按脚本回放，不依赖真实模型。
 
 ## 实测与边界
 
@@ -195,7 +195,7 @@ docker compose build web
 - **没有生产级高可用**：单机 MySQL + 单进程后端，没有多副本、消息队列和跨城容灾；登录限流是进程内实现，不跨实例。
 - **没有真实住户数据**：演示租客、动态、运行记录均为种子数据。
 - **没有随仓库分发的模型密钥**：`.env` 与任何 Key 都不进版本控制，仓库只保留 `.env.example`。
-- **没有前端自动化测试**：前端只做构建与页面冒烟（截图来自真实 Docker 栈）。
+- **前端只有 Playwright 只读冒烟**：CI 的 `e2e` job 会启动整套 Compose 后跑登录/路由/页面/404/错误态用例；没有前端单元测试（截图来自真实 Docker 栈）。
 
 ## 工程文档
 
@@ -206,6 +206,8 @@ docker compose build web
 - AI 能力评测（Phase 0）：[eval/README.md](eval/README.md)
 - 真实模型评测指南（Key/模型怎么填、怎么跑）：[eval/RUNBOOK.md](eval/RUNBOOK.md)
 - 真实模型评测结果（DeepSeek / Qwen 对比）：[eval/RESULTS.md](eval/RESULTS.md)
+- 前端 Playwright 冒烟：[e2e/README.md](e2e/README.md)
+- 自动质量检查（硬规则/汇总一致性/证据覆盖）：[eval/quality_checks.py](eval/quality_checks.py)
 
 ## 截图
 

@@ -51,7 +51,8 @@ jobs:
       - name: AI 能力评测（Phase 0 fixtures）
         run: |
           python eval/run_eval.py --fixtures --bad eval/fixtures/bad
-          python -m py_compile eval/configure_models.py eval/run_live_eval.py
+          python eval/quality_checks.py --bundle eval/fixtures/quality_bundle_sample.json
+          python -m py_compile eval/configure_models.py eval/run_live_eval.py eval/quality_checks.py
 
   frontend:
     runs-on: ubuntu-latest
@@ -67,3 +68,97 @@ jobs:
         run: |
           npm ci
           npm run build
+
+  # 前端 E2E 冒烟：真正启动整套 Docker Compose，再用 Playwright 走一遍
+  # 登录、路由守卫、租客端、管理端、readiness 阻断、404 与 pageerror 断言。
+  # 只读用例，不触发 /match/rerun，不创建/删除业务数据，不调用真实模型。
+  e2e:
+    name: e2e-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      E2E_BASE_URL: http://127.0.0.1:8080
+      E2E_ADMIN_USERNAME: admin
+      E2E_ADMIN_PASSWORD: admin123
+      E2E_MEMBER_USERNAME: member01
+      E2E_MEMBER_PASSWORD: "123456"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare CI .env
+        run: |
+          cat > .env <<'EOF'
+          MYSQL_ROOT_PASSWORD=ci-root-password
+          MYSQL_DATABASE=paringbot
+          MYSQL_USER=paringbot
+          MYSQL_PASSWORD=ci-paringbot-password
+          JWT_SECRET=ci-only-jwt-secret-not-for-production
+          APP_PORT=8080
+          PUBLIC_BASE_URL=
+          MATCH_TIMEOUT_SECONDS=1200
+          MAX_UPLOAD_MB=5
+          TZ=Asia/Shanghai
+          LOGIN_MAX_FAILS=20
+          LOGIN_FAIL_WINDOW_SECONDS=300
+          LOGIN_LOCK_SECONDS=300
+          LOGIN_RATE_LIMIT_ENABLED=true
+          CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+          EOF
+          # YAML 块缩进会带进 heredoc；.env 的行首空白统一去掉，避免 Compose 解析异常
+          sed -i 's/^[[:space:]]*//' .env
+
+      - name: Build and start stack
+        run: docker compose up -d --build
+
+      # 只等 web 端口起来不够：种子库还在导入或后端刚起时登录会失败。
+      # 这里用真实的 admin 登录接口做就绪探针，最多等 10 分钟。
+      - name: Wait for stack readiness
+        run: |
+          for attempt in $(seq 1 120); do
+            if curl -fsS -X POST http://127.0.0.1:8080/api/login \
+              -H 'Content-Type: application/json' \
+              -d '{"username":"admin","password":"admin123"}' | grep -q '"code":"200"'; then
+              echo "stack ready after ${attempt} attempt(s)"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::ParingBot stack did not become ready in 10 minutes"
+          docker compose ps
+          docker compose logs --tail=200
+          exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install E2E dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright smoke tests
+        working-directory: e2e
+        env:
+          CI: "true"
+        run: npx playwright test
+
+      - name: Dump compose logs on failure
+        if: failure()
+        run: docker compose logs --tail=300
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-e2e
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          if-no-files-found: ignore
+          retention-days: 7
