@@ -452,6 +452,41 @@ async def _close_run(run: AgentRun, started, failed: bool, summary: str) -> None
         cost_millis=cost_millis(started))
 
 
+async def generate_for_candidate(member_id: int) -> MemberPortrait | None:
+    """给候选补一版画像（评测/后台补数据用，不改变候选的公开身份）。
+
+    候选画像只在有公开动态时才生成；没有动态不硬造，直接返回 None。
+    每次生成仍走画像师和原有版本校验，失败只影响这一个候选，不抛到调用方。
+    """
+    member = await MemberProfile.get_or_none(id=member_id)
+    if member is None:
+        return None
+    existing = await MemberPortrait.filter(member_id=member.id).order_by("-version").first()
+    if existing is not None:
+        return existing
+    moments = await MemberMoment.filter(member_id=member.id, visible="公开").count()
+    if not moments:
+        return None
+    user = await User.get_or_none(id=member.user_id)
+    if user is None:
+        return None
+    started = precise_now()
+    run = await _open_run(member, user.id, moments)
+    try:
+        result = await build_portrait(member.id, run.id)
+    except CustomException as exc:
+        await _close_run(run, started, True, exc.message)
+        return None
+    except Exception:  # noqa: BLE001
+        await _close_run(run, started, True, "候选画像生成出现未预期错误")
+        return None
+    if result.gate or result.portrait is None:
+        await _close_run(run, started, True, result.conclusion[:ERROR_LIMIT])
+        return None
+    await _close_run(run, started, False, result.conclusion)
+    return result.portrait
+
+
 async def generate(current_user: User) -> dict:
     """租客点一次【生成画像】走的路：核对条件、开运行、提取、收尾。"""
     member = await member_service.get_my_member(current_user, "生成画像")

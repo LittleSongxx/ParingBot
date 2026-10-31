@@ -155,6 +155,13 @@ python eval/run_live_eval.py --env-file .env.eval --trials 3 --label deepseek-fi
 
 S7 的 0/8 是审核判断波动，不是供给问题；下一阶段用 golden/人工抽检盯审核准确性。
 
+### 候选画像补齐 + S7 复测（21:00）
+
+S7 的 0/8 根因：新增候选没有画像，审核官全部以 `PORTRAIT_INSUFFICIENT` 否决。
+已为 08 供给池 32 位候选补齐画像，并把审核规则改为「候选没有画像 ≠ 不合适」；
+候选详情新增画像区块。S7 复测 **8/8、6 轮、9 候选/8 通过/1 否决、208s**，0/8 波动消除。
+
+
 
 
 完整报告：`analysis/scenario-matrix.md`。

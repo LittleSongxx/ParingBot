@@ -255,6 +255,15 @@
           </div>
           <div class="muted evidence-note">每条依据都能回到档案字段、偏好或放宽记录；没有依据的维度不会写成结论。</div>
         </div>
+        <div class="detail-block" v-if="data.detail.candidate_portrait">
+          <div class="section-title">候选画像（v{{ data.detail.candidate_portrait.version }}）</div>
+          <div class="summary-box">{{ data.detail.candidate_portrait.summary || '画像已生成，没有概括。' }}</div>
+          <div class="evidence-list">
+            <span v-for="item in [...(data.detail.candidate_portrait.personality_tags || []), ...(data.detail.candidate_portrait.lifestyle_tags || []), ...(data.detail.candidate_portrait.cohabit_need_tags || [])]"
+                  :key="item" class="chip chip-blue evidence-chip">{{ item }}</span>
+          </div>
+          <div class="muted evidence-note">画像标签均由候选人的公开动态与自我介绍提取，标签依据可查看画像详情。</div>
+        </div>
         <div class="detail-block">
           <div class="section-title">他在意的全部条件</div>
           <div class="summary-box">{{ data.detail.preference_text || '这位候选还没有填合住偏好。' }}</div>

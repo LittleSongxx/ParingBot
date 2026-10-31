@@ -42,7 +42,8 @@ from common.times import cost_millis, format_datetime, now, precise_now
 from models import (AgentDefinition, AgentRun, AgentStep, AiModelConfig, FunctionTool,
                     MatchCandidate, MatchTask, MemberPortrait, MemberProfile,
                     PromptTemplate, RoommatePreference, User)
-from service import agent_service, member_service, preference_service, screener_service
+from service import (agent_service, member_service, preference_service,
+                     portrait_service, screener_service)
 
 # 跑这一轮的角色，以及它把结论回填到哪张表
 AGENT_CODE = agents.AGENT_AUDITOR
@@ -1005,6 +1006,9 @@ async def candidate_detail(current_user: User, candidate_id: int) -> dict:
         })
         return data
     data["preference_text"] = screener_service.preference_text(_preference_dict(preference))
+    portrait = await MemberPortrait.filter(
+        member_id=candidate.id).order_by("-version", "-id").first()
+    data["candidate_portrait"] = portrait_service.portrait_dict(portrait) if portrait else None
     applicant_preference = await RoommatePreference.get_or_none(member_id=member.id)
     data["evidence"] = match_evidence(member, candidate, row, applicant_preference, preference)
     bad = hard_violations(member, candidate, preference)
