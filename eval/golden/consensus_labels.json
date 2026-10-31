@@ -1,0 +1,263 @@
+{
+ "version": 1,
+ "method": "consensus-borda-v1",
+ "note": "A=heuristic-v4、B=作息/租期优先、C=摩擦风险优先；Borda 选前8，交叉校准生成，非人工真值",
+ "labels": [
+  {
+   "member_id": 2,
+   "username": "member02",
+   "nickname": "禾瑾",
+   "gold_ids": [
+    32,
+    231,
+    403,
+    458,
+    467,
+    641,
+    788,
+    861
+   ],
+   "confidence": 8
+  },
+  {
+   "member_id": 4810,
+   "username": "TEST_SCENARIO_LONG12",
+   "nickname": "沈知远",
+   "gold_ids": [
+    743,
+    49,
+    723,
+    805,
+    54,
+    60,
+    768,
+    132
+   ],
+   "confidence": 6
+  },
+  {
+   "member_id": 4811,
+   "username": "TEST_SCENARIO_LONG2Y",
+   "nickname": "程亦舟",
+   "gold_ids": [
+    856,
+    857,
+    859,
+    864,
+    865,
+    866,
+    867,
+    871
+   ],
+   "confidence": 8
+  },
+  {
+   "member_id": 4812,
+   "username": "TEST_SCENARIO_PET",
+   "nickname": "林小满",
+   "gold_ids": [
+    790,
+    427,
+    743,
+    433,
+    439,
+    816,
+    457,
+    840
+   ],
+   "confidence": 4
+  },
+  {
+   "member_id": 4813,
+   "username": "TEST_SCENARIO_SMOKE",
+   "nickname": "许明川",
+   "gold_ids": [
+    771,
+    772,
+    773,
+    776,
+    777,
+    778,
+    780,
+    781
+   ],
+   "confidence": 8
+  },
+  {
+   "member_id": 4814,
+   "username": "TEST_SCENARIO_BUDGET",
+   "nickname": "周清和",
+   "gold_ids": [
+    3,
+    7,
+    10,
+    14,
+    16,
+    23,
+    26,
+    27
+   ],
+   "confidence": 8
+  },
+  {
+   "member_id": 4815,
+   "username": "TEST_SCENARIO_FARSTORE",
+   "nickname": "顾承泽",
+   "gold_ids": [
+    872,
+    879,
+    881,
+    882,
+    885,
+    887,
+    890,
+    894
+   ],
+   "confidence": 8
+  },
+  {
+   "member_id": 6204,
+   "username": "TEST_SCENARIO_OLDER35",
+   "nickname": "苏晚晴",
+   "gold_ids": [
+    199,
+    121,
+    247,
+    166,
+    233,
+    237,
+    205,
+    217
+   ],
+   "confidence": 6
+  },
+  {
+   "member_id": 6205,
+   "username": "TEST_SCENARIO_YOUNG24",
+   "nickname": "陆星野",
+   "gold_ids": [
+    20,
+    22,
+    24,
+    25,
+    30,
+    33,
+    34,
+    35
+   ],
+   "confidence": 8
+  },
+  {
+   "member_id": 6206,
+   "username": "TEST_SCENARIO_SMOKESHORT",
+   "nickname": "周野",
+   "gold_ids": [
+    5,
+    6,
+    8,
+    9,
+    15,
+    17,
+    18,
+    19
+   ],
+   "confidence": 8
+  },
+  {
+   "member_id": 6207,
+   "username": "TEST_SCENARIO_PETLONG",
+   "nickname": "沈清溪",
+   "gold_ids": [
+    82,
+    83,
+    84,
+    85,
+    86,
+    90,
+    97,
+    98
+   ],
+   "confidence": 8
+  },
+  {
+   "member_id": 6208,
+   "username": "TEST_SCENARIO_NIGHTOWL",
+   "nickname": "林夜",
+   "gold_ids": [
+    102,
+    28,
+    101,
+    29,
+    31,
+    103,
+    36,
+    107
+   ],
+   "confidence": 5
+  },
+  {
+   "member_id": 6209,
+   "username": "TEST_SCENARIO_OLDER40",
+   "nickname": "顾承业",
+   "gold_ids": [
+    147,
+    195,
+    69,
+    605,
+    360,
+    155,
+    265,
+    520
+   ],
+   "confidence": 6
+  },
+  {
+   "member_id": 6210,
+   "username": "TEST_SCENARIO_STOREMUST",
+   "nickname": "苏禾",
+   "gold_ids": [
+    44,
+    49,
+    54,
+    57,
+    60,
+    113,
+    61,
+    114
+   ],
+   "confidence": 7
+  },
+  {
+   "member_id": 6211,
+   "username": "TEST_SCENARIO_BROAD",
+   "nickname": "许行",
+   "gold_ids": [
+    162,
+    164,
+    165,
+    115,
+    117,
+    141,
+    170,
+    153
+   ],
+   "confidence": 7
+  },
+  {
+   "member_id": 6212,
+   "username": "TEST_SCENARIO_NARROW",
+   "nickname": "沈砚",
+   "gold_ids": [
+    70,
+    71,
+    73,
+    74,
+    75,
+    76,
+    77,
+    133
+   ],
+   "confidence": 7
+  }
+ ]
+}

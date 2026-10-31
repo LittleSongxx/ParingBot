@@ -210,9 +210,11 @@ python eval/quality_checks.py --bundle /tmp/bundle.json --out /tmp/qc.md
 ## Golden 双评分器交叉校准
 
 ```bash
-python eval/calibrate_golden.py --bundle analysis/quality-bundles/expanded-latest.json
+python eval/calibrate_golden.py --bundle analysis/quality-bundles/expanded-latest.json \
+  --consensus-out eval/golden/consensus_labels.json
 ```
 
-评分器 A 是 heuristic-v4 gold；评分器 B 用不同权重（作息/租期优先）重排 top8，
-输出重合度/Jaccard。当前 16 runs：平均重合 5.25/8、Jaccard 59.95%、完全一致 8/16，
-说明 heuristic gold 排序不稳定，只能当回归基线，不能当人工真值。
+评分器 A 是 heuristic-v4 gold；B 用不同权重（作息/租期优先），C 用摩擦风险优先；
+共识 gold 用 A(权重2)+B+C 的 Borda 前 8。当前 16 runs：A/B 平均重合 5.25/8、
+Jaccard 59.95%、完全一致 8/16，A∩共识平均 7/8，说明单一 heuristic 不稳定，
+共识 gold 更适合做回归基线，但仍不是人工真值。

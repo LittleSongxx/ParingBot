@@ -15,7 +15,7 @@ from tortoise import Tortoise
 from settings import TORTOISE_ORM
 from models import (AgentRun, MatchTask, MatchCandidate, MemberProfile, MemberPortrait,
                     MemberMoment, RoommatePreference, User)
-from service import match_service, trace_service
+from service import auditor_service, match_service, trace_service
 
 
 def dt(value):
@@ -63,9 +63,18 @@ async def main():
         delivered, note = await match_service.deliverable(task.id)
         delivered_ids = {row.id for row in delivered}
         rows = await MatchCandidate.filter(task_id=task.id).order_by("id")
+        applicant_profile = await MemberProfile.get(id=task.member_id)
+        applicant_preference = await RoommatePreference.get_or_none(member_id=task.member_id)
+        candidate_preferences = {item.member_id: item for item in await RoommatePreference.filter(
+            member_id__in=[row.candidate_member_id for row in rows])}
         candidates = []
         for row in rows:
             candidate = dict(await profile_bundle(row.candidate_member_id) or {})
+            candidate_profile = await MemberProfile.get_or_none(id=row.candidate_member_id)
+            if candidate_profile is not None:
+                candidate["evidence"] = auditor_service.match_evidence(
+                    applicant_profile, candidate_profile, row,
+                    applicant_preference, candidate_preferences.get(candidate_profile.id))
             candidate.update({
                 "candidate_row_id": row.id, "screen_score": row.screen_score,
                 "found_round": row.found_round, "relax_note": row.relax_note,
