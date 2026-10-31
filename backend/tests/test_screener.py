@@ -418,6 +418,22 @@ async def test_search_members_defaults_to_applicant_store(db):
     assert other.id not in ids
 
 
+async def test_first_round_limits_bonus_filters(db):
+    """首轮可选项不能一次全用：加分项超过 2 个直接拒绝，后续轮次不限制。"""
+    member = await _make_applicant()
+    task = await _open_task(member)
+    run = await _open_run(task)
+    params = {"age_min": 24, "age_max": 32, "budget_min": 3000, "budget_max": 4000,
+              "store_scope": "同门店", "schedule_accept": "早睡早起"}
+    with pytest.raises(CustomException) as error:
+        await tool_box.invoke("search_members", params, await _context(member, task, run, 1))
+    assert "最多同时使用 2 个加分项" in error.value.message
+
+    # 第二轮允许：这时模型是在按放宽规则逐项收窄，不再受首轮预算限制
+    result = await tool_box.invoke("search_members", params, await _context(member, task, run, 2))
+    assert "total" in result
+
+
 async def test_stops_when_a_round_relaxes_nothing(db, monkeypatch):
     """放宽轮没有放宽条件时收尾：再来一轮还是同一批人，白跑一次。"""
     member = await _make_applicant()

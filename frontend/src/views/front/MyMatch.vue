@@ -82,7 +82,9 @@
           <div class="block-title">这一次的匹配任务</div>
           <div class="task-head">
             <span class="task-badge">{{ data.task.task_no }}</span>
-            <el-tag :type="statusType(data.task.status)" size="small">{{ data.task.status }}</el-tag>
+            <el-tag :type="data.delivery.partial ? 'warning' : statusType(data.task.status)" size="small">
+              {{ data.delivery.partial ? `部分交付 ${data.delivery.delivered}/${data.delivery.requested}` : data.task.status }}
+            </el-tag>
             <span class="task-time">发起于 {{ data.task.create_time }}</span>
           </div>
           <div class="metric-grid task-metrics">
@@ -107,6 +109,16 @@
             要求交付 {{ data.task.deliver_count }} 人，实际交付 {{ data.delivered }} 人，
             调度 {{ data.task.total_round }} 轮（上限 {{ data.limits.round_limit }} 轮）。
             交付的人就是审核通过的候选，到【审核结果】里看名单和每一位的审核结论。
+          </div>
+          <el-alert
+              v-if="data.delivery.partial && !isRunning"
+              type="warning"
+              :closable="false"
+              :title="`本次只交付 ${data.delivery.delivered}/${data.delivery.requested} 人：候选供给不足，不是运行失败`"
+              :description="data.delivery.note || ''">
+          </el-alert>
+          <div v-if="(data.delivery.truncated || []).length" class="task-line">
+            按交付上限截断未展示：{{ data.delivery.truncated.join('、') }}
           </div>
           <el-alert
               v-if="data.task.error_message"
@@ -237,6 +249,7 @@ const data = reactive({
   limits: { round_limit: 0, relax_limit: 0, portrait_limit: 0 },
   note: null,
   delivered: 0,
+  delivery: { requested: 0, delivered: 0, passed: 0, partial: false, truncated: [], note: null },
   submitting: false,
   detailVisible: false,
   detail: null

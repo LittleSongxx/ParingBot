@@ -495,6 +495,25 @@ async def search_members(context: ToolContext, gender: str | None = None,
                     f"合租只找同性，申请方是{applicant.gender}，"
                     f"gender 请传「{applicant.gender}」或者不传")
             gender = applicant.gender
+    # 首轮检索的「加分项预算」：可选项一次全用等于把加分项变成硬条件。
+    # 只限制第一轮，后续放宽轮次仍允许按规则逐项收窄；超过就直接拒绝并回原因。
+    if applicant is not None and context.round_no == 1 and context.member_id:
+        preference = await RoommatePreference.get_or_none(member_id=context.member_id)
+        if preference is not None:
+            bonus = []
+            for label, value, required in (
+                    ("年龄", age_min is not None or age_max is not None, "age_required"),
+                    ("预算", budget_min is not None or budget_max is not None, "budget_required"),
+                    ("整洁度", tidiness_min is not None, "tidiness_required"),
+                    ("门店", store_scope in ("同门店", "同片区"), "store_required"),
+                    ("作息", bool(schedule_accept), "schedule_required"),
+                    ("租期", bool(lease_min), "lease_required")):
+                if value and getattr(preference, required, "") != "必须":
+                    bonus.append(label)
+            if len(bonus) > 2:
+                raise CustomException(
+                    f"首轮检索最多同时使用 2 个加分项（这次用了 {len(bonus)} 个：{'、'.join(bonus)}）。"
+                    f"请只保留必须项，加分项最多带 2 个；其余加分项留到后续放宽轮次再逐项使用。")
     if gender:
         if gender not in member_service.GENDERS:
             raise CustomException(f"性别请从这几项里选：{'、'.join(member_service.GENDERS)}")

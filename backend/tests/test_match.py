@@ -227,6 +227,24 @@ async def test_deliverable_filters_history_violations(db):
     assert note and "3 人" in note and "不可交付" in note
 
 
+async def test_delivery_breakdown_records_truncated_candidates(db):
+    """通过人数超过交付上限时，必须留下被截断的候选记录，不能悄悄丢掉。"""
+    member = await _make_member()
+    task = await _open_task(member, status=match_service.TASK_DONE)
+    await MatchTask.filter(id=task.id).update(deliver_count=2)
+    task.deliver_count = 2
+    for score in (90, 80, 70):
+        await _make_candidate(task, audit_status=tool_box.AUDIT_PASS, screen_score=score)
+
+    detail = await match_service.delivery_breakdown(task.id)
+
+    assert len(detail["passed"]) == 3
+    assert len(detail["delivered"]) == 2
+    assert len(detail["truncated"]) == 1
+    assert "未展示的候选" in detail["note"]
+    assert str(detail["truncated"][0].candidate_member_id) in detail["note"]
+
+
 async def test_deliverable_is_sorted_and_stable(db):
     """交付名单排序稳定：初筛得分降序，同分按审核轮次降序，最后用 id 兜底。"""
     member = await _make_member()

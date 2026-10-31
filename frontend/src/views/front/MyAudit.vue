@@ -125,6 +125,13 @@
             </el-table-column>
             <el-table-column prop="schedule_type" label="作息" width="90"/>
             <el-table-column prop="store" label="意向门店" width="110"/>
+            <el-table-column label="匹配依据" min-width="230">
+              <template #default="scope">
+                <span v-for="item in (scope.row.evidence || []).slice(0, 2)" :key="item" class="chip chip-blue evidence-chip">{{ item }}</span>
+                <span v-if="(scope.row.evidence || []).length > 2" class="muted">+{{ scope.row.evidence.length - 2 }}</span>
+                <span v-if="!(scope.row.evidence || []).length" class="muted">—</span>
+              </template>
+            </el-table-column>
             <el-table-column label="筛出轮次" width="100">
               <template #default="scope">第 {{ scope.row.found_round }} 轮</template>
             </el-table-column>
@@ -240,6 +247,13 @@
         <div class="detail-block">
           <div class="section-title">代码复核</div>
           <div class="summary-box">{{ (data.detail.recheck || {}).note }}</div>
+        </div>
+        <div class="detail-block" v-if="(data.detail.evidence || []).length">
+          <div class="section-title">可核验的匹配依据</div>
+          <div class="evidence-list">
+            <span v-for="item in data.detail.evidence" :key="item" class="chip chip-blue evidence-chip">{{ item }}</span>
+          </div>
+          <div class="muted evidence-note">每条依据都能回到档案字段、偏好或放宽记录；没有依据的维度不会写成结论。</div>
         </div>
         <div class="detail-block">
           <div class="section-title">他在意的全部条件</div>
@@ -400,6 +414,10 @@ load()
 .need-row + .need-row { border-top: 1px solid var(--pb-line); }
 .need-name { flex: none; width: 110px; color: var(--pb-muted); }
 .need-value { color: var(--pb-text); }
+
+.evidence-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.evidence-chip { display: inline-block; margin: 0 4px 4px 0; font-size: 12px; }
+.evidence-note { margin-top: 6px; font-size: 12px; }
 
 @media (max-width: 768px) {
   .task-time { margin-left: 0; }

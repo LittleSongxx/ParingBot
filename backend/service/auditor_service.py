@@ -795,6 +795,47 @@ def candidate_dict(row: MatchCandidate, member: MemberProfile | None) -> dict:
     return data
 
 
+def match_evidence(applicant: MemberProfile, candidate: MemberProfile,
+                   row: MatchCandidate, applicant_preference: RoommatePreference | None,
+                   candidate_preference: RoommatePreference | None) -> list[str]:
+    """交付/审核卡上的「可核验依据」：每条都能回到档案字段或放宽记录。
+
+    这不是模型写的解释，也不是画像标签；它是用当前数据现算的匹配依据，
+    页面展示、质量检查和人工复核都用同一份口径。算不出的维度不写，
+    避免把「没有依据」写成一句看起来很像结论的话。
+    """
+    evidence: list[str] = []
+    if applicant.gender and candidate.gender and applicant.gender == candidate.gender:
+        evidence.append(f"合租同性（{candidate.gender}）")
+    age = member_service.calc_age(candidate.birth_date)
+    if age is not None and applicant_preference is not None:
+        if applicant_preference.age_min <= age <= applicant_preference.age_max:
+            evidence.append(f"年龄 {age} 岁在申请方 {applicant_preference.age_min}-{applicant_preference.age_max} 岁区间")
+    if candidate.rent_budget is not None and applicant_preference is not None:
+        if applicant_preference.budget_min <= candidate.rent_budget <= applicant_preference.budget_max:
+            evidence.append(f"预算 {candidate.rent_budget} 元在申请方 {applicant_preference.budget_min}-{applicant_preference.budget_max} 元区间")
+    if candidate.tidiness and applicant_preference is not None:
+        left = member_service.TIDINESS_LEVELS.index(candidate.tidiness) if candidate.tidiness in member_service.TIDINESS_LEVELS else None
+        right = member_service.TIDINESS_LEVELS.index(applicant_preference.tidiness_min) if applicant_preference.tidiness_min in member_service.TIDINESS_LEVELS else None
+        if left is not None and right is not None and left >= right:
+            evidence.append(f"整洁度 {candidate.tidiness} 达到申请方 {applicant_preference.tidiness_min} 的要求")
+    if candidate.store_id == applicant.store_id:
+        evidence.append(f"同一意向门店（{member_service.store_name(candidate.store_id)}）")
+    if candidate.schedule_type and applicant_preference is not None:
+        if candidate.schedule_type in split_values(applicant_preference.schedule_accept):
+            evidence.append(f"作息 {candidate.schedule_type} 在申请方接受范围内")
+    gap = member_service.lease_term_gap(applicant.lease_term, candidate.lease_term)
+    if gap is not None and gap < member_service.LEASE_TERM_GAP_LIMIT:
+        evidence.append(f"计划租期档位相近（{candidate.lease_term}）")
+    if row.relax_note:
+        evidence.append(f"放宽记录：{row.relax_note}")
+    if applicant_preference is not None and not hard_violations(candidate, applicant, applicant_preference):
+        evidence.append("候选方满足申请方标为必须的条件")
+    if candidate_preference is not None and not hard_violations(applicant, candidate, candidate_preference):
+        evidence.append("申请方满足候选方标为必须的条件")
+    return evidence
+
+
 def run_dict(run: AgentRun | None) -> dict | None:
     """最近一次审核运行在页面上的样子。"""
     if run is None:
@@ -903,8 +944,18 @@ async def my_page(current_user: User) -> dict:
     if task is None:
         return empty
     rows, members = await pool_rows(task.id)
-    candidates = [candidate_dict(row, members.get(row.candidate_member_id))
-                  for row in rows]
+    applicant_preference = await RoommatePreference.get_or_none(member_id=member.id)
+    candidate_preferences = {item.member_id: item for item in await RoommatePreference.filter(
+        member_id__in=[row.candidate_member_id for row in rows])}
+    candidates = []
+    for row in rows:
+        candidate = members.get(row.candidate_member_id)
+        data = candidate_dict(row, candidate)
+        if candidate is not None:
+            data["evidence"] = match_evidence(
+                member, candidate, row, applicant_preference,
+                candidate_preferences.get(candidate.id))
+        candidates.append(data)
     run = await AgentRun.filter(
         task_id=task.id, run_type=RUN_TYPE).order_by("-id").first()
     if run is None:
@@ -954,6 +1005,8 @@ async def candidate_detail(current_user: User, candidate_id: int) -> dict:
         })
         return data
     data["preference_text"] = screener_service.preference_text(_preference_dict(preference))
+    applicant_preference = await RoommatePreference.get_or_none(member_id=member.id)
+    data["evidence"] = match_evidence(member, candidate, row, applicant_preference, preference)
     bad = hard_violations(member, candidate, preference)
     lease_bad = lease_term_conflict(member, candidate)
     if lease_bad:

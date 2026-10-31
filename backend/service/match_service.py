@@ -335,6 +335,29 @@ async def deliverable(task_id: int) -> tuple[list, str | None]:
     return sorted(passed, key=_deliverable_sort_key), note
 
 
+async def delivery_breakdown(task_id: int) -> dict:
+    """交付名单 + 展示上限 + 被截断的人，供运行总结和我的匹配页共用。
+
+    deliverable() 只负责「按当前硬规则复核后谁有资格交付」；这里再叠加
+    task.deliver_count 的展示上限。通过人数超过上限时必须留下截断记录，
+    否则页面上「通过 10 人、交付 8 人」永远说不清另外 2 人是谁。
+    """
+    passed, note = await deliverable(task_id)
+    task = await MatchTask.get_or_none(id=task_id)
+    cap = task.deliver_count if task is not None else 0
+    delivered = passed[:cap]
+    truncated = passed[cap:]
+    if truncated:
+        names = "、".join(row.candidate_member_id and str(row.candidate_member_id)
+                          for row in truncated)
+        # 昵称保存在档案表；这里只存 id 也能追溯，页面再按 id 取昵称。
+        note = (f"{note}；" if note else "") + (
+            f"通过审核 {len(passed)} 人，按交付上限 {cap} 人保留前 {len(delivered)} 人；"
+            f"未展示的候选 member_id：{names}")
+    return {"passed": passed, "delivered": delivered, "truncated": truncated,
+            "requested": cap, "note": note}
+
+
 def _summary(final: dict, counts: dict, rounds: int, task: MatchTask,
              delivered: int, note: str | None) -> str:
     """把这次运行的结果拼成一句能直接显示、也能直接写库的话。"""
@@ -388,9 +411,11 @@ async def execute_task(task_id: int, run_id: int) -> None:
     rows = await MatchCandidate.filter(task_id=task.id)
     counts = graph.pool_counts(rows)
     rounds = await _count_rounds(run.id)
-    passed_rows, note = await deliverable(task.id)
-    delivered = min(len(passed_rows), task.deliver_count)
-    summary = _summary(final, counts, rounds, task, delivered, note)
+    detail = await delivery_breakdown(task.id)
+    passed_rows = detail["passed"]
+    delivered_rows = detail["delivered"]
+    delivered = len(delivered_rows)
+    summary = _summary(final, counts, rounds, task, delivered, detail["note"])
     if not passed_rows:
         message = (f"本次没有可以交付的候选。{summary}。"
                    f"可以到【合住偏好】把标为必须的条件放宽一些再试一次，"
@@ -510,15 +535,28 @@ async def my_page(current_user: User) -> dict:
         return empty
     rows = await MatchCandidate.filter(task_id=task.id).order_by("id")
     counts = graph.pool_counts(rows)
-    passed_rows, note = await deliverable(task.id)
+    detail = await delivery_breakdown(task.id)
+    truncated_ids = [row.candidate_member_id for row in detail["truncated"]]
+    truncated_names = []
+    if truncated_ids:
+        truncated_names = [item.nickname for item in await MemberProfile.filter(
+            id__in=truncated_ids)]
     return {
         "has_profile": True,
         "readiness": state,
         "task": screener_service.task_dict(task),
         "run": auditor_service.run_dict(run),
         "rounds": await round_rows(run.id if run else None),
-        "note": note,
-        "delivered": min(len(passed_rows), task.deliver_count),
+        "note": detail["note"],
+        "delivered": len(detail["delivered"]),
+        "delivery": {
+            "requested": task.deliver_count,
+            "delivered": len(detail["delivered"]),
+            "passed": len(detail["passed"]),
+            "partial": len(detail["delivered"]) < task.deliver_count,
+            "truncated": truncated_names,
+            "note": detail["note"],
+        },
         "counts": {"total": counts["total"], "passed": counts["passed"],
                    "rejected": counts["rejected"], "pending": counts["pending"]},
         "distribution": auditor_service.distribution(
