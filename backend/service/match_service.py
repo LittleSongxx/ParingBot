@@ -176,7 +176,42 @@ async def readiness(member: MemberProfile | None) -> dict:
             "平台没有一条填好 API Key 的启用中对话模型，子 Agent 的请求发不出去，"
             "请联系管理员到【AI模型配置】补上"))
     checks.append(_check("chat", "对话模型", True, f"{chat_ready} 条可用"))
+
+    if member.lease_term:
+        pool = await lease_compatible_pool(member)
+        if not pool:
+            return blocked(_check(
+                "lease_pool", "租期匹配候选", False,
+                f"当前候选池里没有计划租期与您相差 2 档以内的租客（您的计划租期：{member.lease_term}）。"
+                f"短期过渡可以理解，但硬规则不允许跨档合租；请调整计划租期，或等新的短租租客再发起。",
+                "/front/memberProfile", "去调整计划租期"))
+        checks.append(_check("lease_pool", "租期匹配候选", True,
+                             f"{pool} 位租期接近的候选"))
     return {"checks": checks, "blocker": None, "can_run": True}
+
+
+def lease_compatible_terms(term: str | None) -> list[str]:
+    """与这个计划租期相差不到 2 档的档位；缺值返回空，交给人工判断。"""
+    try:
+        index = member_service.LEASE_TERMS.index(term)
+    except (ValueError, AttributeError):
+        return []
+    return [value for position, value in enumerate(member_service.LEASE_TERMS)
+            if abs(position - index) < auditor_service.LEASE_TERM_GAP_LIMIT]
+
+
+async def lease_compatible_pool(member: MemberProfile) -> int:
+    """候选池里计划租期与这位租客相近、可进入硬规则匹配的人数。
+
+    只按性别/审核状态/启用/租期档位粗筛，真正的双向必须项和租期硬校验
+    仍在审核与交付复核里做；这里只用来在发起匹配前提示「池子里有没有人」。
+    """
+    terms = lease_compatible_terms(member.lease_term)
+    if not terms or not member.gender:
+        return 0
+    return await MemberProfile.filter(
+        audit_status="已通过", enabled="是", gender=member.gender,
+        lease_term__in=terms).exclude(id=member.id).count()
 
 
 async def _open_task(member: MemberProfile, deliver: int) -> MatchTask:

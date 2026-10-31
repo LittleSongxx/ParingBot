@@ -395,3 +395,12 @@ async def test_logs_and_steps_are_redacted_before_writing(db):
     step = await AgentStep.filter(run_id=run.id, step_type=agents.STEP_TOOL).first()
     assert "13812345678" not in (step.request_params or "")
     assert "test@example.com" not in (step.response_result or "")
+
+
+def test_lease_compatible_terms_are_adjacent_only():
+    """计划租期相邻档可协商，相差 2 档及以上不在同一池。"""
+    from service import match_service
+    assert match_service.lease_compatible_terms("3个月以下") == ["3个月以下", "3-6个月"]
+    assert match_service.lease_compatible_terms("6-12个月") == ["3-6个月", "6-12个月", "1-2年"]
+    assert match_service.lease_compatible_terms("2年以上") == ["1-2年", "2年以上"]
+    assert match_service.lease_compatible_terms(None) == []
