@@ -244,11 +244,33 @@ async def build_progress(task: MatchTask, run_id: int, round_no: int) -> str:
     return "\n".join(lines)
 
 
+# 模型偶尔会把角色中文名当成编码输出（例如「审计官」）。中文名是页面上的称呼，
+# 不是调度图里的编码；这里先做一次无歧义的别名归一，避免一次格式波动中断整次运行。
+AGENT_CODE_ALIASES = {
+    "合租管家": agents.AGENT_SUPERVISOR,
+    "画像师": agents.AGENT_PORTRAIT,
+    "筛选官": agents.AGENT_SCREENER,
+    "审核官": agents.AGENT_AUDITOR,
+    "审计官": agents.AGENT_AUDITOR,
+    "画像": agents.AGENT_PORTRAIT,
+    "筛选": agents.AGENT_SCREENER,
+    "审核": agents.AGENT_AUDITOR,
+    "结束": AGENT_FINISH,
+    "finish": AGENT_FINISH,
+}
+
+
+def _normalize_agent_code(raw) -> str:
+    """把角色中文名/大小写变体归一成调度图里的编码。"""
+    code = str(raw or "").strip()
+    return AGENT_CODE_ALIASES.get(code, code.upper() if code else "")
+
+
 def _decision_problem(data, allowed: list) -> str | None:
     """主管这一轮的决定哪里不能用。没问题时返回空。"""
     if not isinstance(data, dict):
         return "输出不是一个 JSON 对象"
-    code = str(data.get("next_agent") or "").strip()
+    code = _normalize_agent_code(data.get("next_agent"))
     if not code:
         return "输出里没有 next_agent"
     if code not in allowed:
@@ -305,7 +327,7 @@ async def ask_supervisor(progress: str, context: tool_box.ToolContext) -> dict:
         problem = _decision_problem(data, allowed)
         if problem is None:
             return {
-                "next_agent": str(data.get("next_agent")).strip(),
+                "next_agent": _normalize_agent_code(data.get("next_agent")),
                 "instruction": str(data.get("instruction") or "").strip(),
                 "reason": str(data.get("reason") or "").strip(),
             }

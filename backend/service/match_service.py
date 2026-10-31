@@ -182,7 +182,7 @@ async def readiness(member: MemberProfile | None) -> dict:
         if not pool:
             return blocked(_check(
                 "lease_pool", "租期匹配候选", False,
-                f"当前候选池里没有计划租期与您相差 2 档以内的租客（您的计划租期：{member.lease_term}）。"
+                f"当前候选池里没有同时满足性别、租期档位和您必须项的租客（您的计划租期：{member.lease_term}）。"
                 f"短期过渡可以理解，但硬规则不允许跨档合租；请调整计划租期，或等新的短租租客再发起。",
                 "/front/memberProfile", "去调整计划租期"))
         checks.append(_check("lease_pool", "租期匹配候选", True,
@@ -201,17 +201,28 @@ def lease_compatible_terms(term: str | None) -> list[str]:
 
 
 async def lease_compatible_pool(member: MemberProfile) -> int:
-    """候选池里计划租期与这位租客相近、可进入硬规则匹配的人数。
+    """按申请方硬条件 + 租期档位粗算，池子里至少有多少人可能进入匹配。
 
-    只按性别/审核状态/启用/租期档位粗筛，真正的双向必须项和租期硬校验
-    仍在审核与交付复核里做；这里只用来在发起匹配前提示「池子里有没有人」。
+    这里只做「性别 + 租期档位 + 申请方标为必须的条件」三件事；候选方自己的
+    必须项和画像不足仍留给审核/复核。目的只是避免「硬条件注定为空」的发起，
+    不是替代真正的匹配判定。
     """
-    terms = lease_compatible_terms(member.lease_term)
+    terms = member_service.compatible_lease_terms(member.lease_term)
     if not terms or not member.gender:
         return 0
-    return await MemberProfile.filter(
+    rows = await MemberProfile.filter(
         audit_status="已通过", enabled="是", gender=member.gender,
-        lease_term__in=terms).exclude(id=member.id).count()
+        lease_term__in=terms).exclude(id=member.id)
+    preference = await RoommatePreference.get_or_none(member_id=member.id)
+    if preference is None:
+        return len(rows)
+    count = 0
+    for candidate in rows:
+        # 申请方的必须项要由候选方满足：用反向的 hard_violations 判断
+        if auditor_service.hard_violations(candidate, member, preference):
+            continue
+        count += 1
+    return count
 
 
 async def _open_task(member: MemberProfile, deliver: int) -> MatchTask:

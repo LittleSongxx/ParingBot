@@ -22,6 +22,27 @@ GENDERS = ("男", "女")
 # 整洁度和租期都是有序档位，前面的档低、后面的档高，偏好里的「最低档」按这个顺序比
 TIDINESS_LEVELS = ("随意", "一般", "整洁", "洁癖")
 LEASE_TERMS = ("3个月以下", "3-6个月", "6-12个月", "1-2年", "2年以上")
+
+# 计划租期档位差 ≥2 视为硬冲突；相邻档位（如 6-12个月与1-2年）可协商。
+LEASE_TERM_GAP_LIMIT = 2
+
+
+def compatible_lease_terms(term: str | None) -> list[str]:
+    """与这个计划租期相差不到 2 档的档位；缺值返回空表示不限制。"""
+    try:
+        index = LEASE_TERMS.index(term)
+    except (ValueError, AttributeError):
+        return []
+    return [value for position, value in enumerate(LEASE_TERMS)
+            if abs(position - index) < LEASE_TERM_GAP_LIMIT]
+
+
+def lease_term_gap(one: str | None, other: str | None) -> int | None:
+    """两个计划租期的档位距离；任一侧缺值/非法返回 None。"""
+    try:
+        return abs(LEASE_TERMS.index(one) - LEASE_TERMS.index(other))
+    except (ValueError, AttributeError):
+        return None
 SCHEDULE_TYPES = ("早睡早起", "正常作息", "夜猫子")
 HAS_PET_OPTIONS = ("有", "无")
 SMOKING_OPTIONS = ("不吸烟", "偶尔", "经常")

@@ -404,3 +404,14 @@ def test_lease_compatible_terms_are_adjacent_only():
     assert match_service.lease_compatible_terms("6-12个月") == ["3-6个月", "6-12个月", "1-2年"]
     assert match_service.lease_compatible_terms("2年以上") == ["1-2年", "2年以上"]
     assert match_service.lease_compatible_terms(None) == []
+
+
+def test_supervisor_accepts_chinese_agent_names_as_codes():
+    """主管偶尔会把「审计官」这类页面称呼当编码输出，代码应归一而不是中断整次运行。"""
+    from ai import graph
+    assert graph._normalize_agent_code("审计官") == "AUDITOR"
+    assert graph._normalize_agent_code("画像师") == "PORTRAIT"
+    assert graph._normalize_agent_code("筛选官") == "SCREENER"
+    assert graph._normalize_agent_code("合租管家") == "SUPERVISOR"
+    assert graph._normalize_agent_code("finish") == "FINISH"
+    assert graph._normalize_agent_code("AUDITOR") == "AUDITOR"

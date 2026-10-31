@@ -499,6 +499,11 @@ async def search_members(context: ToolContext, gender: str | None = None,
         if gender not in member_service.GENDERS:
             raise CustomException(f"性别请从这几项里选：{'、'.join(member_service.GENDERS)}")
         query = query.filter(gender=gender)
+    # 计划租期是硬规则：档位差 ≥2 的人不必再进候选池浪费审核预算
+    if applicant is not None and applicant.lease_term:
+        lease_terms = member_service.compatible_lease_terms(applicant.lease_term)
+        if lease_terms:
+            query = query.filter(lease_term__in=lease_terms)
     if budget_min is not None:
         query = query.filter(rent_budget__gte=_check_int(
             budget_min, member_service.MIN_BUDGET, member_service.MAX_BUDGET, "预算下限"))
