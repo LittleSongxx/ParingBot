@@ -183,12 +183,12 @@ python eval/scenario_matrix.py --phase ready
 python eval/scenario_matrix.py --only S1,S3 --trials 2
 ```
 
-场景包含短租/长租/养宠/吸烟/预算紧/远门店/缺档案/缺动态/租期池为空等；
+场景矩阵已扩到 20 个（短租/长租/养宠/吸烟/预算/门店/年龄/宽窄偏好/缺档案/缺动态/租期池为空）；
 新建账号统一 `TEST_SCENARIO_*` 且保持待审核，不会污染演示候选池；结果写入 `eval/reports/scenario-matrix-*`。
 
 ## Golden 匹配质量标注
 
-`eval/golden/matching_labels.json` 是规则启发式 v1 标注：按硬条件 + 门店/作息/预算/整洁/租期/兴趣算分，
+`eval/golden/matching_labels.json` 是规则启发式 v2 标注（19 位场景申请人）：按硬条件 + 门店/作息/预算/整洁/租期/兴趣算分，
 每位申请人取前 8 个 gold 候选。它不是人工逐人打分，先解决「可重复量化」，后续要抽检校准。
 
 ```bash
