@@ -401,3 +401,24 @@ S12（35 岁长租）与 S17（40 岁高预算）在全新 CI 库上分别 7/8�
 
 S12/S17 补供给后，压力门禁默认从 S6/S14/S16/S20 扩到 **S6/S12/S14/S16/S17/S20**；
 本地回归报告最新数据均 ≥7/8，门禁通过。
+
+## 二十、最终全量 20 场景 CI 验证（2026-11-01 18:05）
+
+在 S12/S17/S19 补供给与 heuristic-v5/v6 标签更新后，GitHub `live-eval` 全量 20 场景再次通过：
+
+| 项 | 结果 |
+|---|---|
+| 正向场景 | **16/16 全部 8/8** |
+| 负向场景 | S8/S9 只做前置检查；S10/S11 readiness 阻断 |
+| 压力门禁 | **S6/S12/S14/S16/S17/S20 6/6 通过** |
+| 硬规则违规 | 0 |
+| summary 不一致 | 0 |
+| 交付缺证据 | 0 |
+| 安全/隐私 | 0 error / 0 warning |
+| heuristic Precision/Recall | **75.00% / 75.00%** |
+| consensus Precision/Recall | **72.66% / 72.66%** |
+| 两评分器 top8 重合 | 7.25/8；Jaccard 86.39% |
+
+运行链接：https://github.com/LittleSongxx/ParingBot/actions/runs/41293855469
+
+这是当前评测闭环的最终基线：20 场景矩阵 + 19 位 golden + 三评分器共识 + 6 个压力门禁 + 安全扫描 + GitHub artifacts。
