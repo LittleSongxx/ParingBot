@@ -179,7 +179,7 @@ def main(argv=None):
     parser.add_argument("--min-precision", type=float, default=0.0)
     parser.add_argument("--min-consensus", type=float, default=0.0)
     parser.add_argument("--scenario-dir", type=Path, default=Path("eval/reports"))
-    parser.add_argument("--pressure-scenarios", default="S6,S14,S16,S20")
+    parser.add_argument("--pressure-scenarios", default="S6,S12,S14,S16,S17,S20")
     parser.add_argument("--pressure-min-delivery", type=int, default=7)
     args = parser.parse_args(argv)
     build_report._pressure = args.pressure_scenarios
