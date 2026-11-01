@@ -188,7 +188,7 @@ python eval/scenario_matrix.py --only S1,S3 --trials 2
 
 ## Golden 匹配质量标注
 
-`eval/golden/matching_labels.json` 是规则启发式 v4 标注（19 位场景申请人，候选池已含扩展供给）：按硬条件 + 门店/作息/预算/整洁/租期/兴趣算分，
+`eval/golden/matching_labels.json` 是规则启发式 v5 标注（19 位场景申请人，候选池已含 S12/S17 供给）：按硬条件 + 门店/作息/预算/整洁/租期/兴趣算分，
 每位申请人取前 8 个 gold 候选。它不是人工逐人打分，先解决「可重复量化」，后续要抽检校准。
 
 ```bash
