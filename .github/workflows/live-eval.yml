@@ -10,9 +10,9 @@ on:
         required: true
         default: "1"
       scenarios:
-        description: "场景列表，逗号分隔"
+        description: "场景列表，逗号分隔（默认全部 20 个，含负向场景）"
         required: true
-        default: "S1,S3,S5,S6,S14,S16,S20"
+        default: "S1,S2,S3,S4,S5,S6,S7,S8,S9,S10,S11,S12,S13,S14,S15,S16,S17,S18,S19,S20"
       min_precision:
         description: "heuristic Precision@K 最低阈值"
         required: true
