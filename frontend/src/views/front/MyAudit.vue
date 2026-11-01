@@ -114,7 +114,12 @@
         </div>
 
         <div class="card block-card">
-          <div class="block-title">候选审核清单</div>
+          <div class="block-title warm-title">
+            候选审核清单
+            <el-button size="small" type="primary" plain :loading="data.warmingPortraits" @click="warmPortraits">
+              补全候选画像（每批最多 8 人）
+            </el-button>
+          </div>
           <el-table :data="data.candidates" stripe class="data-table">
             <el-table-column prop="nickname" label="昵称" width="120">
               <template #default="scope">{{ scope.row.nickname || '档案已查不到' }}</template>
@@ -310,7 +315,8 @@ const data = reactive({
   rejected: [],
   detailVisible: false,
   detail: null,
-  portraitLoading: false
+  portraitLoading: false,
+  warmingPortraits: false
 })
 
 const load = () => {
@@ -338,6 +344,21 @@ const auditType = (status) => {
 }
 
 const solutionOf = (code) => SOLUTIONS[code] || '—'
+
+const warmPortraits = () => {
+  if (data.warmingPortraits) return
+  data.warmingPortraits = true
+  request.post('/auditor/warmCandidatePortraits', null, { params: { limit: 8 } }).then(res => {
+    if (res.code === '200') {
+      ElMessage.success(`本批生成 ${res.data.generated} 张画像，跳过 ${res.data.skipped} 人，剩余 ${res.data.remaining} 人`)
+      load()
+    } else {
+      ElMessage.error(res.msg)
+    }
+  }).finally(() => {
+    data.warmingPortraits = false
+  })
+}
 
 const generatePortrait = () => {
   if (!data.detail || data.portraitLoading) return
@@ -450,6 +471,7 @@ load()
 .evidence-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .evidence-chip { display: inline-block; margin: 0 4px 4px 0; font-size: 12px; }
 .evidence-note { margin-top: 6px; font-size: 12px; }
+.warm-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 
 @media (max-width: 768px) {
   .task-time { margin-left: 0; }

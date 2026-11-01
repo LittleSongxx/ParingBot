@@ -1006,6 +1006,40 @@ async def generate_candidate_portrait(current_user: User, candidate_id: int) -> 
     return {"portrait": portrait_service.portrait_dict(portrait), "generated": True}
 
 
+async def warm_candidate_portraits(current_user: User, limit: int = 8) -> dict:
+    """给当前任务候选池里还没有画像的候选批量补画像，每批最多 limit 人。
+
+    这是显式用户动作，按顺序生成，避免并发打爆模型接口；没有公开动态的候选
+    直接跳过并计数，不影响其余候选。
+    """
+    member = await member_service.get_my_member(current_user, "补全候选画像")
+    task = await MatchTask.filter(member_id=member.id).order_by("-id").first()
+    if task is None:
+        raise CustomException("还没有匹配任务，先发起一次匹配再补候选画像")
+    limit = max(1, min(int(limit or 8), 20))
+    rows = await MatchCandidate.filter(task_id=task.id).order_by("id")
+    generated = 0
+    skipped = 0
+    remaining = 0
+    for row in rows:
+        if generated + skipped >= limit:
+            remaining += 1
+            continue
+        portrait = await MemberPortrait.filter(member_id=row.candidate_member_id).first()
+        if portrait is not None:
+            continue
+        candidate = await MemberProfile.get_or_none(id=row.candidate_member_id)
+        if candidate is None:
+            skipped += 1
+            continue
+        result = await portrait_service.generate_for_candidate(candidate.id)
+        if result is None:
+            skipped += 1
+        else:
+            generated += 1
+    return {"generated": generated, "skipped": skipped, "remaining": remaining}
+
+
 async def candidate_detail(current_user: User, candidate_id: int) -> dict:
     """看一位候选的审核详情：他在意的条件、审核结论与代码复核，走弹窗看。"""
     member = await member_service.get_my_member(current_user, "查看审核详情")

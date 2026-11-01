@@ -706,6 +706,15 @@ async def test_candidate_detail_lists_the_must_need(db):
     assert data["self_intro"] == candidate.self_intro
 
 
+async def test_warm_candidate_portraits_requires_a_task(db):
+    """没有匹配任务时批量补画像要给出可照做的提示，而不是空跑。"""
+    member = await _make_applicant()
+    user = await User.get(id=member.user_id)
+    with pytest.raises(CustomException) as error:
+        await auditor_service.warm_candidate_portraits(user)
+    assert "匹配任务" in error.value.message
+
+
 async def test_candidate_portrait_rejects_another_pool(db):
     """按需生成候选画像前先验归属：不能拿别人的候选 id 让模型干活。"""
     owner = await _make_applicant()

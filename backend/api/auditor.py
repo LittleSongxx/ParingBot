@@ -27,3 +27,9 @@ async def select_candidate(candidate_id: int, current_user: User = Depends(get_c
 async def candidate_portrait(candidate_id: int, current_user: User = Depends(get_current_user)):
     """按需生成候选画像（只允许自己候选池里的候选）。"""
     return Result.success(await auditor_service.generate_candidate_portrait(current_user, candidate_id))
+
+
+@router.post("/warmCandidatePortraits")
+async def warm_candidate_portraits(limit: int = 8, current_user: User = Depends(get_current_user)):
+    """给当前候选池批量补画像，每批最多 8 人（上限 20）。"""
+    return Result.success(await auditor_service.warm_candidate_portraits(current_user, limit))
