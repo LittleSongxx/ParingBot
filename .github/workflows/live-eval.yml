@@ -114,6 +114,11 @@ jobs:
         run: |
           docker compose exec -T backend python - < eval/build_quality_bundle.py > quality-bundle.json
 
+      - name: Scenario variance report
+        run: |
+          python eval/scenario_variance.py --reports eval/reports \
+            --out scenario-variance.md --json scenario-variance.json
+
       - name: Regression + safety report
         env:
           MIN_PRECISION: ${{ github.event.inputs.min_precision }}
@@ -139,6 +144,8 @@ jobs:
             safety-report.md
             safety-report.json
             quality-bundle.json
+            scenario-variance.md
+            scenario-variance.json
             eval/reports
           if-no-files-found: ignore
           retention-days: 14
