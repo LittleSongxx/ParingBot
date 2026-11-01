@@ -343,3 +343,24 @@ CI 同时上传 `regression-report.md/json` artifact。无历史场景报告时�
 - 真实扩展 bundle：**0 error / 0 warning**；
 - CI 同时对干净 fixture 断言通过、对坏 fixture 断言必须报错；
 - 安全检查已并入 `regression_report.py` 的一键报告。
+
+## 十七、GitHub live-eval 实跑验证（2026-11-01 15:10）
+
+已配置仓库 secret `DEEPSEEK_API_KEY`，手动触发 `live-eval` workflow 两次，第二次（修复 applicant id 可移植性后）结果：
+
+| 指标 | 结果 |
+|---|---|
+| 场景 | S1/S3/S5/S6/S14/S16/S20，共 7 个 |
+| 交付 | **7/7 全部 8/8** |
+| 轮次 | 4 轮 |
+| 耗时 | 42–76s |
+| 硬规则违规 | 0 |
+| summary 不一致 | 0 |
+| 交付缺证据 | 0 |
+| 安全/隐私 | 0 error / 0 warning |
+| heuristic Precision@K | 71.43% |
+| consensus Precision@K | 82.14% |
+| 两评分器 top8 重合 | 7/8 |
+
+修复点：golden 标注原先按数据库 `member_id` 匹配，CI 全新库里 `TEST_SCENARIO_*` 的 id 与本地不同，
+导致只覆盖 1 个申请人。现在 bundle 带 `username`，golden/consensus 指标按 `username` 回退，7 个申请人全部纳入。
