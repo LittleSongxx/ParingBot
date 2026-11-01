@@ -120,16 +120,16 @@
    "username": "TEST_SCENARIO_OLDER35",
    "nickname": "苏晚晴",
    "gold_ids": [
-    199,
-    121,
-    247,
-    166,
-    233,
-    237,
-    205,
-    217
+    28,
+    29,
+    31,
+    36,
+    37,
+    38,
+    43,
+    44
    ],
-   "confidence": 6
+   "confidence": 8
   },
   {
    "member_id": 6205,
@@ -184,45 +184,45 @@
    "username": "TEST_SCENARIO_NIGHTOWL",
    "nickname": "林夜",
    "gold_ids": [
-    102,
-    28,
     101,
-    29,
-    31,
+    102,
     103,
-    36,
-    107
+    107,
+    99,
+    100,
+    108,
+    110
    ],
-   "confidence": 5
+   "confidence": 8
   },
   {
    "member_id": 6209,
    "username": "TEST_SCENARIO_OLDER40",
    "nickname": "顾承业",
    "gold_ids": [
-    147,
-    195,
-    69,
-    605,
-    360,
-    155,
-    265,
-    520
+    39,
+    41,
+    42,
+    45,
+    48,
+    50,
+    51,
+    52
    ],
-   "confidence": 6
+   "confidence": 8
   },
   {
    "member_id": 6210,
    "username": "TEST_SCENARIO_STOREMUST",
    "nickname": "苏禾",
    "gold_ids": [
-    44,
     49,
     54,
     57,
     60,
     113,
     61,
+    62,
     114
    ],
    "confidence": 7
