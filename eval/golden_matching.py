@@ -31,13 +31,18 @@ DEFAULT_LABELS = Path(__file__).resolve().parent / "golden" / "matching_labels.j
 def evaluate(bundle_path: Path, labels_path: Path) -> dict:
     bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
     labels = json.loads(labels_path.read_text(encoding="utf-8"))
-    by_member = {item["member_id"]: item for item in labels.get("labels", [])}
+    by_member = {}
+    by_username = {}
+    for item in labels.get("labels", []):
+        by_member[item["member_id"]] = item
+        if item.get("username"):
+            by_username[item["username"]] = item
     rows = []
     for item in bundle.get("runs", []):
         run = item.get("run") or {}
         applicant = item.get("applicant") or {}
         task = item.get("task") or {}
-        gold = by_member.get(applicant.get("id"))
+        gold = by_member.get(applicant.get("id")) or by_username.get(applicant.get("username"))
         if gold is None:
             rows.append({"run_id": run.get("id"), "skipped": True,
                          "reason": f"申请人 {applicant.get('id')} 没有 golden 标注"})

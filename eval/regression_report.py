@@ -26,14 +26,20 @@ def load_labels(path: Path) -> dict:
 
 def agreement_rows(bundle: dict, labels: dict, consensus: dict) -> list[dict]:
     by_a = {item["member_id"]: set(item.get("gold_ids") or []) for item in labels.get("labels", [])}
+    by_a_name = {item.get("username"): set(item.get("gold_ids") or [])
+                 for item in labels.get("labels", []) if item.get("username")}
     by_c = {item["member_id"]: set(item.get("gold_ids") or []) for item in consensus.get("labels", [])}
+    by_c_name = {item.get("username"): set(item.get("gold_ids") or [])
+                 for item in consensus.get("labels", []) if item.get("username")}
     rows = []
     for run in bundle.get("runs", []):
         app = run.get("applicant") or {}
         member_id = app.get("id")
-        if member_id not in by_a or member_id not in by_c:
+        username = app.get("username")
+        left = by_a.get(member_id) or by_a_name.get(username)
+        right = by_c.get(member_id) or by_c_name.get(username)
+        if left is None or right is None:
             continue
-        left, right = by_a[member_id], by_c[member_id]
         rows.append({"run_id": run.get("run", {}).get("id"), "applicant": app.get("nickname"),
                      "overlap": len(left & right),
                      "jaccard": round(len(left & right) / len(left | right), 4) if left | right else 0.0})

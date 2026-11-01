@@ -155,12 +155,17 @@ def main():
     args = parser.parse_args()
     bundle = json.loads(args.bundle.read_text(encoding="utf-8"))
     labels = json.loads(args.labels.read_text(encoding="utf-8"))
-    by_member = {item["member_id"]: item for item in labels["labels"]}
+    by_member = {}
+    by_username = {}
+    for item in labels.get("labels", []):
+        by_member[item["member_id"]] = item
+        if item.get("username"):
+            by_username[item["username"]] = item
     rows = []
     consensus_labels = []
     for run in bundle.get("runs", []):
         app = run.get("applicant") or {}
-        gold = by_member.get(app.get("id"))
+        gold = by_member.get(app.get("id")) or by_username.get(app.get("username"))
         if not gold:
             continue
         candidates = [c for c in run.get("candidates", []) if c.get("gender") and hard_ok(app, c)]

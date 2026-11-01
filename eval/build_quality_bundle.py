@@ -60,6 +60,8 @@ async def main():
         if task is None:
             continue
         applicant = await profile_bundle(task.member_id)
+        if applicant is not None:
+            applicant["username"] = user.username
         delivered, note = await match_service.deliverable(task.id)
         delivered_ids = {row.id for row in delivered}
         rows = await MatchCandidate.filter(task_id=task.id).order_by("id")
