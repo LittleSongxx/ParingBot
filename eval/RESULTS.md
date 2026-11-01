@@ -364,3 +364,24 @@ CI 同时上传 `regression-report.md/json` artifact。无历史场景报告时�
 
 修复点：golden 标注原先按数据库 `member_id` 匹配，CI 全新库里 `TEST_SCENARIO_*` 的 id 与本地不同，
 导致只覆盖 1 个申请人。现在 bundle 带 `username`，golden/consensus 指标按 `username` 回退，7 个申请人全部纳入。
+
+## 十八、GitHub 全量 20 场景 live-eval（2026-11-01 16:15）
+
+手动触发 `live-eval` 跑全部 20 场景（16 正向 ×1 trial + 4 负向 readiness）：
+
+| 指标 | 结果 |
+|---|---|
+| 场景 | 20 个全部有状态；16 正向完成 |
+| 交付 | 14 个场景 8/8；S12 7/8、S17 5/8 |
+| 负向 | S8/S9 只做前置检查；S10/S11 readiness 阻断 |
+| 硬规则违规 | 0 |
+| summary 不一致 | 0 |
+| 交付缺证据 | 0 |
+| 安全/隐私 | 0 error / 0 warning |
+| heuristic Precision@K | 68.53% / Recall 65.62% |
+| consensus Precision@K | 67.28% / Recall 64.84% |
+| 两评分器 top8 重合 | 6.81/8；Jaccard 77.98% |
+| 压力门禁 S6/S14/S16/S20 | 4/4 通过 |
+
+GitHub 全量运行耗时较长（约 90 分钟），发版默认建议用 7 场景子集，全量 20 场景手动触发。
+S12（35 岁长租）与 S17（40 岁高预算）在全新 CI 库上分别 7/8、5/8，保留为供给/年龄压力场景，下一轮决定是否补供给。

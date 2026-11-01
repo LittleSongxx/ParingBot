@@ -22,7 +22,7 @@ jobs:
   live-eval:
     name: live-eval
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     env:
       APP_BASE: http://127.0.0.1:8080
     steps:
