@@ -422,3 +422,24 @@ S12/S17 补供给后，压力门禁默认从 S6/S14/S16/S20 扩到 **S6/S12/S14/
 运行链接：https://github.com/LittleSongxx/ParingBot/actions/runs/41293855469
 
 这是当前评测闭环的最终基线：20 场景矩阵 + 19 位 golden + 三评分器共识 + 6 个压力门禁 + 安全扫描 + GitHub artifacts。
+
+## 二十一、压力场景 3 trials 稳定性验证（2026-11-01 18:55）
+
+GitHub `live-eval` 增加场景方差报告后，对 6 个压力场景各跑 3 trials（共 18 次真实运行）：
+
+| 场景 | 交付序列 | 平均 | 最低 |
+|---|---|---|---|
+| S6 预算紧 | 8, 8, 8 | 8.0 | 8 |
+| S12 35岁长租 | 8, 8, 8 | 8.0 | 8 |
+| S14 短租+吸烟 | 8, 8, 8 | 8.0 | 8 |
+| S16 夜猫子 | 8, 8, 8 | 8.0 | 8 |
+| S17 40岁高预算 | 8, 8, 8 | 8.0 | 8 |
+| S20 窄偏好 | 8, 8, 8 | 8.0 | 8 |
+
+- 18/18 运行全部完成、全部 8/8；
+- 压力门禁 6/6 通过；
+- 质量检查：硬规则 0、summary 0、缺证据 0；
+- 安全/隐私：0 error / 0 warning；
+- heuristic Precision/Recall 81.25%，consensus 87.50%，两评分器 top8 重合 7.33/8。
+
+`live-eval` 现在会上传 `scenario-variance.md/json` artifact；后续发版可直接看 3 trials 方差。
