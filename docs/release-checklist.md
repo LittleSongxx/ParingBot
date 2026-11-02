@@ -65,3 +65,9 @@ python eval/safety_checks.py --bundle eval/fixtures/quality_bundle_sample.json
 - 安全扫描是否 0 error
 
 > 没有人工评审时，以上自动门禁 + 共识 gold 是唯一发布依据；不把单次 8/8 当质量结论。
+
+### Holdout 门禁
+
+- `eval/holdout_gate.py`：6 个 holdout 场景平均交付 ≥4/8、失败数 ≤1；
+- 当前基线 4.67/8，1 次失败；
+- 该门禁防止只优化调优集导致真实供给质量下降。

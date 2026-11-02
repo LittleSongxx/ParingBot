@@ -619,3 +619,11 @@ holdout 的 golden 两评分器 top8 重合只有 **4.0/8**（调优集是 7.69/
 - 独立 judge 评分 **3.68/5**（28 条成功、1 条失败）。
 
 结论：holdout 才是质量判断依据；调优集的 8/8 只证明供给充足，不能代表真实匹配质量。
+
+## 三十四、Holdout 门禁与 token 预算（2026-11-02 23:15）
+
+- 新增 `eval/holdout_gate.py`，默认阈值：6 个 holdout 场景平均交付 ≥4/8、失败数 ≤1；
+- 当前基线：**4.67/8，1 次失败 → 通过**；
+- `live-eval` 自动生成 `holdout-gate.md/json` artifact；
+- 回归报告新增 `--max-total-tokens`，超过预算直接失败；
+- 发布检查单已补 holdout 门禁。

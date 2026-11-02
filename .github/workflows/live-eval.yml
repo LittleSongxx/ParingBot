@@ -17,6 +17,10 @@ on:
         description: "heuristic Precision@K 最低阈值"
         required: true
         default: "0.6"
+      max_tokens:
+        description: "本次评测 token 预算上限（0=不限制）"
+        required: false
+        default: "0"
 
 jobs:
   live-eval:
@@ -125,13 +129,20 @@ jobs:
           python eval/scenario_variance.py --reports eval/reports \
             --out scenario-variance.md --json scenario-variance.json
 
+      - name: Holdout quality gate
+        run: |
+          python eval/holdout_gate.py --reports eval/reports \
+            --out holdout-gate.md --json holdout-gate.json
+
       - name: Regression + safety report
         env:
           MIN_PRECISION: ${{ github.event.inputs.min_precision }}
+          MAX_TOKENS: ${{ github.event.inputs.max_tokens }}
         run: |
           python eval/regression_report.py --bundle quality-bundle.json \
             --out regression-report.md --json regression-report.json \
-            --min-precision "$MIN_PRECISION" --min-consensus 0.6
+            --min-precision "$MIN_PRECISION" --min-consensus 0.6 \
+            --max-total-tokens "${MAX_TOKENS:-0}"
           python eval/safety_checks.py --bundle quality-bundle.json \
             --out safety-report.md --json safety-report.json
 
@@ -152,6 +163,8 @@ jobs:
             quality-bundle.json
             scenario-variance.md
             scenario-variance.json
+            holdout-gate.md
+            holdout-gate.json
             eval/reports
           if-no-files-found: ignore
           retention-days: 14

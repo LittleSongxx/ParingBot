@@ -63,7 +63,7 @@ jobs:
             echo "安全自检 fixture 应报错但没有报错"; exit 1
           fi
           python -m py_compile eval/configure_models.py eval/run_live_eval.py eval/quality_checks.py \
-            eval/golden_matching.py eval/calibrate_golden.py eval/build_quality_bundle.py eval/regression_report.py eval/safety_checks.py eval/ndcg.py eval/refresh_golden_labels.py eval/independent_judge.py
+            eval/golden_matching.py eval/calibrate_golden.py eval/build_quality_bundle.py eval/regression_report.py eval/safety_checks.py eval/ndcg.py eval/refresh_golden_labels.py eval/independent_judge.py eval/holdout_gate.py
 
       - name: Upload regression report
         if: always()

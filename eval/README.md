@@ -262,3 +262,13 @@ python eval/independent_judge.py --bundle quality-bundle.json --out independent-
 
 用另一次模型调用，只看双方档案/偏好/动态，对交付候选打 1–5 分；不读 gold、不参考审核结论。
 holdout 6 场景首次结果：24 条已评，平均 **3.54/5**；它用于发现「交付了但质量一般」的候选。
+
+## Holdout 门禁
+
+```bash
+python eval/holdout_gate.py --reports eval/reports \
+  --min-avg-delivery 4.0 --max-failures 1 --out holdout-gate.md
+```
+
+Holdout 不参与供给调优；默认阈值：平均交付 ≥4/8、失败数 ≤1。当前 6 场景 ×3 trials 为 4.67/8、1 次失败，通过。
+`live-eval` 会自动生成 `holdout-gate.md/json` artifact；`--max-total-tokens` 可做 token 预算保护。

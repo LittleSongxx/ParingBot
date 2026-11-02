@@ -204,6 +204,7 @@ def main(argv=None):
     parser.add_argument("--out", type=Path)
     parser.add_argument("--min-precision", type=float, default=0.0)
     parser.add_argument("--min-consensus", type=float, default=0.0)
+    parser.add_argument("--max-total-tokens", type=int, default=0)
     parser.add_argument("--price-input-per-m", type=float, default=0.0)
     parser.add_argument("--price-output-per-m", type=float, default=0.0)
     parser.add_argument("--scenario-dir", type=Path, default=Path("eval/reports"))
@@ -229,6 +230,9 @@ def main(argv=None):
     if result["heuristic"]["avg_precision_at_k"] < args.min_precision:
         failed = True
         print(f"heuristic Precision {result['heuristic']['avg_precision_at_k']:.2%} < {args.min_precision:.2%}")
+    if args.max_total_tokens and result["quality"]["total_tokens"] > args.max_total_tokens:
+        failed = True
+        print(f"token 预算超限：{result['quality']['total_tokens']} > {args.max_total_tokens}")
     if result["consensus"]["avg_precision_at_k"] < args.min_consensus:
         failed = True
         print(f"consensus Precision {result['consensus']['avg_precision_at_k']:.2%} < {args.min_consensus:.2%}")
