@@ -64,6 +64,7 @@ async def main():
             applicant["username"] = user.username
         delivered, note = await match_service.deliverable(task.id)
         delivered_ids = {row.id for row in delivered}
+        delivered_rank = {row.id: rank for rank, row in enumerate(delivered, 1)}
         rows = await MatchCandidate.filter(task_id=task.id).order_by("id")
         applicant_profile = await MemberProfile.get(id=task.member_id)
         applicant_preference = await RoommatePreference.get_or_none(member_id=task.member_id)
@@ -83,6 +84,7 @@ async def main():
                 "audit_status": row.audit_status, "reject_code": row.reject_code,
                 "reject_reason": row.reject_reason, "audit_round": row.audit_round,
                 "delivered": row.id in delivered_ids,
+                "delivered_rank": delivered_rank.get(row.id),
             })
             candidates.append(candidate)
         bundles.append({

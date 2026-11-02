@@ -16,6 +16,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import golden_matching  # noqa: E402
+import ndcg as ndcg_metric  # noqa: E402
 import quality_checks  # noqa: E402
 import safety_checks  # noqa: E402
 
@@ -81,22 +82,29 @@ def load_scenario_summary(directory: Path) -> list[dict]:
 
 
 def build_report(bundle_path: Path, labels_path: Path, consensus_path: Path,
-                 scenario_dir: Path | None = None) -> tuple[dict, str]:
+                 scenario_dir: Path | None = None,
+                 price_input: float = 0.0, price_output: float = 0.0) -> tuple[dict, str]:
     bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
     labels = load_labels(labels_path)
     consensus = load_labels(consensus_path)
     checks = [quality_checks.check_run(item) for item in bundle.get("runs", [])]
     quality_errors = [error for check in checks for error in check["errors"]]
-    tokens = [run.get("run", {}) for run in bundle.get("runs", [])]
-    token_total = sum(item.get("total_tokens") or 0 for item in tokens)
-    token_prompt = sum(item.get("prompt_tokens") or 0 for item in tokens)
-    token_completion = sum(item.get("completion_tokens") or 0 for item in tokens)
     safety_findings = safety_checks.scan_bundle(bundle)
     safety_errors = [item for item in safety_findings if item["severity"] == "error"]
     safety_warnings = [item for item in safety_findings if item["severity"] == "warning"]
     heuristic = golden_matching.evaluate(bundle_path, labels_path)
     consensus_metrics = golden_matching.evaluate(bundle_path, consensus_path)
+    ndcg_result = ndcg_metric.ndcg_at_k(bundle_path, labels_path)
     agreement = agreement_rows(bundle, labels, consensus)
+    durations = sorted((item.get("run", {}).get("cost_millis") or 0) / 1000.0
+                       for item in bundle.get("runs", []))
+    p50 = durations[int(0.50 * (len(durations) - 1))] if durations else 0.0
+    p95 = durations[int(0.95 * (len(durations) - 1))] if durations else 0.0
+    token_prompt = sum((item.get("run", {}).get("prompt_tokens") or 0) for item in bundle.get("runs", []))
+    token_completion = sum((item.get("run", {}).get("completion_tokens") or 0) for item in bundle.get("runs", []))
+    token_total = token_prompt + token_completion
+    estimated_cost = (token_prompt / 1_000_000 * price_input
+                      + token_completion / 1_000_000 * price_output)
     scenarios = load_scenario_summary(scenario_dir) if scenario_dir else []
     pressure_keys = [item.strip() for item in getattr(build_report, "_pressure", "") .split(",") if item.strip()]
     pressure_min = getattr(build_report, "_pressure_min", 7)
@@ -117,12 +125,16 @@ def build_report(bundle_path: Path, labels_path: Path, consensus_path: Path,
             "prompt_tokens": token_prompt,
             "completion_tokens": token_completion,
             "total_tokens": token_total,
+            "latency_p50_seconds": round(p50, 2),
+            "latency_p95_seconds": round(p95, 2),
+            "estimated_cost": round(estimated_cost, 4),
             "errors": quality_errors,
         },
         "safety": {"errors": len(safety_errors), "warnings": len(safety_warnings),
                    "findings": safety_findings},
         "heuristic": heuristic["aggregate"],
         "consensus": consensus_metrics["aggregate"],
+        "ndcg": ndcg_result["aggregate"],
         "agreement": {
             "runs": len(agreement),
             "avg_overlap": round(sum(item["overlap"] for item in agreement) / len(agreement), 2) if agreement else 0.0,
@@ -143,11 +155,14 @@ def build_report(bundle_path: Path, labels_path: Path, consensus_path: Path,
              f"| summary 不一致 | {result['quality']['summary_errors']} |",
              f"| 交付缺证据 | {result['quality']['evidence_missing']} |",
              f"| 交付缺画像 | {result['quality']['portrait_missing']} / {result['quality']['portrait_delivered']} |",
-             f"| 模型 token 合计 | {result['quality']['total_tokens']}（prompt {result['quality']['prompt_tokens']} / completion {result['quality']['completion_tokens']}）|", "",
+             f"| 模型 token 合计 | {result['quality']['total_tokens']}（prompt {result['quality']['prompt_tokens']} / completion {result['quality']['completion_tokens']}）|",
+             f"| 延迟 P50 / P95 | {result['quality']['latency_p50_seconds']}s / {result['quality']['latency_p95_seconds']}s |",
+             f"| 估算成本（按配置单价） | {result['quality']['estimated_cost']} |", "",
              "## Golden 指标", "",
              "| 评分器 | Precision@K | Recall@K | |", "|---|---|---|---|",
              f"| heuristic | {heuristic['aggregate']['avg_precision_at_k']:.2%} | {heuristic['aggregate']['avg_recall_at_k']:.2%} | |",
              f"| consensus | {consensus_metrics['aggregate']['avg_precision_at_k']:.2%} | {consensus_metrics['aggregate']['avg_recall_at_k']:.2%} | |", "",
+             f"- 平均 NDCG@8：**{result['ndcg']['avg_ndcg_at_8']:.2%}**；样本 {result['ndcg']['runs']} runs", "",
              "## heuristic vs consensus 一致度", "",
              f"- 覆盖 runs：{result['agreement']['runs']}",
              f"- top8 平均重合：**{result['agreement']['avg_overlap']}/8**",
@@ -189,13 +204,16 @@ def main(argv=None):
     parser.add_argument("--out", type=Path)
     parser.add_argument("--min-precision", type=float, default=0.0)
     parser.add_argument("--min-consensus", type=float, default=0.0)
+    parser.add_argument("--price-input-per-m", type=float, default=0.0)
+    parser.add_argument("--price-output-per-m", type=float, default=0.0)
     parser.add_argument("--scenario-dir", type=Path, default=Path("eval/reports"))
     parser.add_argument("--pressure-scenarios", default="S6,S12,S14,S16,S17,S20")
     parser.add_argument("--pressure-min-delivery", type=int, default=7)
     args = parser.parse_args(argv)
     build_report._pressure = args.pressure_scenarios
     build_report._pressure_min = args.pressure_min_delivery
-    result, markdown = build_report(args.bundle, args.labels, args.consensus, args.scenario_dir)
+    result, markdown = build_report(args.bundle, args.labels, args.consensus, args.scenario_dir,
+                                    args.price_input_per_m, args.price_output_per_m)
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")

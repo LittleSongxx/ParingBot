@@ -241,3 +241,15 @@ python eval/safety_checks.py --bundle eval/fixtures/quality_bundle_sample.json
 扫描 bundle 中的手机号/邮箱/身份证/API Key（错误）、承诺性措辞（warning）、
 提示词注入痕迹（warning）。`eval/fixtures/safety_bundle_bad.json` 是自检样例，
 CI 会断言它能被检测出来。
+
+## Holdout 场景与 NDCG
+
+```bash
+# 8 个 holdout 场景，不针对其补供给，用于观察真实供给下的交付
+python eval/scenario_matrix.py --only S30,S31,S32,S34,S36,S37 --trials 1
+
+# 分级 gold 的 NDCG@8（回归报告已自动包含）
+python eval/ndcg.py --bundle analysis/quality-bundles/expanded-latest.json
+```
+
+holdout 结果用于判断指标是否被供给调优“教坏”，不参与日常回归门禁。

@@ -562,3 +562,22 @@ GitHub `live-eval` 最终全量：20 场景 × 3 trials（16 正向 × 3 = 48 �
 不影响规则/交付/安全回归。S19 出现一次 7/8，属于宽偏好场景的模型波动，仍高于 7 人压力阈值。
 
 运行链接：https://github.com/LittleSongxx/ParingBot/actions/runs/41411595529
+
+## 三十一、Holdout 场景与 NDCG（2026-11-02 19:40）
+
+新增 8 个 holdout 场景（S30–S37，不针对其补供给）。其中可运行的 6 个首次真实运行：
+
+| 场景 | 交付 | 轮次 | 耗时 |
+|---|---|---|---|
+| S30 Holdout01 27岁男/6-12个月 | 6/8 | 10 | 188s |
+| S31 Holdout02 31岁女/长租 | 3/8 | 9 | 333s |
+| S32 Holdout03 34岁男/养宠 | 5/8 | 10 | 242s |
+| S34 Holdout05 23岁男/低预算 | 2/8 | 10 | 288s |
+| S36 Holdout07 30岁男/夜猫子 | 1/8 | 9 | 297s |
+| S37 Holdout08 27岁女/中短租 | 8/8 | 4 | 127s |
+| S33/S35 | readiness 阻断 | — | — |
+
+结论：holdout 平均交付 **4.17/8**，此前调优集是 99.7% 交付率。说明调优集的 8/8 不能代表真实供给；
+holdout 的 golden 两评分器 top8 重合只有 **4.0/8**（调优集是 7.69/8），也说明调优集的共识偏高。
+
+新增 `eval/ndcg.py` 与 regression report 的 NDCG/延迟/token 成本字段；fixture NDCG 为 79.79%。
