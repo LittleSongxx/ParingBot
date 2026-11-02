@@ -253,3 +253,12 @@ python eval/ndcg.py --bundle analysis/quality-bundles/expanded-latest.json
 ```
 
 holdout 结果用于判断指标是否被供给调优“教坏”，不参与日常回归门禁。
+
+## 独立 judge（交叉验证，不进门禁）
+
+```bash
+python eval/independent_judge.py --bundle quality-bundle.json --out independent-judge.md
+```
+
+用另一次模型调用，只看双方档案/偏好/动态，对交付候选打 1–5 分；不读 gold、不参考审核结论。
+holdout 6 场景首次结果：24 条已评，平均 **3.54/5**；它用于发现「交付了但质量一般」的候选。
