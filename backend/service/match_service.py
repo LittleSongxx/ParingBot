@@ -322,6 +322,10 @@ def _suitability_score(applicant: MemberProfile, candidate: MemberProfile,
                 score += 1
         except ValueError:
             pass
+    # 兴趣重合是加分项；最多算 2 分，避免标签多的人被过度加权
+    def interests(value):
+        return {item.strip() for item in str(value or "").replace("，", ",").split(",") if item.strip()}
+    score += min(2, len(interests(applicant.interest_tags) & interests(candidate.interest_tags)))
     return score
 
 
