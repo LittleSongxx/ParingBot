@@ -636,3 +636,11 @@ holdout 的 golden 两评分器 top8 重合只有 **4.0/8**（调优集是 7.69/
 - 本地 warm 脚本实测 `generated=0 skipped=0`（本地交付画像已 149/149，无需补）。
 
 CI 仍默认不 warm，画像是评测环境准备项，不影响规则/交付/安全回归。
+
+## 三十六、定时 live-eval（2026-11-03 00:50）
+
+- `live-eval` 增加每周一 02:00（Asia/Shanghai）定时任务；
+- 默认 7 场景 ×1 trial；
+- token 预算默认 **1,500,000**，超过即失败；
+- 所有回归/安全/方差/holdout artifact 照常上传；
+- 不想自动跑时删除 workflow 中的 `schedule` 即可。

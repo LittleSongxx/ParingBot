@@ -71,3 +71,9 @@ python eval/safety_checks.py --bundle eval/fixtures/quality_bundle_sample.json
 - `eval/holdout_gate.py`：6 个 holdout 场景平均交付 ≥4/8、失败数 ≤1；
 - 当前基线 4.67/8，1 次失败；
 - 该门禁防止只优化调优集导致真实供给质量下降。
+
+### 定时真实评测
+
+- `live-eval` 每周一 02:00 自动跑 7 场景 ×1 trial；
+- token 预算默认 1,500,000；
+- 如果自动任务失败，先看 `regression-report.md`、`holdout-gate.md`、`safety-report.md`。

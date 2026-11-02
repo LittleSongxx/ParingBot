@@ -33,6 +33,13 @@ on:
         description: "本次评测 token 预算上限（0=不限制）"
         required: false
         default: "0"
+  # 每周一凌晨 02:00（Asia/Shanghai）跑一次 7 场景冒烟评测，带 token 预算。
+  # 如不想自动跑，删掉这个 schedule 即可。
+  schedule:
+    - cron: '0 18 * * 0'
+concurrency:
+  group: live-eval
+  cancel-in-progress: false
 
 jobs:
   live-eval:
@@ -96,7 +103,7 @@ jobs:
       - name: Configure live models
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          TRIALS: ${{ github.event.inputs.trials }}
+          TRIALS: ${{ github.event.inputs.trials || '1' }}
           RUN_LABEL: live-${{ github.run_id }}
         run: |
           cat > .env.eval <<EOF
@@ -118,8 +125,8 @@ jobs:
 
       - name: Run selected scenarios
         env:
-          TRIALS: ${{ github.event.inputs.trials }}
-          SCENARIOS: ${{ github.event.inputs.scenarios }}
+          TRIALS: ${{ github.event.inputs.trials || '1' }}
+          SCENARIOS: ${{ github.event.inputs.scenarios || 'S1,S3,S5,S6,S14,S16,S20' }}
           RUN_LABEL: live-${{ github.run_id }}
         run: |
           python eval/scenario_matrix.py --env-file .env.eval \
@@ -153,8 +160,8 @@ jobs:
 
       - name: Regression + safety report
         env:
-          MIN_PRECISION: ${{ github.event.inputs.min_precision }}
-          MAX_TOKENS: ${{ github.event.inputs.max_tokens }}
+          MIN_PRECISION: ${{ github.event.inputs.min_precision || '0.6' }}
+          MAX_TOKENS: ${{ github.event.inputs.max_tokens || '1500000' }}
           PRICE_IN: ${{ github.event.inputs.price_input_per_m }}
           PRICE_OUT: ${{ github.event.inputs.price_output_per_m }}
         run: |

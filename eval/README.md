@@ -282,3 +282,12 @@ Holdout 不参与供给调优；默认阈值：平均交付 ≥4/8、失败数 �
 - `max_tokens`：token 预算上限。
 
 默认 `warm_portraits=false`、单价 0、预算不限制。
+
+## 定时真实评测
+
+`live-eval` 已加每周一 02:00（Asia/Shanghai）定时任务：
+
+- 默认 7 场景 ×1 trial；
+- token 预算默认 1,500,000，超过即失败；
+- 结果、回归、安全、方差、holdout 门禁都作为 artifact 保存；
+- 不想自动跑时，删除 workflow 里的 `schedule` 即可。
