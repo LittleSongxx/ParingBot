@@ -17,12 +17,16 @@ test.describe('管理端页面（admin，只读）', () => {
     await openAs(page, request, '/manager/matchTrace', ADMIN)
 
     await expect(page.getByRole('heading', { name: '调度时间线' })).toBeVisible()
-    const rows = page.locator('.el-table__row')
-    await expect(rows.first()).toBeVisible()
-    await expect(rows.first()).toContainText(/MATCH-\d{14}-[0-9a-f]{6}/)
+    // 时间线按时间倒序，最近可能有画像提取等非匹配运行；先按运行类型筛选，
+    // 再锁匹配任务行，不能假设第一行一定是 MATCH-*，否则补画像后会产生误报。
+    await page.locator('.filter-select').first().click()
+    await page.getByRole('option', { name: '匹配编排' }).click()
+    const matchRow = page.locator('.el-table__row').filter({ hasText: /MATCH-\d{14}-[0-9a-f]{6}/ }).first()
+    await expect(matchRow).toBeVisible()
+    await expect(matchRow).toContainText(/MATCH-\d{14}-[0-9a-f]{6}/)
 
     // 「查看过程」只发 GET /trace/detail，不改任何数据
-    await rows.first().getByRole('button', { name: '查看过程' }).click()
+    await matchRow.getByRole('button', { name: '查看过程' }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await expect(page.getByText('运行概览', { exact: true })).toBeVisible()
     await expect(page.getByText('候选漏斗', { exact: true })).toBeVisible()

@@ -250,13 +250,15 @@ def _summarize(data: dict) -> str:
     return "模型给出：" + "、".join(parts) + "标签"
 
 
-async def _prompt_values(member: MemberProfile, hint: str | None) -> tuple[dict, str]:
+async def _prompt_values(member: MemberProfile, hint: str | None,
+                        include_roommate_moments: bool = False) -> tuple[dict, str]:
     """组装提示词变量，同时把发给模型的材料原样留一份用来核对依据。
 
     档案和动态都通过工具实现来读：取哪些字段、动态取几条、按什么排序，
     和画像师自己在循环里调工具读到的完全一致。
     """
-    context = tool_box.ToolContext(member_id=member.id)
+    context = tool_box.ToolContext(
+        member_id=member.id, include_roommate_moments=include_roommate_moments)
     profile = await tool_box.read_member_detail(context)
     moments = await tool_box.read_member_moments(context, limit=MOMENT_LIMIT)
     tags = await tool_box.list_interest_tags(context)
@@ -318,7 +320,8 @@ def _conclusion(portrait: MemberPortrait, outcome: agents.AgentOutcome,
 
 
 async def build_portrait(member_id: int, run_id: int, *, round_no: int = 1,
-                         focus_hint: str | None = None) -> PortraitResult:
+                         focus_hint: str | None = None,
+                         include_roommate_moments: bool = False) -> PortraitResult:
     """跑一次画像提取并把结果落库。
 
     运行记录由调度层创建，画像产物通过 run_id 关联本次智能匹配。
@@ -327,7 +330,7 @@ async def build_portrait(member_id: int, run_id: int, *, round_no: int = 1,
     if member is None:
         raise CustomException("没有找到这位租客的档案，请先让他把档案填好")
     hint = (focus_hint or "").strip()[:255] or None
-    values, sources = await _prompt_values(member, hint)
+    values, sources = await _prompt_values(member, hint, include_roommate_moments)
     context = tool_box.ToolContext(run_id=run_id, agent_code=AGENT_CODE,
                                    member_id=member.id, round_no=round_no)
     outcome = await agents.run_agent(
@@ -464,7 +467,8 @@ async def generate_for_candidate(member_id: int) -> MemberPortrait | None:
     existing = await MemberPortrait.filter(member_id=member.id).order_by("-version").first()
     if existing is not None:
         return existing
-    moments = await MemberMoment.filter(member_id=member.id, visible="公开").count()
+    moments = await MemberMoment.filter(
+        member_id=member.id, visible__in=("公开", "仅匹配室友可见")).count()
     if not moments:
         return None
     user = await User.get_or_none(id=member.user_id)
@@ -473,7 +477,7 @@ async def generate_for_candidate(member_id: int) -> MemberPortrait | None:
     started = precise_now()
     run = await _open_run(member, user.id, moments)
     try:
-        result = await build_portrait(member.id, run.id)
+        result = await build_portrait(member.id, run.id, include_roommate_moments=True)
     except CustomException as exc:
         await _close_run(run, started, True, exc.message)
         return None
@@ -498,7 +502,7 @@ async def generate(current_user: User) -> dict:
     started = precise_now()
     run = await _open_run(member, current_user.id, moment_count)
     try:
-        result = await build_portrait(member.id, run.id)
+        result = await build_portrait(member.id, run.id, include_roommate_moments=True)
     except CustomException as exc:
         await _close_run(run, started, True, exc.message)
         raise

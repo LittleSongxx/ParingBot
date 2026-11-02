@@ -111,6 +111,8 @@ class ToolContext:
     round_no: int = 0
     # 注册表里写的单次返回行数上限
     max_return_rows: int | None = None
+    # 候选画像场景：允许读「仅匹配室友可见」的动态；申请方画像仍只读公开动态
+    include_roommate_moments: bool = False
 
 
 def _json_text(value: Any) -> str:
@@ -381,8 +383,9 @@ async def read_member_moments(context: ToolContext, member_id: int | None = None
     """
     target = _member_target(context, member_id)
     size = _limit_of(limit, DEFAULT_MOMENT_LIMIT, context.max_return_rows)
+    visible_values = ("公开", "仅匹配室友可见") if context.include_roommate_moments else ("公开",)
     rows = await MemberMoment.filter(
-        member_id=target, visible="公开").order_by("-publish_time", "-id").limit(size)
+        member_id=target, visible__in=visible_values).order_by("-publish_time", "-id").limit(size)
     return {
         "member_id": target,
         "returned": len(rows),

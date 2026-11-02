@@ -212,6 +212,22 @@ def test_select_one_of_missing_version(client, user_headers):
 # ---------------------------------------------------------------- 执行器与服务层
 
 
+async def test_moment_tool_can_include_roommate_visible_for_candidates(db):
+    """候选画像可以读「仅匹配室友可见」的动态；普通申请方画像仍只读公开动态。"""
+    member = await _make_member(moments=())
+    await MemberMoment.create(member_id=member.id, content="公开动态", visible="公开", publish_time=now())
+    await MemberMoment.create(member_id=member.id, content="仅室友可见动态",
+                              visible="仅匹配室友可见", publish_time=now())
+
+    public_result = await tool_box.read_member_moments(
+        tool_box.ToolContext(member_id=member.id))
+    assert [item["content"] for item in public_result["moments"]] == ["公开动态"]
+
+    candidate_context = tool_box.ToolContext(member_id=member.id, include_roommate_moments=True)
+    both = await tool_box.read_member_moments(candidate_context)
+    assert {item["content"] for item in both["moments"]} == {"公开动态", "仅室友可见动态"}
+
+
 async def test_portrait_written_with_steps_and_evidence(db, monkeypatch):
     """跑通一次提取：画像落库、步骤落库、工具日志落库、模型调用留痕。"""
     member = await _make_member()
