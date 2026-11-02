@@ -88,6 +88,9 @@ async def main():
         bundles.append({
             "run": {"id": run.id, "run_no": run.run_no, "status": run.run_status,
                     "total_round": run.total_round, "cost_millis": run.cost_millis,
+                    "prompt_tokens": run.prompt_tokens or 0,
+                    "completion_tokens": run.completion_tokens or 0,
+                    "total_tokens": (run.prompt_tokens or 0) + (run.completion_tokens or 0),
                     "summary": run.output_summary, "error": run.error_message,
                     "start": dt(run.start_time), "end": dt(run.end_time)},
             "task": {"id": task.id, "task_no": task.task_no, "status": task.status,

@@ -323,6 +323,7 @@ async def ask_supervisor(progress: str, context: tool_box.ToolContext) -> dict:
             # 接口报错翻译成人话再往上抛，页面上的提示要能指到该改哪里
             raise CustomException(model_factory.translate_exception(exc))
         model_factory.check_truncated(response)
+        await agents.record_usage(context, response)
         data = agents.first_json_object(agents.message_text(response))
         problem = _decision_problem(data, allowed)
         if problem is None:

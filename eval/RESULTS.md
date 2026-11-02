@@ -503,3 +503,22 @@ member01 演示任务此前已 15/15 全覆盖。
 matching 场景下这些动态本来就是给室友看的，用于候选画像不越权；最后一位画像缺口不再依赖补公开动态。
 新增对应测试，后端测试 358→**359 passed**；管理端 E2E 改为按运行类型筛选匹配行，避免画像补全记录把
 MATCH 行挤出第一页造成误报。
+
+## 二十七、模型 token 用量采集（2026-11-02 16:20）
+
+- `agent_run` 新增 `prompt_tokens` / `completion_tokens`（迁移 17）；
+- 执行器与主管每次模型调用都把 LangChain usage 累加到运行记录；
+- S1 单次实测：**prompt 142,065 / completion 3,361**，约 3 轮；
+- quality bundle / 一键回归报告已输出 token 合计；
+- 这为后续「单次匹配成本、P95 延迟、模型对比」提供基础数据。
+
+## 二十八、Golden 标签自动重算（2026-11-02 16:25）
+
+新增 `eval/refresh_golden_labels.py`（backend 容器内运行），按当前候选池重算 member02 + TEST_SCENARIO_* 的 top8。
+`live-eval` workflow 在导出 quality bundle 后自动执行：
+
+1. 重算 `eval/golden/matching_labels.json`；
+2. 用当前 bundle 重算 `consensus_labels.json`；
+3. 再跑回归/安全报告。
+
+这避免了 S12/S17 那类「补供给后标签过期导致门禁误报」的问题。

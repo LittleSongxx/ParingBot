@@ -30,6 +30,9 @@ class AgentRun(Model):
     start_time = fields.DatetimeField(null=True)
     end_time = fields.DatetimeField(null=True)
     cost_millis = fields.IntField(null=True)
+    # 模型调用累计 token；一次运行里所有角色/主管调用都累加到这里
+    prompt_tokens = fields.IntField(default=0)
+    completion_tokens = fields.IntField(default=0)
     create_time = fields.DatetimeField(auto_now_add=True)
 
     class Meta:

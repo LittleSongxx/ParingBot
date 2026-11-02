@@ -87,6 +87,10 @@ def build_report(bundle_path: Path, labels_path: Path, consensus_path: Path,
     consensus = load_labels(consensus_path)
     checks = [quality_checks.check_run(item) for item in bundle.get("runs", [])]
     quality_errors = [error for check in checks for error in check["errors"]]
+    tokens = [run.get("run", {}) for run in bundle.get("runs", [])]
+    token_total = sum(item.get("total_tokens") or 0 for item in tokens)
+    token_prompt = sum(item.get("prompt_tokens") or 0 for item in tokens)
+    token_completion = sum(item.get("completion_tokens") or 0 for item in tokens)
     safety_findings = safety_checks.scan_bundle(bundle)
     safety_errors = [item for item in safety_findings if item["severity"] == "error"]
     safety_warnings = [item for item in safety_findings if item["severity"] == "warning"]
@@ -110,6 +114,9 @@ def build_report(bundle_path: Path, labels_path: Path, consensus_path: Path,
             "evidence_missing": sum(item["evidence"]["delivered"] - item["evidence"]["with_evidence"] for item in checks),
             "portrait_missing": sum(item["evidence"].get("missing_portrait", 0) for item in checks),
             "portrait_delivered": sum(item["evidence"]["delivered"] for item in checks),
+            "prompt_tokens": token_prompt,
+            "completion_tokens": token_completion,
+            "total_tokens": token_total,
             "errors": quality_errors,
         },
         "safety": {"errors": len(safety_errors), "warnings": len(safety_warnings),
@@ -135,7 +142,8 @@ def build_report(bundle_path: Path, labels_path: Path, consensus_path: Path,
              f"| 硬规则违规 | {result['quality']['hard_rule_violations']} |",
              f"| summary 不一致 | {result['quality']['summary_errors']} |",
              f"| 交付缺证据 | {result['quality']['evidence_missing']} |",
-             f"| 交付缺画像 | {result['quality']['portrait_missing']} / {result['quality']['portrait_delivered']} |", "",
+             f"| 交付缺画像 | {result['quality']['portrait_missing']} / {result['quality']['portrait_delivered']} |",
+             f"| 模型 token 合计 | {result['quality']['total_tokens']}（prompt {result['quality']['prompt_tokens']} / completion {result['quality']['completion_tokens']}）|", "",
              "## Golden 指标", "",
              "| 评分器 | Precision@K | Recall@K | |", "|---|---|---|---|",
              f"| heuristic | {heuristic['aggregate']['avg_precision_at_k']:.2%} | {heuristic['aggregate']['avg_recall_at_k']:.2%} | |",

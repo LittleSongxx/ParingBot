@@ -433,3 +433,14 @@ def test_supervisor_accepts_chinese_agent_names_as_codes():
     assert graph._normalize_agent_code("合租管家") == "SUPERVISOR"
     assert graph._normalize_agent_code("finish") == "FINISH"
     assert graph._normalize_agent_code("AUDITOR") == "AUDITOR"
+def test_usage_from_response_reads_langchain_metadata():
+    """token 统计兼容 usage_metadata 和 response_metadata 两种格式。"""
+    from types import SimpleNamespace
+    from ai import agents
+    one = SimpleNamespace(usage_metadata={"input_tokens": 12, "output_tokens": 7})
+    two = SimpleNamespace(usage_metadata={}, response_metadata={"token_usage": {"prompt_tokens": 3, "completion_tokens": 4}})
+    assert agents.usage_from_response(one) == (12, 7)
+    assert agents.usage_from_response(two) == (3, 4)
+    assert agents.usage_from_response(SimpleNamespace()) == (0, 0)
+
+

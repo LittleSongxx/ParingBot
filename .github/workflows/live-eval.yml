@@ -114,6 +114,12 @@ jobs:
         run: |
           docker compose exec -T backend python - < eval/build_quality_bundle.py > quality-bundle.json
 
+      - name: Refresh golden labels and consensus
+        run: |
+          docker compose exec -T backend python - < eval/refresh_golden_labels.py > eval/golden/matching_labels.json
+          python eval/calibrate_golden.py --bundle quality-bundle.json \
+            --consensus-out eval/golden/consensus_labels.json
+
       - name: Scenario variance report
         run: |
           python eval/scenario_variance.py --reports eval/reports \

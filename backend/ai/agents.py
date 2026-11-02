@@ -31,13 +31,14 @@ from dataclasses import dataclass
 from typing import Callable
 
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from tortoise.expressions import F
 
 from ai import model_factory, prompt_loader
 from ai import tools as tool_box
 from common.exception_handler import CustomException
 from common.redact import redact_text
 from common.times import cost_millis, now, precise_now
-from models import AgentDefinition, AgentStep
+from models import AgentDefinition, AgentRun, AgentStep
 from service import config_service
 
 # 执行器认识的几个角色编码，和 agent_definition.agent_code 一致
@@ -123,6 +124,34 @@ def _json_text(value, limit: int = TEXT_LIMIT) -> str | None:
 def _error_text(message) -> str:
     text = redact_text(str(message or "").strip()) or "角色执行失败"
     return text if len(text) <= ERROR_LIMIT else text[:ERROR_LIMIT]
+
+
+def usage_from_response(response) -> tuple[int, int]:
+    """从 LangChain 响应里取 prompt/completion token；取不到就返回 0，不影响运行。"""
+    usage = getattr(response, "usage_metadata", None) or {}
+    prompt = usage.get("input_tokens") or usage.get("prompt_tokens") or 0
+    completion = usage.get("output_tokens") or usage.get("completion_tokens") or 0
+    if not prompt and not completion:
+        metadata = getattr(response, "response_metadata", None) or {}
+        token_usage = metadata.get("token_usage") or metadata.get("usage") or {}
+        prompt = token_usage.get("prompt_tokens") or token_usage.get("input_tokens") or 0
+        completion = token_usage.get("completion_tokens") or token_usage.get("output_tokens") or 0
+    try:
+        return int(prompt), int(completion)
+    except (TypeError, ValueError):
+        return 0, 0
+
+
+async def record_usage(context, response) -> None:
+    """把一次模型调用的 token 累加到 agent_run；采集不到就静默跳过。"""
+    if not context.run_id:
+        return
+    prompt, completion = usage_from_response(response)
+    if not prompt and not completion:
+        return
+    await AgentRun.filter(id=context.run_id).update(
+        prompt_tokens=F("prompt_tokens") + prompt,
+        completion_tokens=F("completion_tokens") + completion)
 
 
 def message_text(message) -> str:
@@ -358,6 +387,7 @@ async def run_agent(agent_code: str, context: tool_box.ToolContext, *,
             # 接口报错翻译成人话再往上抛，页面上的提示要能指到该改哪里
             raise CustomException(model_factory.translate_exception(exc))
         model_factory.check_truncated(response)
+        await record_usage(context, response)
         messages.append(response)
 
         calls = list(getattr(response, "tool_calls", None) or [])
