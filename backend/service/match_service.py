@@ -287,6 +287,44 @@ async def _close(run: AgentRun, task: MatchTask, started, ok: bool, summary: str
             error_message=None if ok else summary[:ERROR_LIMIT])
 
 
+def _suitability_score(applicant: MemberProfile, candidate: MemberProfile,
+                       preference: RoommatePreference | None) -> int:
+    """交付排序用的可解释适配分：只看硬规则之外的合住匹配信号。
+
+    模型给的 screen_score 是同一批候选内部的相对分，跨 run 不稳定；
+    交付名单的展示顺序和截断会直接影响租客看到谁，所以用代码再算一遍
+    可解释的适配分做排序，soft 条件全部来自双方档案/偏好，可逐条说明。
+    """
+    score = 0
+    if candidate.store_id == applicant.store_id:
+        score += 3
+    elif member_service.area_name(candidate.store_id) == member_service.area_name(applicant.store_id):
+        score += 1
+    if candidate.schedule_type and preference is not None:
+        if candidate.schedule_type in str(preference.schedule_accept or "").split(","):
+            score += 3
+    gap = member_service.lease_term_gap(applicant.lease_term, candidate.lease_term)
+    if gap == 0:
+        score += 2
+    elif gap == 1:
+        score += 1
+    if candidate.rent_budget is not None and preference is not None:
+        if preference.budget_min <= candidate.rent_budget <= preference.budget_max:
+            score += 2
+    age = member_service.calc_age(candidate.birth_date)
+    if age is not None and preference is not None:
+        if preference.age_min <= age <= preference.age_max:
+            score += 1
+    if candidate.tidiness and preference is not None:
+        try:
+            if (member_service.TIDINESS_LEVELS.index(candidate.tidiness)
+                    >= member_service.TIDINESS_LEVELS.index(preference.tidiness_min)):
+                score += 1
+        except ValueError:
+            pass
+    return score
+
+
 def _deliverable_sort_key(row: MatchCandidate):
     """交付名单的排序键：初筛得分高的在前，同分按审核轮次近的在前，最后用 id 兜底。
 
@@ -332,6 +370,21 @@ async def deliverable(task_id: int) -> tuple[list, str | None]:
                 passed = [row for row in passed if row.id not in blocked]
                 note = (f"通过审核的候选里有 {len(records)} 人按当前规则不可交付"
                         f"（性别、双向必须项或计划租期复核不通过），已从交付名单里剔除")
+    task = await MatchTask.get_or_none(id=task_id)
+    applicant = await MemberProfile.get_or_none(id=task.member_id) if task else None
+    preference = (await RoommatePreference.get_or_none(member_id=applicant.id)
+                  if applicant is not None else None)
+    if applicant is not None:
+        candidate_ids = [row.candidate_member_id for row in passed]
+        members = {item.id: item for item in await MemberProfile.filter(id__in=candidate_ids)}
+        def rank_key(row: MatchCandidate):
+            member = members.get(row.candidate_member_id)
+            suitability = _suitability_score(applicant, member, preference) if member else 0
+            screen, audit_round, row_id = _deliverable_sort_key(row)
+            return (-suitability, screen, audit_round, row_id)
+
+        passed = sorted(passed, key=rank_key)
+        return passed, note
     return sorted(passed, key=_deliverable_sort_key), note
 
 
