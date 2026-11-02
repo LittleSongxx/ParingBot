@@ -627,3 +627,12 @@ holdout 的 golden 两评分器 top8 重合只有 **4.0/8**（调优集是 7.69/
 - `live-eval` 自动生成 `holdout-gate.md/json` artifact；
 - 回归报告新增 `--max-total-tokens`，超过预算直接失败；
 - 发布检查单已补 holdout 门禁。
+
+## 三十五、live-eval 画像 warm 与成本配置（2026-11-02 23:55）
+
+- workflow 新增输入 `warm_portraits`（默认 false），只补本次交付候选，避免全量 841 人；
+- 新增 `price_input_per_m` / `price_output_per_m`，回归报告可输出估算成本；
+- 新增 `max_tokens` 预算门禁；
+- 本地 warm 脚本实测 `generated=0 skipped=0`（本地交付画像已 149/149，无需补）。
+
+CI 仍默认不 warm，画像是评测环境准备项，不影响规则/交付/安全回归。

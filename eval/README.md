@@ -272,3 +272,13 @@ python eval/holdout_gate.py --reports eval/reports \
 
 Holdout 不参与供给调优；默认阈值：平均交付 ≥4/8、失败数 ≤1。当前 6 场景 ×3 trials 为 4.67/8、1 次失败，通过。
 `live-eval` 会自动生成 `holdout-gate.md/json` artifact；`--max-total-tokens` 可做 token 预算保护。
+
+## live-eval 画像 warm 与成本配置
+
+`live-eval` workflow 新增可选输入：
+
+- `warm_portraits=true`：只给本次交付候选补画像，避免全量 841 人烧 token；
+- `price_input_per_m` / `price_output_per_m`：token 单价，回归报告输出估算成本；
+- `max_tokens`：token 预算上限。
+
+默认 `warm_portraits=false`、单价 0、预算不限制。

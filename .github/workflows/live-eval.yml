@@ -17,6 +17,18 @@ on:
         description: "heuristic Precision@K 最低阈值"
         required: true
         default: "0.6"
+      warm_portraits:
+        description: "是否给本次交付候选补画像（会额外消耗 token）"
+        required: false
+        default: "false"
+      price_input_per_m:
+        description: "输入 token 单价（每百万，0=不估算）"
+        required: false
+        default: "0"
+      price_output_per_m:
+        description: "输出 token 单价（每百万，0=不估算）"
+        required: false
+        default: "0"
       max_tokens:
         description: "本次评测 token 预算上限（0=不限制）"
         required: false
@@ -114,6 +126,11 @@ jobs:
             --only "$SCENARIOS" --trials "$TRIALS" \
             --label "$RUN_LABEL" --stamp "$RUN_LABEL"
 
+      - name: Warm delivered-candidate portraits
+        if: ${{ github.event.inputs.warm_portraits == 'true' }}
+        run: |
+          docker compose exec -T backend python - < eval/warm_eval_portraits.py
+
       - name: Build quality bundle
         run: |
           docker compose exec -T backend python - < eval/build_quality_bundle.py > quality-bundle.json
@@ -138,11 +155,14 @@ jobs:
         env:
           MIN_PRECISION: ${{ github.event.inputs.min_precision }}
           MAX_TOKENS: ${{ github.event.inputs.max_tokens }}
+          PRICE_IN: ${{ github.event.inputs.price_input_per_m }}
+          PRICE_OUT: ${{ github.event.inputs.price_output_per_m }}
         run: |
           python eval/regression_report.py --bundle quality-bundle.json \
             --out regression-report.md --json regression-report.json \
             --min-precision "$MIN_PRECISION" --min-consensus 0.6 \
-            --max-total-tokens "${MAX_TOKENS:-0}"
+            --max-total-tokens "${MAX_TOKENS:-0}" \
+            --price-input-per-m "${PRICE_IN:-0}" --price-output-per-m "${PRICE_OUT:-0}"
           python eval/safety_checks.py --bundle quality-bundle.json \
             --out safety-report.md --json safety-report.json
 
