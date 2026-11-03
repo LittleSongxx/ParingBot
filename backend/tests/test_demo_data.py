@@ -7,7 +7,7 @@
 3. 两个种子任务的 delivered_count 等于当前 deliverable() 口径算出来的交付数；
 4. 两次运行记录里的总结数字与候选池现查结果一致，并带历史迁移说明。
 
-历史数据由 deploy/mysql/init/03-data-fixes.sql 迁移：task 40 的 6 名异性候选、
+历史数据由 deploy/mysql/sql/base/03-data-fixes.sql 迁移：task 40 的 6 名异性候选、
 task 78 的「谦砚」按当前硬规则改判否决，交付数分别调整为 4 / 7。种子库没重建时
 这些断言会失败，属于预期——它守的就是「迁移脚本真的执行过、页面数字才可信」。
 """

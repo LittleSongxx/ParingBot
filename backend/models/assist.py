@@ -9,7 +9,7 @@ class AiAssistLog(Model):
     「摘要」写进来：提示词全文和输入载荷分别算 sha256，原文一律不落库，
     避免把租客自我介绍、联系方式等 PII 复制到日志表里。
 
-    表结构见 deploy/mysql/init/05-ai-assist-log.sql；本表不建物理外键，
+    表结构见 deploy/mysql/sql/base/05-ai-assist-log.sql；本表不建物理外键，
     member_id / prompt_code 都是逻辑关联。
     """
 

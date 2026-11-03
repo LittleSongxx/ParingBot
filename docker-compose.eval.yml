@@ -1,0 +1,17 @@
+# eval profile：只加载 base 种子（无 demo 供给），使用独立数据卷，避免评测/演示互相污染。
+# 用法：docker compose -f docker-compose.yml -f docker-compose.eval.yml up -d --build
+services:
+  mysql:
+    build:
+      context: ./deploy/mysql
+      args:
+        INIT_PROFILE: eval
+  backend:
+    environment:
+      MATCH_TIMEOUT_SECONDS: ${MATCH_TIMEOUT_SECONDS:-600}
+
+volumes:
+  mysql_data:
+    name: paringbot_eval_mysql_data
+  uploads:
+    name: paringbot_eval_uploads

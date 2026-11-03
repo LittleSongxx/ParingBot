@@ -78,3 +78,4 @@ volumes:
     name: paringbot_app_mysql_data
   uploads:
     name: paringbot_app_uploads
+

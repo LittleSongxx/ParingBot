@@ -6,7 +6,7 @@
 2. user 表所有密码替换为 PBKDF2-SHA256 哈希（与 backend/common/security.py 同格式）。
 
 这是本机一次性的迁移工具：源文件是旧工程的 ai_coliving.sql，不在本仓库内。
-新环境只需要直接导入生成的 deploy/mysql/init/01-paringbot.sql。
+新环境只需要直接导入生成的 deploy/mysql/sql/base/01-paringbot.sql。
 """
 import hashlib
 import os
@@ -16,7 +16,7 @@ from pathlib import Path
 
 ITERATIONS = 120000
 SOURCE = Path("/home/song/code/Agent/multi-agent/AIColiving/ai_coliving.sql")
-TARGET = Path(__file__).resolve().parents[1] / "deploy/mysql/init/01-paringbot.sql"
+TARGET = Path(__file__).resolve().parents[1] / "deploy/mysql/sql/base/01-paringbot.sql"
 
 
 def hash_password(raw: str) -> str:
@@ -52,3 +52,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
