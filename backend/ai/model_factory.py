@@ -26,8 +26,8 @@ PURPOSE_AUDIT = "审核"
 PURPOSES = (PURPOSE_SCHEDULE, PURPOSE_PORTRAIT, PURPOSE_SCREEN, PURPOSE_AUDIT)
 
 # 单次请求的超时与重试次数：偶发一次网络抖动不该让整条链路当场失败
-REQUEST_TIMEOUT = 60
-MAX_RETRIES = 2
+REQUEST_TIMEOUT = 120
+MAX_RETRIES = 3
 
 
 async def load_for_purpose(purpose: str) -> AiModelConfig:
