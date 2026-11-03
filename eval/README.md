@@ -291,3 +291,14 @@ Holdout 不参与供给调优；默认阈值：平均交付 ≥4/8、失败数 �
 - token 预算默认 1,500,000，超过即失败；
 - 结果、回归、安全、方差、holdout 门禁都作为 artifact 保存；
 - 不想自动跑时，删除 workflow 里的 `schedule` 即可。
+
+## Holdout v2
+
+S40–S47 是独立 holdout v2（当前 6 个可运行），**不针对其补供给**，用于观察优化是否真正泛化：
+
+```bash
+python eval/scenario_matrix.py --only S40,S42,S43,S45,S46,S47 --trials 1
+```
+
+v2 基线（1 trial）：交付 8/4/0/8/1/6，平均 4.5/8；S43 池子为空、S46 仅 1 人。
+它不用于日常门禁调优，只作为独立观测；holdout_gate 已纳入 S40/S42/S43/S45/S46/S47。

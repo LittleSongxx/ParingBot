@@ -15,7 +15,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import scenario_variance  # noqa: E402
 
-DEFAULT_HOLDOUT = "S30,S31,S32,S34,S36,S37"
+DEFAULT_HOLDOUT = "S30,S31,S32,S34,S36,S37,S40,S42,S43,S45,S46,S47"
 
 
 def main(argv=None):
