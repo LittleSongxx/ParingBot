@@ -585,6 +585,29 @@ async def search_members(context: ToolContext, gender: str | None = None,
     for tag in wanted_tags:
         # 兴趣按「命中任意一个」算：全都要满足会把候选直接筛空
         query = query.filter(interest_tags__contains=tag)
+    # 候选方标为必须、而申请方验不过的人，别再返回给模型浪费一轮审核：
+    # 审核官最后一定会判 MISMATCH_HARD，提前在这里滤掉。
+    if applicant is not None:
+        from service import auditor_service  # 延迟导入，避免 tools/auditor 循环依赖
+        all_ids = await query.values_list("id", flat=True)
+        if all_ids:
+            profiles = {item.id: item for item in await MemberProfile.filter(id__in=all_ids)}
+            prefs = {item.member_id: item for item in
+                     await RoommatePreference.filter(member_id__in=all_ids)}
+            keep = []
+            for candidate_id in all_ids:
+                candidate = profiles.get(candidate_id)
+                if candidate is None:
+                    continue
+                preference = prefs.get(candidate_id)
+                if preference is not None and auditor_service.hard_violations(
+                        applicant, candidate, preference):
+                    continue
+                if auditor_service.lease_term_conflict(applicant, candidate):
+                    continue
+                keep.append(candidate_id)
+            query = query.filter(id__in=keep)
+
     # 同一任务里已经写进候选池的人不再重复返回：模型下一轮搜索/放宽时
     # 应该看到新的候选，而不是一直看到同一批人。这样不随机打乱顺序，
     # 又能让有限的单次返回条数在多轮里覆盖更多人。
