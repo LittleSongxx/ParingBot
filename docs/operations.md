@@ -136,4 +136,3 @@ docker compose down -v       # 连同数据卷一起删除（不可恢复）
 | 响应头 | nginx 统一加 `X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy` |
 | 文件访问 | `/files/download/{文件名}` 仅放行合法文件路径；其它 `/files/*` 返回 404，不再落到 SPA 首页 |
 | 级联删除 | 删除账号时档案/偏好/动态/画像/匹配记录在同一事务内删除，文件清理在事务之后 |
-
