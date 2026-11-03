@@ -25,7 +25,7 @@ on:
       max_tokens:
         description: "本次 token 预算上限（0=不限制）"
         required: false
-        default: "1500000"
+        default: "2500000"
   schedule:
     - cron: '0 18 * * 0'   # 每周一 02:00 Asia/Shanghai
 
@@ -152,7 +152,7 @@ jobs:
           MODE: ${{ github.event.inputs.mode || 'verify' }}
           PRICE_IN: ${{ github.event.inputs.price_input_per_m }}
           PRICE_OUT: ${{ github.event.inputs.price_output_per_m }}
-          MAX_TOKENS: ${{ github.event.inputs.max_tokens || '1500000' }}
+          MAX_TOKENS: ${{ github.event.inputs.max_tokens || '2500000' }}
         run: |
           EXTRA=()
           if [ -n "$PRICE_IN" ] && [ -n "$PRICE_OUT" ]; then
