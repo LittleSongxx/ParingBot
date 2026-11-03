@@ -107,11 +107,25 @@ def run_scenario(api: Api, admin: str, scenario: dict, args, env: dict) -> dict:
     print(f"  账号：{scenario['account']}（{note}）")
 
     if scenario.get("profile"):
-        save_profile(api, token, scenario["profile"])
-        record["notes"].append("档案已保存")
+        try:
+            save_profile(api, token, scenario["profile"])
+            record["notes"].append("档案已保存")
+        except Exception as exc:  # noqa: BLE001
+            if scenario.get("run", True):
+                raise
+            record["status"] = "未运行（负向：档案不完整，API 层拒绝）"
+            record["notes"].append(str(exc)[:300])
+            return record
     if scenario.get("preference"):
-        save_preference(api, token, scenario["preference"])
-        record["notes"].append("偏好已保存")
+        try:
+            save_preference(api, token, scenario["preference"])
+            record["notes"].append("偏好已保存")
+        except Exception as exc:  # noqa: BLE001
+            if scenario.get("run", True):
+                raise
+            record["status"] = "未运行（负向：偏好不完整，API 层拒绝）"
+            record["notes"].append(str(exc)[:300])
+            return record
     if scenario.get("moments"):
         moment_state = ensure_moments(api, token, scenario["moments"])
         record["moments"] = moment_state

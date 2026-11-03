@@ -57,6 +57,16 @@ def _must_dims(preference):
             if key.endswith("_required") and value == "必须"]
 
 
+
+
+def _as_int(value):
+    """bundle 里的偏好字段可能被序列化成字符串，比较前统一转 int。"""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _has_constraint(preference, code):
     if code == "age":
         return preference.get("age_min") is not None and preference.get("age_max") is not None
@@ -80,12 +90,16 @@ def _violates(applicant, candidate, preference, code, as_of):
     """申请方是否不满足候选方在 code 维度上的必须项。"""
     if code == "age":
         age = _age(applicant.get("birth_date"), as_of)
-        if age is None:
+        min_age = _as_int(preference.get("age_min"))
+        max_age = _as_int(preference.get("age_max"))
+        if age is None or min_age is None or max_age is None:
             return False
-        return age < preference["age_min"] or age > preference["age_max"]
+        return age < min_age or age > max_age
     if code == "budget":
         value = applicant.get("rent_budget")
-        return value is not None and (value < preference["budget_min"] or value > preference["budget_max"])
+        low = _as_int(preference.get("budget_min"))
+        high = _as_int(preference.get("budget_max"))
+        return value is not None and low is not None and high is not None and (value < low or value > high)
     if code == "tidiness":
         left = _rank(TIDINESS_LEVELS, applicant.get("tidiness"))
         right = _rank(TIDINESS_LEVELS, preference.get("tidiness_min"))
@@ -93,7 +107,9 @@ def _violates(applicant, candidate, preference, code, as_of):
     if code == "store":
         scope = preference.get("store_scope")
         if scope == "同门店":
-            return bool(applicant.get("store")) and applicant.get("store") != candidate.get("store")
+            a_store = applicant.get("store") or applicant.get("store_id")
+            c_store = candidate.get("store") or candidate.get("store_id")
+            return bool(a_store) and bool(c_store) and str(a_store) != str(c_store)
         if scope == "同片区":
             left = applicant.get("store_area")
             right = candidate.get("store_area")

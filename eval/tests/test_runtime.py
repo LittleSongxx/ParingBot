@@ -43,6 +43,19 @@ class QualityChecksTest(unittest.TestCase):
         result = quality_checks.check_run(run_bundle({"budget_required": "加分"}))
         self.assertFalse(result["hard_rule_violations"])
 
+    def test_string_preference_values_do_not_crash(self):
+        # bundle 里偏好字段被序列化成字符串（真实数据就是这样），不能 TypeError
+        result = quality_checks.check_run(
+            run_bundle({"age_required": "必须", "age_min": "24", "age_max": "28",
+                        "budget_required": "加分", "budget_min": "2500", "budget_max": "2800"}))
+        self.assertIsInstance(result["hard_rule_violations"], list)
+
+    def test_store_must_uses_store_id(self):
+        bundle = run_bundle({"store_required": "必须", "store_scope": "同门店"})
+        bundle["candidates"][0]["store_id"] = 2  # 申请方 store_id=1
+        result = quality_checks.check_run(bundle)
+        self.assertTrue(result["hard_rule_violations"], "同门店必须项未用 store_id 比较")
+
 
 class SafetyChecksTest(unittest.TestCase):
     def test_promise_and_injection_reachable(self):

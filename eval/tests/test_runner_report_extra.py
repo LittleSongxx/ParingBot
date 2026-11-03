@@ -1,6 +1,5 @@
 import importlib.util
 import json
-import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,8 +20,6 @@ def load_module(path: Path, name: str):
 
 class RunnerPathsTest(unittest.TestCase):
     def test_load_suites(self):
-        spec = importlib.util.spec_from_file_location("run_matrix", REPO / "eval" / "run_matrix.py")
-        module = importlib.util.module_from_spec(spec)
         # 不执行 main；只验证数据文件可解析
         data_v3 = json.loads((REPO / "eval" / "frozen" / "v3" / "scenarios.json").read_text(encoding="utf-8"))
         data_demo = json.loads((REPO / "eval" / "suites" / "demo.json").read_text(encoding="utf-8"))
