@@ -585,6 +585,14 @@ async def search_members(context: ToolContext, gender: str | None = None,
     for tag in wanted_tags:
         # 兴趣按「命中任意一个」算：全都要满足会把候选直接筛空
         query = query.filter(interest_tags__contains=tag)
+    # 同一任务里已经写进候选池的人不再重复返回：模型下一轮搜索/放宽时
+    # 应该看到新的候选，而不是一直看到同一批人。这样不随机打乱顺序，
+    # 又能让有限的单次返回条数在多轮里覆盖更多人。
+    if context.task_id:
+        seen = await MatchCandidate.filter(
+            task_id=context.task_id).values_list("candidate_member_id", flat=True)
+        if seen:
+            query = query.exclude(id__in=list(seen))
     total = await query.count()
     ceiling = context.max_return_rows or POOL_LIMIT_DEFAULT
     rows = await query.order_by("-id").limit(ceiling)
