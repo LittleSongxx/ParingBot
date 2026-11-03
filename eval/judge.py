@@ -144,8 +144,20 @@ def main(argv=None) -> int:
     if model in production and not args.allow_same_model:
         raise SystemExit(f"judge 模型 {model} 与生产模型相同，不独立；换不同模型族，或显式 --allow-same-model（仅探索）")
     rows = delivered(bundle)
+    if args.sample_not_delivered > 0:
+        extra = []
+        for run in bundle.get("runs", []):
+            app = run.get("applicant") or {}
+            for candidate in run.get("candidates", []):
+                if not candidate.get("delivered"):
+                    extra.append({"run": run, "applicant": app, "candidate": candidate})
+                    if len(extra) >= args.sample_not_delivered:
+                        break
+            if len(extra) >= args.sample_not_delivered:
+                break
+        rows = rows + extra
     if not rows:
-        raise SystemExit("bundle 中没有交付候选")
+        raise SystemExit("bundle 中没有可评候选")
     if args.mode == "pairwise":
         result = pairwise(rows, model, base_url, api_key)
     else:
@@ -160,9 +172,29 @@ def main(argv=None) -> int:
                 scored.append({"index": index, "candidate": row["candidate"].get("nickname"),
                                "score": None, "error": str(exc)})
         scores = [item["score"] for item in scored if isinstance(item.get("score"), (int, float))]
+        aggregate = {"judged": len(scores), "errors": len(scored) - len(scores),
+                     "avg_score": round(sum(scores) / len(scores), 3) if scores else None}
+        if args.human_labels and args.human_labels.exists():
+            import csv
+            human = {}
+            with args.human_labels.open(encoding="utf-8", newline="") as handle:
+                for row in csv.DictReader(handle):
+                    name = row.get("candidate")
+                    value = row.get("human_score") or row.get("annotator_a")
+                    if name and value:
+                        human[name] = float(value)
+            pairs = [(row["score"], human[row["candidate"]]) for row in scored
+                     if row.get("candidate") in human and isinstance(row.get("score"), (int, float))]
+            if len(pairs) >= 3:
+                rank = lambda values: [sorted(values).index(value) + 1 for value in values]
+                xs = rank([a for a, _ in pairs]); ys = rank([b for _, b in pairs])
+                n = len(pairs); mx = sum(xs) / n; my = sum(ys) / n
+                num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+                den = (sum((x - mx) ** 2 for x in xs) * sum((y - my) ** 2 for y in ys)) ** 0.5
+                aggregate["human_spearman"] = round(num / den, 3) if den else None
+                aggregate["human_n"] = n
         result = {"mode": "pointwise", "provider": provider, "model": model, "rows": scored,
-                  "aggregate": {"judged": len(scores), "errors": len(scored) - len(scores),
-                                "avg_score": round(sum(scores) / len(scores), 3) if scores else None}}
+                  "aggregate": aggregate}
     if args.json:
         args.json.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
     lines = ["# 独立 judge 报告", "", f"- 模式：{args.mode}；模型：{model}（{provider}）",

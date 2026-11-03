@@ -128,11 +128,10 @@ jobs:
       - name: Build quality bundle
         env:
           GIT_COMMIT: ${{ github.sha }}
-          EVAL_SUITE: v3
-          DB_PROFILE: eval
-          LABELS_HASH: ${{ hashFiles('eval/frozen/v3/labels.json') }}
-          SCENARIOS_HASH: ${{ hashFiles('eval/frozen/v3/scenarios.json') }}
-        run: docker compose exec -T backend python - < eval/build_bundle.py > quality-bundle.json
+        run: |
+          LABELS_HASH=$(sha256sum eval/frozen/v3/labels.json | cut -d' ' -f1)
+          SCENARIOS_HASH=$(sha256sum eval/frozen/v3/scenarios.json | cut -d' ' -f1)
+          docker compose exec -T -e GIT_COMMIT="$GIT_COMMIT" -e EVAL_SUITE=v3 -e DB_PROFILE=eval -e LABELS_HASH="$LABELS_HASH" -e SCENARIOS_HASH="$SCENARIOS_HASH" -e MATCH_TIMEOUT_SECONDS=600 backend python - < eval/build_bundle.py > quality-bundle.json
 
       - name: Optional independent judge
         env:

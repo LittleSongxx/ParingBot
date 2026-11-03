@@ -218,4 +218,3 @@ docker compose build web
 ## 截图
 
 全部页面截图在 [`docs/assets/screenshots/`](docs/assets/screenshots/)：登录、租客端首页/档案/智能匹配/候选结果/审核结果/画像结果、管理端首页/调度时间线/工具中心/用户管理，均由本机 Docker Compose 栈（1440×900）实时截取；前端视觉规范见 [`docs/frontend-style.md`](docs/frontend-style.md)。
-

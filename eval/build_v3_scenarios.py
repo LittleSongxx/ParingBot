@@ -437,7 +437,6 @@ def _build_positive(spec: dict, cell: dict, applicant, profile, preference,
 
 def _build_negative(slot: int, cell: dict, profile: dict, preference: dict,
                     capacity: int, reason: str) -> dict:
-    kind = "moment" if reason == "moment" else "intro"
     if reason == "moment":
         moments: list[str] = []
         expect = {

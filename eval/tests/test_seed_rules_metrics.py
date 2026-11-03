@@ -3,11 +3,10 @@
 """lib/seed、lib/rules、lib/metrics、lib/render 的离线单测（不需要 DB / 模型）。"""
 from __future__ import annotations
 
-import json
 import sys
 import tempfile
 import unittest
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -205,7 +204,6 @@ class RulesTest(unittest.TestCase):
         self.assertIn("年龄", rules.DIM_NAMES.values())
 
     def test_hard_violations_each_dimension(self):
-        applicant = make_member()
         candidate = make_member(id=2, store_id=2, tidiness="一般",
                                 lease_term="3个月以下", schedule_type="夜猫子",
                                 has_pet="有", birth_date=date(1980, 1, 1),

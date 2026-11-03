@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -18,7 +17,7 @@ DEFAULT_ENV = REPO / ".env.eval"
 REPORTS = ROOT / "reports"
 
 from lib.api import (  # noqa: E402
-    Account, Api, ensure_account, ensure_moments, login, readiness_of, save_preference,
+    Api, BALANCE_HINTS, ensure_account, ensure_moments, login, readiness_of, save_preference,
     save_profile, wait_idle, wait_run,
 )
 from lib.env import load_env  # noqa: E402
@@ -257,8 +256,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--only", help="只跑这些场景，逗号分隔，例如 S1,S3")
     parser.add_argument("--trials", type=int, help="覆盖每个场景的 trial 数")
     parser.add_argument("--poll", type=int, default=3)
-    parser.add_argument("--timeout", type=int, default=1300,
-                        help="单次运行最长等待秒数（.env 里 MATCH_TIMEOUT_SECONDS=1200）")
+    parser.add_argument("--timeout", type=int, default=650,
+                        help="单次运行最长等待秒数（生产 MATCH_TIMEOUT_SECONDS=600 + 缓冲）")
     parser.add_argument("--label", help="报告标签")
     parser.add_argument("--stamp", help="输出目录时间戳")
     args = parser.parse_args(argv)
@@ -270,7 +269,7 @@ def main(argv: list[str] | None = None) -> int:
     selected = load_suite(args.suite)
     if args.only:
         wanted = {item.strip().upper() for item in args.only.split(",") if item.strip()}
-        selected = [item for item in SCENARIOS if item["key"].upper() in wanted]
+        selected = [item for item in selected if item["key"].upper() in wanted]
         if not selected:
             raise SystemExit(f"没有匹配到场景：{args.only}")
 

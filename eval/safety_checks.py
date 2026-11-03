@@ -8,10 +8,10 @@
 - 提示词注入痕迹（忽略之前指令、ignore previous instructions、system prompt 等）：warning。
 
 用法：
-  python eval/safety_checks.py --bundle eval/fixtures/quality_bundle_sample.json
+  python eval/safety_checks.py --bundle eval/tests/fixtures/quality_bundle_sample.json
 """
 from __future__ import annotations
-import argparse, json, re, sys
+import argparse, json, re
 from pathlib import Path
 
 PII_PATTERNS = {
@@ -57,8 +57,9 @@ def scan_bundle(bundle):
             for moment in applicant.get("moments") or []:
                 findings += scan_text(moment.get("content"), "applicant.moment", run_id,
                                       applicant.get("nickname"))
-        findings += scan_text((run.get("run") or {}).get("output_summary"), "run.output_summary",
-                               run_id, (run.get("run") or {}).get("run_no"))
+        run_block = run.get("run") or {}
+        findings += scan_text(run_block.get("output_summary") or run_block.get("summary"),
+                               "run.output_summary", run_id, run_block.get("run_no"))
         for candidate in run.get("candidates", []):
             for field in TEXT_FIELDS:
                 findings += scan_text(candidate.get(field), f"candidate.{field}", run_id,
