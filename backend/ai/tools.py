@@ -12,6 +12,7 @@
 成功失败都记——只记成功的话，出错的那几次调用在页面上看不见，复盘时只能靠猜。
 """
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass, replace
@@ -587,7 +588,16 @@ async def search_members(context: ToolContext, gender: str | None = None,
         query = query.filter(interest_tags__contains=tag)
     total = await query.count()
     ceiling = context.max_return_rows or POOL_LIMIT_DEFAULT
-    rows = await query.order_by("-id").limit(ceiling)
+    if total > ceiling:
+        # 只按 -id 取前 N 会让新补的候选长期挤掉老候选，模型反复看到同一个子集，
+        # 漏掉真正合适的人。这里按申请方/任务/候选做稳定哈希抽样，覆盖新旧候选。
+        ids = await query.values_list("id", flat=True)
+        seed = f"{context.member_id or 0}:{context.task_id or 0}:{context.round_no}"
+        selected = sorted(
+            ids, key=lambda cid: hashlib.sha1(f"{seed}:{cid}".encode()).hexdigest())[:ceiling]
+        rows = await MemberProfile.filter(id__in=selected).order_by("-id")
+    else:
+        rows = await query.order_by("-id").limit(ceiling)
     return {
         "total": total,
         "returned": len(rows),

@@ -278,7 +278,7 @@ UPDATE `member_profile`
 SET `gender`='男', `birth_date`='1996-10-10', `rent_budget`=4200, `tidiness`='一般',
     `store_id`=9, `schedule_type`='夜猫子', `lease_term`='6-12个月', `has_pet`='无',
     `smoking`='不吸烟', `audit_status`='已通过', `enabled`='是',
-    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息规律、爱干净，预算和租期对得上；不介意猫的话更好。'
+    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息合拍、好沟通；夜猫子也能接受，预算和租期对得上。'
 WHERE `id`=95;
 
 UPDATE `roommate_preference`
@@ -295,7 +295,7 @@ UPDATE `member_profile`
 SET `gender`='男', `birth_date`='1996-10-10', `rent_budget`=4200, `tidiness`='一般',
     `store_id`=9, `schedule_type`='夜猫子', `lease_term`='6-12个月', `has_pet`='无',
     `smoking`='不吸烟', `audit_status`='已通过', `enabled`='是',
-    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息规律、爱干净，预算和租期对得上；不介意猫的话更好。'
+    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息合拍、好沟通；夜猫子也能接受，预算和租期对得上。'
 WHERE `id`=96;
 
 UPDATE `roommate_preference`
@@ -312,7 +312,7 @@ UPDATE `member_profile`
 SET `gender`='男', `birth_date`='1996-10-10', `rent_budget`=4200, `tidiness`='一般',
     `store_id`=9, `schedule_type`='夜猫子', `lease_term`='6-12个月', `has_pet`='无',
     `smoking`='不吸烟', `audit_status`='已通过', `enabled`='是',
-    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息规律、爱干净，预算和租期对得上；不介意猫的话更好。'
+    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息合拍、好沟通；夜猫子也能接受，预算和租期对得上。'
 WHERE `id`=104;
 
 UPDATE `roommate_preference`
@@ -329,7 +329,7 @@ UPDATE `member_profile`
 SET `gender`='男', `birth_date`='1996-10-10', `rent_budget`=4200, `tidiness`='一般',
     `store_id`=9, `schedule_type`='夜猫子', `lease_term`='6-12个月', `has_pet`='无',
     `smoking`='不吸烟', `audit_status`='已通过', `enabled`='是',
-    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息规律、爱干净，预算和租期对得上；不介意猫的话更好。'
+    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息合拍、好沟通；夜猫子也能接受，预算和租期对得上。'
 WHERE `id`=105;
 
 UPDATE `roommate_preference`
@@ -346,7 +346,7 @@ UPDATE `member_profile`
 SET `gender`='男', `birth_date`='1996-10-10', `rent_budget`=4200, `tidiness`='一般',
     `store_id`=9, `schedule_type`='夜猫子', `lease_term`='6-12个月', `has_pet`='无',
     `smoking`='不吸烟', `audit_status`='已通过', `enabled`='是',
-    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息规律、爱干净，预算和租期对得上；不介意猫的话更好。'
+    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息合拍、好沟通；夜猫子也能接受，预算和租期对得上。'
 WHERE `id`=106;
 
 UPDATE `roommate_preference`
@@ -363,7 +363,7 @@ UPDATE `member_profile`
 SET `gender`='男', `birth_date`='1996-10-10', `rent_budget`=4200, `tidiness`='一般',
     `store_id`=9, `schedule_type`='夜猫子', `lease_term`='6-12个月', `has_pet`='无',
     `smoking`='不吸烟', `audit_status`='已通过', `enabled`='是',
-    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息规律、爱干净，预算和租期对得上；不介意猫的话更好。'
+    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息合拍、好沟通；夜猫子也能接受，预算和租期对得上。'
 WHERE `id`=109;
 
 UPDATE `roommate_preference`
@@ -380,7 +380,7 @@ UPDATE `member_profile`
 SET `gender`='男', `birth_date`='1996-10-10', `rent_budget`=4200, `tidiness`='一般',
     `store_id`=9, `schedule_type`='夜猫子', `lease_term`='6-12个月', `has_pet`='无',
     `smoking`='不吸烟', `audit_status`='已通过', `enabled`='是',
-    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息规律、爱干净，预算和租期对得上；不介意猫的话更好。'
+    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息合拍、好沟通；夜猫子也能接受，预算和租期对得上。'
 WHERE `id`=111;
 
 UPDATE `roommate_preference`
@@ -397,7 +397,7 @@ UPDATE `member_profile`
 SET `gender`='男', `birth_date`='1996-10-10', `rent_budget`=4200, `tidiness`='一般',
     `store_id`=9, `schedule_type`='夜猫子', `lease_term`='6-12个月', `has_pet`='无',
     `smoking`='不吸烟', `audit_status`='已通过', `enabled`='是',
-    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息规律、爱干净，预算和租期对得上；不介意猫的话更好。'
+    `self_intro`='在中山公园附近做摄影师，晚上修片到一两点，早上起得晚。', `roommate_expectation`='希望室友作息合拍、好沟通；夜猫子也能接受，预算和租期对得上。'
 WHERE `id`=112;
 
 UPDATE `roommate_preference`
