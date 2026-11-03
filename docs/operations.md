@@ -27,6 +27,18 @@ DOCKER_CONTEXT=default docker compose up -d --build
 | 管理员 | `admin` | `admin123` |
 | 租客 | `member01` | `123456` |
 
+## 2.1 评测环境（eval profile）
+
+评测必须使用**不含演示供给**的独立数据库，避免评测数据与演示数据互相污染：
+
+```bash
+# eval profile：只加载 deploy/mysql/sql/base，不加载任何 demo 供给
+docker compose -f docker-compose.yml -f docker-compose.eval.yml up -d --build
+```
+
+demo 与 eval 使用不同的数据卷（`paringbot_app_mysql_data` / `paringbot_eval_mysql_data`），
+互不影响；切换 profile 时不要用同一个数据卷。评测流程见 `eval/RUNBOOK.md`。
+
 ## 3. 配置项（.env）
 
 | 变量 | 默认 | 说明 |
@@ -59,7 +71,7 @@ DOCKER_CONTEXT=default docker compose up -d --build
 docker compose ps
 docker compose logs --tail=100 backend
 python scripts/smoke_check.py --base http://127.0.0.1:8080
-docker compose exec -T backend pytest -q     # 266+ 用例，使用真实 MySQL + FakeModel
+docker compose exec -T backend pytest -q     # 全量用例（数量以输出为准），真实 MySQL + FakeModel
 docker compose exec -T backend python -c "import main; print('import ok')"
 ```
 
@@ -72,13 +84,13 @@ docker compose exec -T mysql sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" pa
 docker compose exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" paringbot' < backup.sql
 ```
 
-数据卷：`paringbot_mysql_data`（数据库）、`paringbot_uploads`（上传文件）。
+数据卷：`paringbot_app_mysql_data`（demo 数据库）、`paringbot_eval_mysql_data`（eval 数据库）、`paringbot_app_uploads`（上传文件）。
 重建空库：`docker compose down -v && docker compose up -d --build`（会删除以上两个卷）。
 
 ## 7. 本地开发模式（不用 Docker）
 
 ```bash
-# 数据库：本机 MySQL 8，建库 paringbot 并导入 deploy/mysql/init/*.sql
+# 数据库：本机 MySQL 8，建库 paringbot 并导入 deploy/mysql/sql/base/*.sql（演示再加 sql/demo/*.sql）
 cd backend
 python -m venv .venv && . .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -124,3 +136,4 @@ docker compose down -v       # 连同数据卷一起删除（不可恢复）
 | 响应头 | nginx 统一加 `X-Content-Type-Options: nosniff`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy` |
 | 文件访问 | `/files/download/{文件名}` 仅放行合法文件路径；其它 `/files/*` 返回 404，不再落到 SPA 首页 |
 | 级联删除 | 删除账号时档案/偏好/动态/画像/匹配记录在同一事务内删除，文件清理在事务之后 |
+

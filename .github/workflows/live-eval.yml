@@ -1,59 +1,52 @@
 name: live-eval
 
-# 手动触发的真实模型评测：会真实消耗 DeepSeek token。
-# 使用前在仓库 Settings → Secrets and variables → Actions 配置 DEEPSEEK_API_KEY。
+# v3 冻结集真实模型评测（fail-closed）。
+# 首次使用：手动触发 mode=baseline -> 下载 artifact -> 人工提交 eval/frozen/v3/BASELINE.json；
+# 之后默认 mode=verify，交付回退/缺场景/缺成本/judge 缺失等会直接失败。
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: "baseline 或 verify"
+        required: true
+        default: "verify"
       trials:
         description: "每个场景 trial 次数"
         required: true
         default: "1"
-      scenarios:
-        description: "场景列表，逗号分隔（默认全部 20 个，含负向场景）"
-        required: true
-        default: "S1,S2,S3,S4,S5,S6,S7,S8,S9,S10,S11,S12,S13,S14,S15,S16,S17,S18,S19,S20"
-      min_precision:
-        description: "heuristic Precision@K 最低阈值"
-        required: true
-        default: "0.6"
-      warm_portraits:
-        description: "是否给本次交付候选补画像（会额外消耗 token）"
-        required: false
-        default: "false"
       price_input_per_m:
-        description: "输入 token 单价（每百万，0=不估算）"
+        description: "输入 token 单价（每百万，发布前必填）"
         required: false
-        default: "0"
+        default: ""
       price_output_per_m:
-        description: "输出 token 单价（每百万，0=不估算）"
+        description: "输出 token 单价（每百万，发布前必填）"
         required: false
-        default: "0"
+        default: ""
       max_tokens:
-        description: "本次评测 token 预算上限（0=不限制）"
+        description: "本次 token 预算上限（0=不限制）"
         required: false
-        default: "0"
-  # 每周一凌晨 02:00（Asia/Shanghai）跑一次 7 场景冒烟评测，带 token 预算。
-  # 如不想自动跑，删掉这个 schedule 即可。
+        default: "1500000"
   schedule:
-    - cron: '0 18 * * 0'
+    - cron: '0 18 * * 0'   # 每周一 02:00 Asia/Shanghai
+
 concurrency:
   group: live-eval
   cancel-in-progress: false
 
 jobs:
   live-eval:
-    name: live-eval
+    name: live-eval-v3
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
       APP_BASE: http://127.0.0.1:8080
+      MATCH_TIMEOUT_SECONDS: "600"
     steps:
       - uses: actions/checkout@v4
 
       - name: Prepare .env
         run: |
-          cat > .env <<'EOF'
+          cat > .env <<EOF
           MYSQL_ROOT_PASSWORD=ci-root-password
           MYSQL_DATABASE=paringbot
           MYSQL_USER=paringbot
@@ -61,7 +54,7 @@ jobs:
           JWT_SECRET=ci-only-jwt-secret-not-for-production
           APP_PORT=8080
           PUBLIC_BASE_URL=
-          MATCH_TIMEOUT_SECONDS=1200
+          MATCH_TIMEOUT_SECONDS=600
           MAX_UPLOAD_MB=5
           TZ=Asia/Shanghai
           LOGIN_MAX_FAILS=20
@@ -72,8 +65,8 @@ jobs:
           EOF
           sed -i 's/^[[:space:]]*//' .env
 
-      - name: Build and start stack
-        run: docker compose up -d --build
+      - name: Build and start eval stack
+        run: docker compose -f docker-compose.yml -f docker-compose.eval.yml up -d --build
 
       - name: Wait for API readiness
         run: |
@@ -87,7 +80,6 @@ jobs:
             sleep 5
           done
           echo "::error::ParingBot stack did not become ready in 10 minutes"
-          docker compose ps
           docker compose logs --tail=200
           exit 1
 
@@ -103,7 +95,6 @@ jobs:
       - name: Configure live models
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          TRIALS: ${{ github.event.inputs.trials || '1' }}
           RUN_LABEL: live-${{ github.run_id }}
         run: |
           cat > .env.eval <<EOF
@@ -113,63 +104,67 @@ jobs:
           EVAL_APP_BASE=${APP_BASE}
           EVAL_ADMIN_USERNAME=admin
           EVAL_ADMIN_PASSWORD=admin123
-          EVAL_MEMBER_USERNAME=member02
-          EVAL_MEMBER_PASSWORD=123456
+          EVAL_SUITE=v3
+          DB_PROFILE=eval
           EVAL_LABEL=${RUN_LABEL}
-          EVAL_TRIALS=${TRIALS}
+          EVAL_TRIALS=${{ github.event.inputs.trials || '1' }}
           EVAL_POLL_SECONDS=3
-          EVAL_MAX_WAIT_SECONDS=1200
+          EVAL_MAX_WAIT_SECONDS=650
           EOF
           sed -i 's/^[[:space:]]*//' .env.eval
           python eval/configure_models.py --env-file .env.eval
 
-      - name: Run selected scenarios
+      - name: Freeze check
+        run: python eval/check_freeze.py
+
+      - name: Run v3 matrix
         env:
           TRIALS: ${{ github.event.inputs.trials || '1' }}
-          SCENARIOS: ${{ github.event.inputs.scenarios || 'S1,S3,S5,S6,S14,S16,S20' }}
           RUN_LABEL: live-${{ github.run_id }}
         run: |
-          python eval/scenario_matrix.py --env-file .env.eval \
-            --only "$SCENARIOS" --trials "$TRIALS" \
+          python eval/run_matrix.py --suite v3 --trials "$TRIALS" \
             --label "$RUN_LABEL" --stamp "$RUN_LABEL"
 
-      - name: Warm delivered-candidate portraits
-        if: ${{ github.event.inputs.warm_portraits == 'true' }}
-        run: |
-          docker compose exec -T backend python - < eval/warm_eval_portraits.py
-
       - name: Build quality bundle
-        run: |
-          docker compose exec -T backend python - < eval/build_quality_bundle.py > quality-bundle.json
-
-      - name: Refresh golden labels and consensus
-        run: |
-          docker compose exec -T backend python - < eval/refresh_golden_labels.py > eval/golden/matching_labels.json
-          python eval/calibrate_golden.py --bundle quality-bundle.json \
-            --consensus-out eval/golden/consensus_labels.json
-
-      - name: Scenario variance report
-        run: |
-          python eval/scenario_variance.py --reports eval/reports \
-            --out scenario-variance.md --json scenario-variance.json
-
-      - name: Holdout quality gate
-        run: |
-          python eval/holdout_gate.py --reports eval/reports \
-            --out holdout-gate.md --json holdout-gate.json
-
-      - name: Regression + safety report
         env:
-          MIN_PRECISION: ${{ github.event.inputs.min_precision || '0.6' }}
-          MAX_TOKENS: ${{ github.event.inputs.max_tokens || '1500000' }}
+          GIT_COMMIT: ${{ github.sha }}
+          EVAL_SUITE: v3
+          DB_PROFILE: eval
+          LABELS_HASH: ${{ hashFiles('eval/frozen/v3/labels.json') }}
+          SCENARIOS_HASH: ${{ hashFiles('eval/frozen/v3/scenarios.json') }}
+        run: docker compose exec -T backend python - < eval/build_bundle.py > quality-bundle.json
+
+      - name: Optional independent judge
+        env:
+          EVAL_JUDGE_API_KEY: ${{ secrets.EVAL_JUDGE_API_KEY }}
+        run: |
+          if [ -z "$EVAL_JUDGE_API_KEY" ]; then
+            echo "未配置 EVAL_JUDGE_API_KEY，跳过独立 judge（发布前必须补）"
+          else
+            printf '\nEVAL_JUDGE_PROVIDER=%s\nEVAL_JUDGE_BASE_URL=%s\nEVAL_JUDGE_API_KEY=%s\nEVAL_JUDGE_MODEL=%s\n' \
+              "${{ secrets.EVAL_JUDGE_PROVIDER }}" "${{ secrets.EVAL_JUDGE_BASE_URL }}" \
+              "$EVAL_JUDGE_API_KEY" "${{ secrets.EVAL_JUDGE_MODEL }}" >> .env.eval
+            python eval/judge.py --bundle quality-bundle.json --mode pointwise \
+              --sample-not-delivered 8 --out judge-report.md --json judge-report.json || true
+          fi
+
+      - name: Report + gates
+        env:
+          MODE: ${{ github.event.inputs.mode || 'verify' }}
           PRICE_IN: ${{ github.event.inputs.price_input_per_m }}
           PRICE_OUT: ${{ github.event.inputs.price_output_per_m }}
+          MAX_TOKENS: ${{ github.event.inputs.max_tokens || '1500000' }}
         run: |
-          python eval/regression_report.py --bundle quality-bundle.json \
-            --out regression-report.md --json regression-report.json \
-            --min-precision "$MIN_PRECISION" --min-consensus 0.6 \
-            --max-total-tokens "${MAX_TOKENS:-0}" \
-            --price-input-per-m "${PRICE_IN:-0}" --price-output-per-m "${PRICE_OUT:-0}"
+          EXTRA=()
+          if [ -n "$PRICE_IN" ] && [ -n "$PRICE_OUT" ]; then
+            EXTRA+=(--price-input-per-m "$PRICE_IN" --price-output-per-m "$PRICE_OUT" --require-cost)
+          fi
+          python eval/report.py --bundle quality-bundle.json --matrix eval/reports \
+            --labels eval/frozen/v3/labels.json \
+            --scenarios eval/frozen/v3/scenarios.json \
+            --manifest eval/frozen/v3/MANIFEST.json \
+            --mode "$MODE" --max-tokens "${MAX_TOKENS:-0}" --baseline-out v3-baseline.json \
+            "${EXTRA[@]}" --out regression-report.md --json regression-report.json
           python eval/safety_checks.py --bundle quality-bundle.json \
             --out safety-report.md --json safety-report.json
 
@@ -177,7 +172,7 @@ jobs:
         if: failure()
         run: docker compose logs --tail=300
 
-      - name: Upload live-eval artifacts
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -185,13 +180,13 @@ jobs:
           path: |
             regression-report.md
             regression-report.json
+            quality-bundle.json
             safety-report.md
             safety-report.json
-            quality-bundle.json
-            scenario-variance.md
-            scenario-variance.json
-            holdout-gate.md
-            holdout-gate.json
+            judge-report.md
+            judge-report.json
+            v3-baseline.json
             eval/reports
+            eval/frozen/v3/*.json
           if-no-files-found: ignore
           retention-days: 14

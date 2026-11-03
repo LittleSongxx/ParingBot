@@ -41,40 +41,30 @@ jobs:
       - name: Import seed database
         run: |
           until mysqladmin ping -h127.0.0.1 -uroot -proot --silent; do sleep 2; done
-          for f in deploy/mysql/init/*.sql; do
+          for f in deploy/mysql/sql/base/*.sql deploy/mysql/sql/demo/*.sql; do
             echo "import $f"
             mysql -h127.0.0.1 -uroot -proot paringbot < "$f"
           done
       - name: pytest
         working-directory: backend
         run: pytest -q
-      - name: AI 能力评测（Phase 0 fixtures）
+      - name: Eval 单测与冻结守卫
         run: |
-          python eval/run_eval.py --fixtures --bad eval/fixtures/bad
-          python eval/quality_checks.py --bundle eval/fixtures/quality_bundle_sample.json
-          python eval/golden_matching.py --bundle eval/fixtures/quality_bundle_sample.json
-          python eval/golden_matching.py --bundle eval/fixtures/quality_bundle_sample.json \
-            --labels eval/golden/consensus_labels.json --min-precision 0.7
-          python eval/regression_report.py --bundle eval/fixtures/quality_bundle_sample.json \
-            --out /tmp/regression-report.md --json /tmp/regression-report.json \
-            --min-precision 0.7 --min-consensus 0.7
-          python eval/safety_checks.py --bundle eval/fixtures/quality_bundle_sample.json
-          if python eval/safety_checks.py --bundle eval/fixtures/safety_bundle_bad.json; then
-            echo "安全自检 fixture 应报错但没有报错"; exit 1
-          fi
-          python -m py_compile eval/configure_models.py eval/run_live_eval.py eval/quality_checks.py \
-            eval/golden_matching.py eval/calibrate_golden.py eval/build_quality_bundle.py eval/regression_report.py eval/safety_checks.py eval/ndcg.py eval/refresh_golden_labels.py eval/independent_judge.py eval/holdout_gate.py eval/warm_eval_portraits.py
+          python -m unittest discover -s eval/tests -v
+          python -m compileall -q eval
+          python eval/check_freeze.py
+          python eval/phase0/run_eval.py --fixtures --bad eval/phase0/fixtures/bad
 
-      - name: Upload regression report
-        if: always()
-        uses: actions/upload-artifact@v4
+  freeze-guard:
+    name: freeze-guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          name: regression-report
-          path: |
-            /tmp/regression-report.md
-            /tmp/regression-report.json
-          if-no-files-found: ignore
-          retention-days: 7
+          python-version: "3.13"
+      - name: validate v3 frozen set and eval profile
+        run: python eval/check_freeze.py
 
   frontend:
     runs-on: ubuntu-latest
@@ -184,3 +174,4 @@ jobs:
             e2e/test-results
           if-no-files-found: ignore
           retention-days: 7
+

@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/MySQL-8-4479A1?style=flat-square&logo=mysql&logoColor=white" />
   <img src="https://img.shields.io/badge/Vue-3.4-4FC08D?style=flat-square&logo=vuedotjs&logoColor=white" />
   <img src="https://img.shields.io/badge/Docker%20Compose-3%20services-2496ED?style=flat-square&logo=docker&logoColor=white" />
-  <img src="https://img.shields.io/badge/tests-360%20passed-2ea44f?style=flat-square" />
+  <img src="https://img.shields.io/badge/tests-CI%20gate-2ea44f?style=flat-square" />
 </p>
 
 <p align="center">
@@ -90,7 +90,7 @@
 | **代码复核会翻案** | 模型判「通过」后，代码按候选方标为必须的条件复核申请方；验不过（含同性硬规则）的候选当场改判否决，而不是只写一条备注。 |
 | **每一步可复盘** | `agent_run` / `agent_step` / `tool_call_log` 三张账本；调度时间线 + 候选漏斗；异常一律翻译成「去哪个页面改哪一项」。 |
 | **配置中台** | 模型、Prompt、角色、工具、7 项闸门参数全部入库，运行时现查、改完下一步生效；停用一个工具，模型手里真的没有它。 |
-| **可部署、可测试** | Docker Compose 三服务（MySQL + FastAPI + Nginx/Vue）；266 条原有用例 + 新增回归共 **360 条**，AI 流程用 FakeModel 回放，不需要真实 API Key。 |
+| **可部署、可测试** | Docker Compose 三服务（MySQL + FastAPI + Nginx/Vue）；后端 pytest 全量用例以 CI 为准，AI 流程用 FakeModel 回放，不需要真实 API Key。 |
 
 ## 架构
 
@@ -118,7 +118,7 @@ paringbot/
 │   ├── models/             16 张表的 ORM 定义
 │   └── tests/              pytest（FakeModel 回放，免 API Key）
 ├── frontend/               Vue 3 + Vite + Element Plus（31 个页面）
-├── deploy/mysql/           MySQL 镜像与种子 SQL
+├── deploy/mysql/           MySQL 镜像与种子 SQL（base / demo / eval profiles）
 ├── docker-compose.yml      三服务编排
 ├── docs/                   架构、运维、截图
 └── scripts/                种子生成、部署冒烟
@@ -166,22 +166,25 @@ docker compose logs --tail=100 backend
 # 部署冒烟：健康检查 / 管理员登录 / 权限 / 租客登录 / 上传鉴权 / 路径穿越
 python scripts/smoke_check.py --base http://127.0.0.1:8080
 
-# 后端全量测试：真实 MySQL + FakeModel，不需要模型 API Key
+# 后端全量测试：真实 MySQL + FakeModel，不需要模型 API Key（数量以 CI 输出为准）
 docker compose exec -T backend pytest -q
-# -> 360 passed
 
-# AI 能力评测（Phase 0）：40 条 golden case + 坏输出自检，不需要模型 Key
-python eval/run_eval.py --fixtures --bad eval/fixtures/bad
+# 评测工具单测 + 冻结集守护（不连 DB/模型）
+python -m unittest discover -s eval/tests -v
+python eval/check_freeze.py
+
+# Phase 0 schema 自检（资料教练/解读官尚未实现，非质量证据）
+python eval/phase0/run_eval.py --fixtures --bad eval/phase0/fixtures/bad
 
 # 前端构建（镜像构建阶段已执行 npm ci + vite build）
 docker compose build web
 ```
 
-当前基线：**360 项后端测试，0 失败**（2026-10-30，本机 Docker Compose 栈内实测）。测试数量来自 `pytest -q` 尾行统计；AI 相关用例用 FakeModel 按脚本回放，不依赖真实模型。
+测试通过数以 CI 输出为准；AI 相关用例用 FakeModel 按脚本回放，不依赖真实模型。
 
 ## 实测与边界
 
-这些数字只代表本机 Docker Desktop 与仓库内演示数据，不是生产容量或 SLA：
+以下均为 demo profile 的演示数据，**不是质量结论**；真实质量结论必须走 v3 冻结集（见 eval/RESULTS.md）：
 
 - **两条演示运行记录（种子库内置，已按当前口径迁移）**：8 轮调度 / 84 次工具调用 / 82.3 秒 / 33 个候选 → 4 通过、29 否决 → 交付 4（要求 8）；4 轮 / 39 次调用 / 50.3 秒 / 15 个候选 → 7 通过、8 否决 → 交付 7（要求 8）。迁移时把与当前硬规则冲突的历史「通过」（异性候选、复核不满足必须项）改判否决并重写了运行总结，页面、漏斗、交付数字现在是自洽的。
 - **演示库**：900 位租客（男女各 450、20 家门店）、2,500 条动态、80 个兴趣标签、2 条演示运行记录；历史数据已按当前口径迁移，新发起的匹配同样走修复后的硬校验。
@@ -203,15 +206,16 @@ docker compose build web
 - 部署、配置与故障处理：[docs/operations.md](docs/operations.md)
 - 部署冒烟脚本：[scripts/smoke_check.py](scripts/smoke_check.py)
 - 种子库生成说明：[scripts/prepare_seed.py](scripts/prepare_seed.py)
-- AI 能力评测（Phase 0）：[eval/README.md](eval/README.md)
-- 真实模型评测指南（Key/模型怎么填、怎么跑）：[eval/RUNBOOK.md](eval/RUNBOOK.md)
-- 真实模型评测结果（DeepSeek / Qwen 对比）：[eval/RESULTS.md](eval/RESULTS.md)
+- 评测体系与冻结集：[eval/README.md](eval/README.md)
+- 评测运行手册（环境/基线/judge/人工评估）：[eval/RUNBOOK.md](eval/RUNBOOK.md)
+- 当前评测状态（无质量结论，历史数字已作废）：[eval/RESULTS.md](eval/RESULTS.md)
 - 前端 Playwright 冒烟：[e2e/README.md](e2e/README.md)
 - 发布前质量检查单：[docs/release-checklist.md](docs/release-checklist.md)
-- 真实模型评测工作流：`.github/workflows/live-eval.yml`（手动触发，需 DEEPSEEK_API_KEY secret）
-- 自动质量检查（硬规则/汇总一致性/证据覆盖）：[eval/quality_checks.py](eval/quality_checks.py)
-- Golden 匹配质量指标（Precision@K / Recall@K）：[eval/golden_matching.py](eval/golden_matching.py)
+- 真实模型评测工作流：`.github/workflows/live-eval.yml`（v3 冻结集；手动触发，需 DEEPSEEK_API_KEY secret）
+- 评测报告与门禁：[eval/report.py](eval/report.py)
+- 质量政策（冻结/oracle/变更纪律/对外口径）：[docs/quality-policy.md](docs/quality-policy.md)
 
 ## 截图
 
 全部页面截图在 [`docs/assets/screenshots/`](docs/assets/screenshots/)：登录、租客端首页/档案/智能匹配/候选结果/审核结果/画像结果、管理端首页/调度时间线/工具中心/用户管理，均由本机 Docker Compose 栈（1440×900）实时截取；前端视觉规范见 [`docs/frontend-style.md`](docs/frontend-style.md)。
+
