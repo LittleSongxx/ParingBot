@@ -217,7 +217,7 @@ def configure(rows: list[dict], env: dict, test: bool) -> None:
     print("\n写入结果：")
     for item in results:
         print(f"  {item['purpose']:<4} config_id={item['config_id']} model={item['model']} test={item['test']}")
-    print("\n下一步：python eval/run_live_eval.py")
+    print("\n下一步：python eval/run_matrix.py --suite v3 --trials 1")
     if any("失败" in str(item["test"]) for item in results):
         print("有连接测试失败：请核对 base_url/model，或先用管理端【AI模型配置】手工测试。")
         raise SystemExit(1)

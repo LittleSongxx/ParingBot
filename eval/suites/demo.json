@@ -1,0 +1,991 @@
+{
+ "version": 1,
+ "suite": "demo",
+ "scenarios": [
+  {
+   "key": "S1",
+   "account": "member02",
+   "reuse": true,
+   "trials": 3,
+   "run": true,
+   "title": "短租（3个月以下）基线",
+   "expect": "可运行并交付（池内已补短租候选）",
+   "why": "演示账号禾瑾：女/26/4000 元/整洁/3个月以下/张江店；偏好必须项=年龄 23-30 + 作息",
+   "profile": null,
+   "preference": null,
+   "moments": []
+  },
+  {
+   "key": "S2",
+   "account": "TEST_SCENARIO_LONG12",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "长租 1-2 年",
+   "expect": "可运行；候选多为中长租",
+   "why": "租期另一侧：女/28/3600 元/整洁/1-2年/中山北路店(20)；偏好租期下限 1-2 年（加分）",
+   "profile": {
+    "nickname": "沈知远",
+    "gender": "女",
+    "birth_date": "1997-06-12",
+    "rent_budget": 3600,
+    "tidiness": "整洁",
+    "occupation": "产品经理",
+    "lease_term": "1-2年",
+    "store_id": 20,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "在中山北路一带做产品经理，打算长住一年以上。作息比较规律，十二点半前睡。周末喜欢在家做饭、看纪录片，公共区域用完会收拾干净。不吸烟，也没有养宠物。",
+    "roommate_expectation": "希望室友作息规律、爱干净，能接受偶尔一起做饭；希望长租，别住几个月就搬，尽量在同一家门店附近。",
+    "interest_tags": [
+     "看电影",
+     "看纪录片"
+    ]
+   },
+   "preference": {
+    "age_min": 25,
+    "age_max": 33,
+    "age_required": "必须",
+    "budget_min": 3000,
+    "budget_max": 4200,
+    "budget_required": "加分",
+    "tidiness_min": "整洁",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "加分",
+    "schedule_accept": [
+     "正常作息",
+     "早睡早起"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "1-2年",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "这个月开始认真看长租的房子，打算至少住一年，不想再折腾搬家了。",
+    "周末在家做了三菜一汤，厨房擦得比较干净，锅具都归位了。"
+   ]
+  },
+  {
+   "key": "S3",
+   "account": "TEST_SCENARIO_LONG2Y",
+   "reuse": false,
+   "trials": 2,
+   "run": true,
+   "title": "长租 2 年以上",
+   "expect": "可运行；验证长租另一端与交付稳定性",
+   "why": "男/31/3200 元/一般/2年以上/中山北路店(20)；夜猫子、预算与年龄都设必须项",
+   "profile": {
+    "nickname": "程亦舟",
+    "gender": "男",
+    "birth_date": "1994-09-03",
+    "rent_budget": 3200,
+    "tidiness": "一般",
+    "occupation": "后端工程师",
+    "lease_term": "2年以上",
+    "store_id": 20,
+    "schedule_type": "夜猫子",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "程序员，在中山北路附近上班，准备长租两年以上。加班比较多，通常一两点睡，早上起得晚，晚上会在客厅敲会儿键盘但戴耳机。东西不算特别整齐，但不会堆垃圾。",
+    "roommate_expectation": "希望室友能接受晚睡晚起的作息，晚上别太吵；长租优先，至少一年以上。",
+    "interest_tags": [
+     "主机游戏",
+     "听音乐"
+    ]
+   },
+   "preference": {
+    "age_min": 26,
+    "age_max": 36,
+    "age_required": "必须",
+    "budget_min": 2800,
+    "budget_max": 4000,
+    "budget_required": "必须",
+    "tidiness_min": "一般",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "加分",
+    "schedule_accept": [
+     "夜猫子",
+     "正常作息"
+    ],
+    "schedule_required": "加分",
+    "lease_min": "2年以上",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "连着加了一周班，回来基本就是洗漱睡觉，客厅灯都懒得开。",
+    "打算在这儿长住两年，把显示器和椅子都搬过来了。"
+   ]
+  },
+  {
+   "key": "S4",
+   "account": "TEST_SCENARIO_PET",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "养宠（has_pet=有）",
+   "expect": "可运行；候选需接受室友养宠",
+   "why": "女/27/3500 元/一般/6-12个月/桃浦店(19)；养猫，偏好里「接受」室友养宠",
+   "profile": {
+    "nickname": "林小满",
+    "gender": "女",
+    "birth_date": "1998-03-18",
+    "rent_budget": 3500,
+    "tidiness": "一般",
+    "occupation": "幼儿园老师",
+    "lease_term": "6-12个月",
+    "store_id": 19,
+    "schedule_type": "正常作息",
+    "has_pet": "有",
+    "smoking": "不吸烟",
+    "self_intro": "在幼儿园当老师，养了一只三岁的橘猫叫「团子」，很乖、已绝育、会自己用猫砂盆。作息正常，十一点睡，周末会打扫一遍房间。猫不进屋乱翻，但掉毛是没办法的事。",
+    "roommate_expectation": "希望室友不排斥猫，能接受偶尔有猫毛；如果不喜欢猫提前说，我可以把猫留在自己房间。希望作息规律，公共区域一起保持干净。",
+    "interest_tags": [
+     "养猫",
+     "撸猫"
+    ]
+   },
+   "preference": {
+    "age_min": 24,
+    "age_max": 33,
+    "age_required": "必须",
+    "budget_min": 3000,
+    "budget_max": 4200,
+    "budget_required": "加分",
+    "tidiness_min": "一般",
+    "tidiness_required": "加分",
+    "store_scope": "同片区",
+    "store_required": "加分",
+    "schedule_accept": [
+     "正常作息",
+     "早睡早起"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "6-12个月",
+    "lease_required": "加分",
+    "pet_accept": "接受",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "团子今天把我的毛线球拆了，收拾了半天，猫倒是睡得很香。",
+    "周末给猫砂盆彻底换了一遍，房间也拖了地，闻不到味道。",
+    "带团子去打了疫苗，医生说体重很标准。"
+   ]
+  },
+  {
+   "key": "S5",
+   "account": "TEST_SCENARIO_SMOKE",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "吸烟（偶尔）+ 期望不在屋里抽",
+   "expect": "可运行；审核官需按「吸烟偶尔」与室友期望双向判断",
+   "why": "男/29/3300 元/整洁/6-12个月/真如店(18)；smoking=偶尔，自述只在阳台抽",
+   "profile": {
+    "nickname": "许明川",
+    "gender": "男",
+    "birth_date": "1996-11-07",
+    "rent_budget": 3300,
+    "tidiness": "整洁",
+    "occupation": "销售",
+    "lease_term": "6-12个月",
+    "store_id": 18,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "偶尔",
+    "self_intro": "做销售的，应酬多，烟瘾不重，一周抽两三根，只在阳台抽、开窗、烟头自己收。屋里从来不抽。作息比较正常，十二点前睡，房间保持整洁。",
+    "roommate_expectation": "希望室友不在屋里抽烟，阳台可以；如果室友完全不吸烟更好，我不会把烟味带进屋。希望作息规律、爱干净。",
+    "interest_tags": [
+     "看电影",
+     "听音乐"
+    ]
+   },
+   "preference": {
+    "age_min": 25,
+    "age_max": 35,
+    "age_required": "必须",
+    "budget_min": 2800,
+    "budget_max": 4000,
+    "budget_required": "加分",
+    "tidiness_min": "整洁",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "加分",
+    "schedule_accept": [
+     "正常作息"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "6-12个月",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "应酬完回来有点晚，在阳台抽了一根才进屋，怕把烟味带进客厅。",
+    "把阳台的烟灰缸洗了，窗台也擦了，屋里闻不出味道。"
+   ]
+  },
+  {
+   "key": "S6",
+   "account": "TEST_SCENARIO_BUDGET",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "预算偏紧（2500-2800）",
+   "expect": "可运行；验证预算两端偏紧时候选是否够",
+   "why": "女/25/2500 元/一般/3-6个月/张江店(1)；偏好预算 2500-2800 设为必须项",
+   "profile": {
+    "nickname": "周清和",
+    "gender": "女",
+    "birth_date": "2000-08-22",
+    "rent_budget": 2500,
+    "tidiness": "一般",
+    "occupation": "客服专员",
+    "lease_term": "3-6个月",
+    "store_id": 1,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "在张江做客服，刚换工作，预算比较紧，能接受 2500 左右的房间。作息正常，平时不太做饭，主要点外卖，公共区域用完会收拾。不吸烟、不养宠物。",
+    "roommate_expectation": "希望房租别太贵，预算 2600 以内；希望室友作息正常、爱干净，晚上别太吵。",
+    "interest_tags": [
+     "追剧",
+     "听音乐"
+    ]
+   },
+   "preference": {
+    "age_min": 22,
+    "age_max": 30,
+    "age_required": "必须",
+    "budget_min": 2500,
+    "budget_max": 2800,
+    "budget_required": "必须",
+    "tidiness_min": "一般",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "加分",
+    "schedule_accept": [
+     "正常作息",
+     "早睡早起"
+    ],
+    "schedule_required": "加分",
+    "lease_min": "3-6个月",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "刚换工作，工资还没发，这个月基本靠外卖凑合，预算得省着点。",
+    "下班回来把房间收拾了一遍，东西不多，好归置。"
+   ]
+  },
+  {
+   "key": "S7",
+   "account": "TEST_SCENARIO_FARSTORE",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "跨区/远门店（store_id=20 中山北路店）",
+   "expect": "可运行；验证同门店硬范围下的候选供给",
+   "why": "男/30/3000 元/整洁/6-12个月/中山北路店(20)；门店范围设必须「同门店」",
+   "profile": {
+    "nickname": "顾承泽",
+    "gender": "男",
+    "birth_date": "1995-05-14",
+    "rent_budget": 3000,
+    "tidiness": "整洁",
+    "occupation": "物流主管",
+    "lease_term": "6-12个月",
+    "store_id": 20,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "在物流公司做主管，常驻中山北路店附近，通勤骑车十分钟。作息正常，爱干净，公共区域会主动打扫。不吸烟、不养宠物，周末偶尔做顿饭。",
+    "roommate_expectation": "希望就在中山北路店附近，通勤方便；希望室友作息正常、干净，别半夜吵闹。",
+    "interest_tags": [
+     "看电影",
+     "看纪录片"
+    ]
+   },
+   "preference": {
+    "age_min": 26,
+    "age_max": 35,
+    "age_required": "必须",
+    "budget_min": 2800,
+    "budget_max": 4000,
+    "budget_required": "加分",
+    "tidiness_min": "整洁",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "必须",
+    "schedule_accept": [
+     "正常作息"
+    ],
+    "schedule_required": "加分",
+    "lease_min": "6-12个月",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "搬到中山北路这边上班，通勤十分钟，想就近找房子。",
+    "周末把公共区域拖了一遍，垃圾桶也倒了。"
+   ]
+  },
+  {
+   "key": "S8",
+   "account": "TEST_SCENARIO_NOMOMENT",
+   "reuse": false,
+   "trials": 0,
+   "run": false,
+   "title": "档案不完整：有档案/偏好、无动态",
+   "expect": "readiness 在「租客动态」阻断，不调用模型",
+   "why": "档案与偏好都完整，故意不发动态；验证 moment 检查与 /match/rerun 拒绝",
+   "profile": {
+    "nickname": "苏念安",
+    "gender": "女",
+    "birth_date": "1999-12-01",
+    "rent_budget": 3400,
+    "tidiness": "整洁",
+    "occupation": "会计",
+    "lease_term": "6-12个月",
+    "store_id": 5,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "在漕河泾做会计，作息正常、爱干净，不吸烟不养宠物，周末一般在家看书。",
+    "roommate_expectation": "希望室友作息规律、干净，最好同门店通勤。",
+    "interest_tags": []
+   },
+   "preference": {
+    "age_min": 23,
+    "age_max": 32,
+    "age_required": "必须",
+    "budget_min": 3000,
+    "budget_max": 4000,
+    "budget_required": "加分",
+    "tidiness_min": "整洁",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "加分",
+    "schedule_accept": [
+     "正常作息"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "不限",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [],
+   "probe_rerun": true
+  },
+  {
+   "key": "S9",
+   "account": "TEST_SCENARIO_NOPROFILE",
+   "reuse": false,
+   "trials": 0,
+   "run": false,
+   "title": "档案不完整：只注册、无任何档案",
+   "expect": "readiness 在「租客档案」阻断，不调用模型",
+   "why": "只有账号，profile/preference/moment 全空；验证第一项检查与 /match/rerun 拒绝",
+   "profile": null,
+   "preference": null,
+   "moments": [],
+   "probe_rerun": true
+  },
+  {
+   "key": "S10",
+   "account": "TEST_SCENARIO_LEASEPOOL",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "池中无可用候选（租期看似兼容、硬筛后为空）",
+   "expect": "预期 readiness lease_pool 阻断；实际以运行结果为准",
+   "why": "男/34/2年以上/中山北路店(20)，年龄必须项设 18-18 岁（种子池最小 22 岁）→ 硬筛必空",
+   "profile": {
+    "nickname": "邵怀瑾",
+    "gender": "男",
+    "birth_date": "1992-02-09",
+    "rent_budget": 3400,
+    "tidiness": "整洁",
+    "occupation": "法务顾问",
+    "lease_term": "2年以上",
+    "store_id": 20,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "做法务顾问，准备在中山北路长租两年以上。作息正常，房间整洁，不吸烟不养宠物。",
+    "roommate_expectation": "希望室友年龄跟我差不多、作息正常、干净，长租优先。",
+    "interest_tags": []
+   },
+   "preference": {
+    "age_min": 18,
+    "age_max": 18,
+    "age_required": "必须",
+    "budget_min": 3000,
+    "budget_max": 4500,
+    "budget_required": "加分",
+    "tidiness_min": "整洁",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "必须",
+    "schedule_accept": [
+     "正常作息"
+    ],
+    "schedule_required": "加分",
+    "lease_min": "2年以上",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "最近在对比中山北路附近的长租房源，打算一次签两年。"
+   ]
+  },
+  {
+   "key": "S11",
+   "account": "TEST_SCENARIO_LEASEHARD",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "租期硬冲突（申请方短租、候选必须 2 年以上）",
+   "expect": "候选能找到但都被租期硬规则否决，最终 0 交付",
+   "why": "女/26/3个月以下/张江店(1)，偏好「最短租期 2 年以上」设必须 → 档位差 4 ≥2 全否决",
+   "profile": {
+    "nickname": "孟抒宜",
+    "gender": "女",
+    "birth_date": "1999-04-25",
+    "rent_budget": 3800,
+    "tidiness": "整洁",
+    "occupation": "新媒体运营",
+    "lease_term": "3个月以下",
+    "store_id": 1,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "做新媒体运营，近期是过渡期，先住两三个月看看。作息正常、爱干净，不吸烟不养宠物。",
+    "roommate_expectation": "希望室友作息规律、爱干净，租期能长一点更稳定。",
+    "interest_tags": [
+     "追剧",
+     "看电影"
+    ]
+   },
+   "preference": {
+    "age_min": 25,
+    "age_max": 35,
+    "age_required": "必须",
+    "budget_min": 3200,
+    "budget_max": 4800,
+    "budget_required": "加分",
+    "tidiness_min": "整洁",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "加分",
+    "schedule_accept": [
+     "正常作息"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "2年以上",
+    "lease_required": "必须",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "这两个月先找个过渡的房子，行李不多，随时能搬。"
+   ]
+  },
+  {
+   "key": "S12",
+   "account": "TEST_SCENARIO_OLDER35",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "35 岁女性 / 长租 1-2 年",
+   "expect": "可运行；验证偏大年龄与长租组合",
+   "why": "女/35/4200 元/整洁/1-2年/商城店(5)；年龄 30-40 必须、同门店加分",
+   "profile": {
+    "nickname": "苏晚晴",
+    "gender": "女",
+    "birth_date": "1991-02-14",
+    "rent_budget": 4200,
+    "tidiness": "整洁",
+    "occupation": "财务主管",
+    "lease_term": "1-2年",
+    "store_id": 5,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "在商城店附近做财务主管，工作稳定，计划长租一到两年。作息规律，平时自己做饭，公共区域保持干净。不吸烟、不养宠物，周末喜欢看展。",
+    "roommate_expectation": "希望室友成熟稳定、作息规律，长租优先；最好同门店，公共区域随手收拾。",
+    "interest_tags": [
+     "看展",
+     "下厨"
+    ]
+   },
+   "preference": {
+    "age_min": 30,
+    "age_max": 40,
+    "age_required": "必须",
+    "budget_min": 3000,
+    "budget_max": 5000,
+    "budget_required": "加分",
+    "tidiness_min": "整洁",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "加分",
+    "schedule_accept": [
+     "正常作息",
+     "早睡早起"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "1-2年",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "最近在对比长租合同，打算一次签一年半，省得搬家。",
+    "周末做了顿晚饭，厨房收拾干净才出门。"
+   ]
+  },
+  {
+   "key": "S13",
+   "account": "TEST_SCENARIO_YOUNG24",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "24 岁男性 / 短租 3-6 个月",
+   "expect": "可运行；验证年轻租客与短中租",
+   "why": "男/24/2800 元/一般/3-6个月/金桥店(2)；预算 2500-3200 必须",
+   "profile": {
+    "nickname": "陆星野",
+    "gender": "男",
+    "birth_date": "2002-01-09",
+    "rent_budget": 2800,
+    "tidiness": "一般",
+    "occupation": "助理工程师",
+    "lease_term": "3-6个月",
+    "store_id": 2,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "刚毕业做助理工程师，在张江附近上班，计划先住三到六个月。作息正常，东西不算整齐但会定期收拾，平时点外卖为主。不吸烟、不养宠物。",
+    "roommate_expectation": "希望室友作息正常、好相处；预算有限，尽量在 3200 以内，短租优先。",
+    "interest_tags": [
+     "手游",
+     "篮球"
+    ]
+   },
+   "preference": {
+    "age_min": 22,
+    "age_max": 30,
+    "age_required": "必须",
+    "budget_min": 2200,
+    "budget_max": 3200,
+    "budget_required": "必须",
+    "tidiness_min": "一般",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "加分",
+    "schedule_accept": [
+     "正常作息",
+     "夜猫子"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "3-6个月",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "刚入职，先找个短租过渡，东西不多。",
+    "周末打球回来洗了衣服，房间简单收拾了一下。"
+   ]
+  },
+  {
+   "key": "S14",
+   "account": "TEST_SCENARIO_SMOKESHORT",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "29 岁男性 / 短租 + 偶尔吸烟",
+   "expect": "可运行；验证吸烟与短租组合",
+   "why": "男/29/3500 元/整洁/3个月以下/唐镇店(3)；偶尔吸烟，偏好同门店",
+   "profile": {
+    "nickname": "周野",
+    "gender": "男",
+    "birth_date": "1996-04-21",
+    "rent_budget": 3500,
+    "tidiness": "整洁",
+    "occupation": "销售",
+    "lease_term": "3个月以下",
+    "store_id": 3,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "偶尔",
+    "self_intro": "做销售，经常在外面跑，计划先住三个月看看。作息正常，偶尔抽烟但只在楼下。比较爱干净，公共区域用完会收拾。不养宠物。",
+    "roommate_expectation": "希望室友不介意偶尔抽烟（只在楼下），作息正常、爱干净，尽量同门店。",
+    "interest_tags": [
+     "跑步",
+     "看电影"
+    ]
+   },
+   "preference": {
+    "age_min": 25,
+    "age_max": 35,
+    "age_required": "必须",
+    "budget_min": 2800,
+    "budget_max": 4500,
+    "budget_required": "加分",
+    "tidiness_min": "整洁",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "加分",
+    "schedule_accept": [
+     "正常作息",
+     "早睡早起"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "3个月以下",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "最近跑客户比较多，先短租三个月，稳定了再看。",
+    "下班回来把客厅拖了一遍，烟都在楼下抽。"
+   ]
+  },
+  {
+   "key": "S15",
+   "account": "TEST_SCENARIO_PETLONG",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "32 岁女性 / 长租 + 养宠",
+   "expect": "可运行；验证长租、养宠与候选接受度",
+   "why": "女/32/4500 元/整洁/2年以上/松江店(8)；养猫，偏好接受室友养宠",
+   "profile": {
+    "nickname": "沈清溪",
+    "gender": "女",
+    "birth_date": "1993-07-30",
+    "rent_budget": 4500,
+    "tidiness": "整洁",
+    "occupation": "建筑设计",
+    "lease_term": "2年以上",
+    "store_id": 8,
+    "schedule_type": "正常作息",
+    "has_pet": "有",
+    "smoking": "不吸烟",
+    "self_intro": "做建筑设计，在松江店附近长住，养了一只安静的猫。作息正常，爱干净，在家办公的时候比较多。不吸烟，希望室友能接受猫。",
+    "roommate_expectation": "希望室友接受我养猫、作息正常、爱干净；长租优先，最好同门店。",
+    "interest_tags": [
+     "养猫",
+     "看电影"
+    ]
+   },
+   "preference": {
+    "age_min": 28,
+    "age_max": 40,
+    "age_required": "必须",
+    "budget_min": 3500,
+    "budget_max": 5200,
+    "budget_required": "加分",
+    "tidiness_min": "整洁",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "加分",
+    "schedule_accept": [
+     "正常作息",
+     "夜猫子"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "2年以上",
+    "lease_required": "加分",
+    "pet_accept": "接受",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "猫最近掉毛厉害，每天都要吸一遍地。",
+    "准备在松江长住两年，正在看合同。"
+   ]
+  },
+  {
+   "key": "S16",
+   "account": "TEST_SCENARIO_NIGHTOWL",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "26 岁女性 / 夜猫子",
+   "expect": "可运行；验证作息必须是夜猫子的匹配",
+   "why": "女/26/4200 元/一般/6-12个月/虹桥店(12)；作息必须接受夜猫子",
+   "profile": {
+    "nickname": "林夜",
+    "gender": "女",
+    "birth_date": "1999-11-03",
+    "rent_budget": 4200,
+    "tidiness": "一般",
+    "occupation": "新媒体运营",
+    "lease_term": "6-12个月",
+    "store_id": 12,
+    "schedule_type": "夜猫子",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "做新媒体，晚上经常剪片子到一两点，早上起得晚。作息偏夜猫子，但不吵，戴耳机工作。东西一般整齐，周末集中收拾。不吸烟、不养宠物。",
+    "roommate_expectation": "希望室友能接受我晚睡晚起，不要早上太早弄出大动静；同门店加分。",
+    "interest_tags": [
+     "摄影",
+     "听音乐"
+    ]
+   },
+   "preference": {
+    "age_min": 23,
+    "age_max": 33,
+    "age_required": "必须",
+    "budget_min": 3200,
+    "budget_max": 5000,
+    "budget_required": "加分",
+    "tidiness_min": "一般",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "加分",
+    "schedule_accept": [
+     "夜猫子",
+     "正常作息"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "6-12个月",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "连续剪了两天片子，都是凌晨两点才睡。",
+    "周末把家里收拾了一遍，平时太忙顾不上。"
+   ]
+  },
+  {
+   "key": "S17",
+   "account": "TEST_SCENARIO_OLDER40",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "40 岁男性 / 高预算",
+   "expect": "可运行；验证年龄与预算上限的供给",
+   "why": "男/40/5200 元/整洁/6-12个月/长寿路店(18)；年龄 35-45 必须、预算 4500-6000",
+   "profile": {
+    "nickname": "顾承业",
+    "gender": "男",
+    "birth_date": "1985-09-12",
+    "rent_budget": 5200,
+    "tidiness": "整洁",
+    "occupation": "企业顾问",
+    "lease_term": "6-12个月",
+    "store_id": 18,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "做企业顾问，收入稳定，预算充足。作息正常，注重居住品质，公共区域保持干净。不吸烟、不养宠物，偶尔出差。",
+    "roommate_expectation": "希望室友成熟、作息正常、爱干净；预算不是问题，居住体验更重要。",
+    "interest_tags": [
+     "自驾游",
+     "咖啡"
+    ]
+   },
+   "preference": {
+    "age_min": 35,
+    "age_max": 45,
+    "age_required": "必须",
+    "budget_min": 4500,
+    "budget_max": 6500,
+    "budget_required": "加分",
+    "tidiness_min": "整洁",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "加分",
+    "schedule_accept": [
+     "正常作息",
+     "早睡早起"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "6-12个月",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "下周又要出差，家里保持干净比较重要。",
+    "最近在找长租，预算可以放宽一点。"
+   ]
+  },
+  {
+   "key": "S18",
+   "account": "TEST_SCENARIO_STOREMUST",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "28 岁女性 / 同门店必须",
+   "expect": "可运行；验证门店必须是硬约束时的供给",
+   "why": "女/28/3000 元/一般/6-12个月/中山北路店(20)；同门店必须",
+   "profile": {
+    "nickname": "苏禾",
+    "gender": "女",
+    "birth_date": "1997-02-26",
+    "rent_budget": 3000,
+    "tidiness": "一般",
+    "occupation": "行政",
+    "lease_term": "6-12个月",
+    "store_id": 20,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "在中山北路附近做行政，通勤希望走路可达。作息正常，平时点外卖，房间保持基本整洁。不吸烟、不养宠物。",
+    "roommate_expectation": "希望室友就在中山北路店附近，作息正常、好相处。",
+    "interest_tags": [
+     "追剧",
+     "徒步"
+    ]
+   },
+   "preference": {
+    "age_min": 24,
+    "age_max": 34,
+    "age_required": "必须",
+    "budget_min": 2800,
+    "budget_max": 3800,
+    "budget_required": "加分",
+    "tidiness_min": "一般",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "必须",
+    "schedule_accept": [
+     "正常作息",
+     "早睡早起"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "6-12个月",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "每天通勤太远，想搬到中山北路店附近。",
+    "周末散步顺便看了几套房子。"
+   ]
+  },
+  {
+   "key": "S19",
+   "account": "TEST_SCENARIO_BROAD",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "27 岁男性 / 偏好很宽",
+   "expect": "可运行；验证宽松偏好下候选充足",
+   "why": "男/27/3500 元/一般/1-2年/世纪大道店(4)；七项偏好全部加分/不限",
+   "profile": {
+    "nickname": "许行",
+    "gender": "男",
+    "birth_date": "1998-08-08",
+    "rent_budget": 3500,
+    "tidiness": "一般",
+    "occupation": "运营",
+    "lease_term": "1-2年",
+    "store_id": 4,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "做运营，性格随和，计划长住一年以上。作息正常，东西一般整齐，不吸烟、不养宠物，对室友条件比较包容。",
+    "roommate_expectation": "希望室友正常人、好沟通即可，条件都可以商量。",
+    "interest_tags": [
+     "看电影",
+     "骑行"
+    ]
+   },
+   "preference": {
+    "age_min": 18,
+    "age_max": 60,
+    "age_required": "必须",
+    "budget_min": 800,
+    "budget_max": 20000,
+    "budget_required": "加分",
+    "tidiness_min": "随意",
+    "tidiness_required": "加分",
+    "store_scope": "不限",
+    "store_required": "加分",
+    "schedule_accept": [
+     "早睡早起",
+     "正常作息",
+     "夜猫子"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "3个月以下",
+    "lease_required": "加分",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "我比较好说话，室友正常就行。",
+    "周末骑车去了滨江，回来把房间收拾了一下。"
+   ]
+  },
+  {
+   "key": "S20",
+   "account": "TEST_SCENARIO_NARROW",
+   "reuse": false,
+   "trials": 1,
+   "run": true,
+   "title": "30 岁女性 / 偏好很窄",
+   "expect": "可运行；验证多必须项时的低供给",
+   "why": "女/30/4000 元/整洁/3-6个月/紫竹店(10)；年龄/预算/门店/作息/租期/整洁全部必须",
+   "profile": {
+    "nickname": "沈砚",
+    "gender": "女",
+    "birth_date": "1995-12-01",
+    "rent_budget": 4000,
+    "tidiness": "整洁",
+    "occupation": "研究员",
+    "lease_term": "3-6个月",
+    "store_id": 10,
+    "schedule_type": "正常作息",
+    "has_pet": "无",
+    "smoking": "不吸烟",
+    "self_intro": "在紫竹做研究员，项目周期三到六个月。作息正常，爱干净，不吸烟、不养宠物。找房条件比较明确，希望一次匹配到合适的人。",
+    "roommate_expectation": "希望室友年龄相近、作息正常、爱干净，同门店、租期一致，条件不合适就不勉强。",
+    "interest_tags": [
+     "小说",
+     "瑜伽"
+    ]
+   },
+   "preference": {
+    "age_min": 28,
+    "age_max": 32,
+    "age_required": "必须",
+    "budget_min": 3500,
+    "budget_max": 4500,
+    "budget_required": "加分",
+    "tidiness_min": "整洁",
+    "tidiness_required": "加分",
+    "store_scope": "同门店",
+    "store_required": "必须",
+    "schedule_accept": [
+     "正常作息"
+    ],
+    "schedule_required": "必须",
+    "lease_min": "3-6个月",
+    "lease_required": "必须",
+    "pet_accept": "无所谓",
+    "pet_required": "加分"
+   },
+   "moments": [
+    "项目还有四个月，想找紫竹附近合适的房子。",
+    "每周练两次瑜伽，生活比较规律。"
+   ]
+  }
+ ]
+}

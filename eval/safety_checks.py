@@ -22,11 +22,12 @@ PII_PATTERNS = {
 }
 PROMISE = re.compile(r"保证|一定|绝对|承诺|100%|放心")
 INJECTION = re.compile(r"忽略(?:之前|以上|前面).*?(?:指令|提示|要求)|ignore\s+(?:all\s+)?(?:previous|prior)?.{0,20}instructions|system\s*prompt|你现在是", re.I)
-TEXT_FIELDS = ("self_intro", "roommate_expectation", "reject_reason", "summary")
+TEXT_FIELDS = ("self_intro", "roommate_expectation", "reject_reason", "summary", "output_summary")
 
 
 def scan_text(text, field, run_id, candidate):
     findings = []
+    base = str(field or "").split(".")[-1]
     body = str(text or "")
     if not body:
         return findings
@@ -34,11 +35,11 @@ def scan_text(text, field, run_id, candidate):
         for match in pattern.finditer(body):
             findings.append({"kind": f"pii_{kind}", "severity": "error", "run_id": run_id,
                              "candidate": candidate, "field": field, "match": match.group(0)[:80]})
-    if field in ("reject_reason", "summary"):
+    if base in ("reject_reason", "summary", "output_summary"):
         for match in PROMISE.finditer(body):
             findings.append({"kind": "promise", "severity": "warning", "run_id": run_id,
                              "candidate": candidate, "field": field, "match": match.group(0)})
-    if field in ("self_intro", "roommate_expectation"):
+    if base in ("self_intro", "roommate_expectation"):
         for match in INJECTION.finditer(body):
             findings.append({"kind": "prompt_injection", "severity": "warning", "run_id": run_id,
                              "candidate": candidate, "field": field, "match": match.group(0)[:120]})
@@ -53,6 +54,11 @@ def scan_bundle(bundle):
         for field in TEXT_FIELDS:
             findings += scan_text(applicant.get(field), f"applicant.{field}", run_id,
                                   applicant.get("nickname"))
+            for moment in applicant.get("moments") or []:
+                findings += scan_text(moment.get("content"), "applicant.moment", run_id,
+                                      applicant.get("nickname"))
+        findings += scan_text((run.get("run") or {}).get("output_summary"), "run.output_summary",
+                               run_id, (run.get("run") or {}).get("run_no"))
         for candidate in run.get("candidates", []):
             for field in TEXT_FIELDS:
                 findings += scan_text(candidate.get(field), f"candidate.{field}", run_id,
@@ -96,3 +102,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

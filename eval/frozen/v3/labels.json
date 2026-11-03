@@ -1,0 +1,777 @@
+{
+  "version": "v3",
+  "protocol_version": "v3-2026-11-04",
+  "method": "heuristic-offline-v1",
+  "note": "离线启发式 gold（非人工金标）：由 v3 场景 + 仓库种子 SQL + 固定权重算出，只用于排序/命中率参照；禁止在 CI 中自动重算，变更需升 protocol_version 并人工审阅",
+  "seed": 20261104,
+  "as_of": "2026-11-04",
+  "top_k": 8,
+  "weights": {
+    "store_same": 3,
+    "store_area": 1,
+    "schedule": 2,
+    "budget": 2,
+    "age": 1,
+    "tidiness": 1,
+    "lease_gap_0": 2,
+    "lease_gap_1": 1,
+    "interest_cap": 2
+  },
+  "labels": [
+    {
+      "username": "TEST_SCENARIO_V3_01",
+      "key": "V3_01",
+      "case": "positive",
+      "gold_ids": [
+        649,
+        670,
+        633,
+        643,
+        548,
+        569,
+        147,
+        614
+      ],
+      "ranked": [
+        {
+          "id": 649,
+          "score": 11
+        },
+        {
+          "id": 670,
+          "score": 11
+        },
+        {
+          "id": 633,
+          "score": 10
+        },
+        {
+          "id": 643,
+          "score": 10
+        },
+        {
+          "id": 548,
+          "score": 9
+        },
+        {
+          "id": 569,
+          "score": 9
+        },
+        {
+          "id": 147,
+          "score": 8
+        },
+        {
+          "id": 614,
+          "score": 8
+        },
+        {
+          "id": 67,
+          "score": 7
+        },
+        {
+          "id": 87,
+          "score": 7
+        },
+        {
+          "id": 268,
+          "score": 7
+        },
+        {
+          "id": 323,
+          "score": 7
+        },
+        {
+          "id": 334,
+          "score": 7
+        },
+        {
+          "id": 425,
+          "score": 7
+        },
+        {
+          "id": 585,
+          "score": 7
+        },
+        {
+          "id": 203,
+          "score": 6
+        },
+        {
+          "id": 367,
+          "score": 4
+        }
+      ],
+      "ranked_total": 17,
+      "hard_eligible": 17,
+      "ex_ante_capacity": {
+        "tier": "high",
+        "tier_label": "高容量",
+        "eligible": 8,
+        "eligible_unbounded": 17,
+        "raw_cell": 14,
+        "store_scope": "同片区",
+        "store_id": 15,
+        "store": "虹桥枢纽店",
+        "area": "闵行",
+        "gender": "男",
+        "lease_term": "3-6个月",
+        "must_dimensions": [
+          "年龄",
+          "作息"
+        ],
+        "must_codes": [
+          "age",
+          "schedule"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "username": "TEST_SCENARIO_V3_02",
+      "key": "V3_02",
+      "case": "positive",
+      "gold_ids": [
+        259,
+        233,
+        322,
+        315,
+        3,
+        36,
+        71,
+        212
+      ],
+      "ranked": [
+        {
+          "id": 259,
+          "score": 11
+        },
+        {
+          "id": 233,
+          "score": 10
+        },
+        {
+          "id": 322,
+          "score": 10
+        },
+        {
+          "id": 315,
+          "score": 9
+        },
+        {
+          "id": 3,
+          "score": 8
+        },
+        {
+          "id": 36,
+          "score": 8
+        },
+        {
+          "id": 71,
+          "score": 8
+        },
+        {
+          "id": 212,
+          "score": 8
+        },
+        {
+          "id": 285,
+          "score": 8
+        },
+        {
+          "id": 356,
+          "score": 8
+        },
+        {
+          "id": 357,
+          "score": 8
+        },
+        {
+          "id": 410,
+          "score": 8
+        },
+        {
+          "id": 740,
+          "score": 8
+        },
+        {
+          "id": 747,
+          "score": 8
+        },
+        {
+          "id": 791,
+          "score": 8
+        },
+        {
+          "id": 802,
+          "score": 8
+        },
+        {
+          "id": 808,
+          "score": 8
+        },
+        {
+          "id": 870,
+          "score": 8
+        },
+        {
+          "id": 283,
+          "score": 7
+        },
+        {
+          "id": 488,
+          "score": 7
+        },
+        {
+          "id": 539,
+          "score": 7
+        },
+        {
+          "id": 590,
+          "score": 7
+        },
+        {
+          "id": 886,
+          "score": 7
+        },
+        {
+          "id": 660,
+          "score": 6
+        }
+      ],
+      "ranked_total": 24,
+      "hard_eligible": 24,
+      "ex_ante_capacity": {
+        "tier": "high",
+        "tier_label": "高容量",
+        "eligible": 9,
+        "eligible_unbounded": 24,
+        "raw_cell": 20,
+        "store_scope": "同片区",
+        "store_id": 6,
+        "store": "徐家汇店",
+        "area": "徐汇",
+        "gender": "女",
+        "lease_term": "6-12个月",
+        "must_dimensions": [
+          "年龄",
+          "作息"
+        ],
+        "must_codes": [
+          "age",
+          "schedule"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "username": "TEST_SCENARIO_V3_03",
+      "key": "V3_03",
+      "case": "positive",
+      "gold_ids": [
+        856,
+        859,
+        879,
+        729,
+        829,
+        894,
+        68,
+        693
+      ],
+      "ranked": [
+        {
+          "id": 856,
+          "score": 10
+        },
+        {
+          "id": 859,
+          "score": 10
+        },
+        {
+          "id": 879,
+          "score": 10
+        },
+        {
+          "id": 729,
+          "score": 9
+        },
+        {
+          "id": 829,
+          "score": 9
+        },
+        {
+          "id": 894,
+          "score": 9
+        },
+        {
+          "id": 68,
+          "score": 8
+        },
+        {
+          "id": 693,
+          "score": 8
+        },
+        {
+          "id": 736,
+          "score": 8
+        },
+        {
+          "id": 798,
+          "score": 8
+        },
+        {
+          "id": 155,
+          "score": 7
+        },
+        {
+          "id": 194,
+          "score": 7
+        },
+        {
+          "id": 262,
+          "score": 7
+        },
+        {
+          "id": 266,
+          "score": 7
+        },
+        {
+          "id": 319,
+          "score": 7
+        },
+        {
+          "id": 709,
+          "score": 7
+        },
+        {
+          "id": 834,
+          "score": 7
+        },
+        {
+          "id": 64,
+          "score": 6
+        },
+        {
+          "id": 367,
+          "score": 6
+        },
+        {
+          "id": 623,
+          "score": 6
+        },
+        {
+          "id": 119,
+          "score": 5
+        }
+      ],
+      "ranked_total": 21,
+      "hard_eligible": 21,
+      "ex_ante_capacity": {
+        "tier": "high",
+        "tier_label": "高容量",
+        "eligible": 9,
+        "eligible_unbounded": 21,
+        "raw_cell": 16,
+        "store_scope": "同片区",
+        "store_id": 20,
+        "store": "中山北路店",
+        "area": "普陀",
+        "gender": "男",
+        "lease_term": "1-2年",
+        "must_dimensions": [
+          "年龄",
+          "作息"
+        ],
+        "must_codes": [
+          "age",
+          "schedule"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "username": "TEST_SCENARIO_V3_04",
+      "key": "V3_04",
+      "case": "positive",
+      "gold_ids": [
+        695,
+        690,
+        700,
+        720,
+        686
+      ],
+      "ranked": [
+        {
+          "id": 695,
+          "score": 12
+        },
+        {
+          "id": 690,
+          "score": 11
+        },
+        {
+          "id": 700,
+          "score": 11
+        },
+        {
+          "id": 720,
+          "score": 11
+        },
+        {
+          "id": 686,
+          "score": 10
+        }
+      ],
+      "ranked_total": 5,
+      "hard_eligible": 5,
+      "ex_ante_capacity": {
+        "tier": "medium",
+        "tier_label": "中容量",
+        "eligible": 5,
+        "eligible_unbounded": 5,
+        "raw_cell": 8,
+        "store_scope": "同门店",
+        "store_id": 16,
+        "store": "紫竹店",
+        "area": "闵行",
+        "gender": "女",
+        "lease_term": "2年以上",
+        "must_dimensions": [
+          "年龄",
+          "作息",
+          "门店"
+        ],
+        "must_codes": [
+          "age",
+          "schedule",
+          "store"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "username": "TEST_SCENARIO_V3_05",
+      "key": "V3_05",
+      "case": "positive",
+      "gold_ids": [
+        2,
+        14,
+        31,
+        32,
+        426,
+        139,
+        467,
+        861
+      ],
+      "ranked": [
+        {
+          "id": 2,
+          "score": 10
+        },
+        {
+          "id": 14,
+          "score": 10
+        },
+        {
+          "id": 31,
+          "score": 10
+        },
+        {
+          "id": 32,
+          "score": 10
+        },
+        {
+          "id": 426,
+          "score": 9
+        },
+        {
+          "id": 139,
+          "score": 8
+        },
+        {
+          "id": 467,
+          "score": 8
+        },
+        {
+          "id": 861,
+          "score": 8
+        },
+        {
+          "id": 512,
+          "score": 7
+        },
+        {
+          "id": 790,
+          "score": 7
+        },
+        {
+          "id": 791,
+          "score": 7
+        },
+        {
+          "id": 892,
+          "score": 7
+        }
+      ],
+      "ranked_total": 12,
+      "hard_eligible": 12,
+      "ex_ante_capacity": {
+        "tier": "medium",
+        "tier_label": "中容量",
+        "eligible": 4,
+        "eligible_unbounded": 12,
+        "raw_cell": 10,
+        "store_scope": "同门店",
+        "store_id": 1,
+        "store": "张江店",
+        "area": "浦东",
+        "gender": "女",
+        "lease_term": "3-6个月",
+        "must_dimensions": [
+          "年龄",
+          "作息",
+          "预算"
+        ],
+        "must_codes": [
+          "age",
+          "schedule",
+          "budget"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "username": "TEST_SCENARIO_V3_06",
+      "key": "V3_06",
+      "case": "positive",
+      "gold_ids": [
+        533,
+        539,
+        502,
+        512
+      ],
+      "ranked": [
+        {
+          "id": 533,
+          "score": 12
+        },
+        {
+          "id": 539,
+          "score": 12
+        },
+        {
+          "id": 502,
+          "score": 10
+        },
+        {
+          "id": 512,
+          "score": 10
+        }
+      ],
+      "ranked_total": 4,
+      "hard_eligible": 4,
+      "ex_ante_capacity": {
+        "tier": "medium",
+        "tier_label": "中容量",
+        "eligible": 4,
+        "eligible_unbounded": 4,
+        "raw_cell": 19,
+        "store_scope": "同门店",
+        "store_id": 12,
+        "store": "大桥店",
+        "area": "杨浦",
+        "gender": "女",
+        "lease_term": "1-2年",
+        "must_dimensions": [
+          "年龄",
+          "作息",
+          "门店"
+        ],
+        "must_codes": [
+          "age",
+          "schedule",
+          "store"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "username": "TEST_SCENARIO_V3_07",
+      "key": "V3_07",
+      "case": "positive",
+      "gold_ids": [
+        609,
+        693,
+        706,
+        784,
+        262,
+        266,
+        319,
+        729
+      ],
+      "ranked": [
+        {
+          "id": 609,
+          "score": 11
+        },
+        {
+          "id": 693,
+          "score": 9
+        },
+        {
+          "id": 706,
+          "score": 9
+        },
+        {
+          "id": 784,
+          "score": 9
+        },
+        {
+          "id": 262,
+          "score": 7
+        },
+        {
+          "id": 266,
+          "score": 7
+        },
+        {
+          "id": 319,
+          "score": 7
+        },
+        {
+          "id": 729,
+          "score": 7
+        }
+      ],
+      "ranked_total": 8,
+      "hard_eligible": 8,
+      "ex_ante_capacity": {
+        "tier": "low",
+        "tier_label": "低容量",
+        "eligible": 1,
+        "eligible_unbounded": 8,
+        "raw_cell": 15,
+        "store_scope": "同门店",
+        "store_id": 14,
+        "store": "七宝店",
+        "area": "闵行",
+        "gender": "男",
+        "lease_term": "1-2年",
+        "must_dimensions": [
+          "年龄",
+          "作息",
+          "预算"
+        ],
+        "must_codes": [
+          "age",
+          "schedule",
+          "budget"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "username": "TEST_SCENARIO_V3_08",
+      "key": "V3_08",
+      "case": "positive",
+      "gold_ids": [
+        35,
+        64,
+        177,
+        19,
+        165,
+        693,
+        784,
+        894
+      ],
+      "ranked": [
+        {
+          "id": 35,
+          "score": 10
+        },
+        {
+          "id": 64,
+          "score": 9
+        },
+        {
+          "id": 177,
+          "score": 9
+        },
+        {
+          "id": 19,
+          "score": 8
+        },
+        {
+          "id": 165,
+          "score": 8
+        },
+        {
+          "id": 693,
+          "score": 8
+        },
+        {
+          "id": 784,
+          "score": 8
+        },
+        {
+          "id": 894,
+          "score": 8
+        },
+        {
+          "id": 262,
+          "score": 7
+        },
+        {
+          "id": 299,
+          "score": 7
+        },
+        {
+          "id": 777,
+          "score": 6
+        },
+        {
+          "id": 844,
+          "score": 6
+        },
+        {
+          "id": 707,
+          "score": 5
+        },
+        {
+          "id": 871,
+          "score": 5
+        },
+        {
+          "id": 718,
+          "score": 4
+        }
+      ],
+      "ranked_total": 15,
+      "hard_eligible": 15,
+      "ex_ante_capacity": {
+        "tier": "low",
+        "tier_label": "低容量",
+        "eligible": 1,
+        "eligible_unbounded": 15,
+        "raw_cell": 19,
+        "store_scope": "同门店",
+        "store_id": 2,
+        "store": "金桥店",
+        "area": "浦东",
+        "gender": "男",
+        "lease_term": "1-2年",
+        "must_dimensions": [
+          "年龄",
+          "作息",
+          "宠物态度"
+        ],
+        "must_codes": [
+          "age",
+          "schedule",
+          "pet"
+        ],
+        "requested": 8
+      }
+    }
+  ]
+}

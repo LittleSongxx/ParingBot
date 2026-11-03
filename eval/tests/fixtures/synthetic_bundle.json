@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-11-04 00:00:00",
+  "meta": {"code_commit": "test", "scenario_suite": "v3", "db_profile": "eval", "warm_portraits": false,
+           "model_configs": [{"purpose": "审核", "model_name": "deepseek-flash"}]},
+  "runs": [
+    {
+      "run": {"id": 1, "run_no": "MATCH-TEST-1", "status": "已完成", "total_round": 3,
+              "prompt_tokens": 1000, "completion_tokens": 100, "summary": "调度 3 轮，候选池累计 1 人，通过审核 1 人，否决 0 人，交付 1 人（要求 8 人）"},
+      "task": {"id": 1, "deliver_count": 8},
+      "applicant": {"id": 100, "username": "TEST_SCENARIO_V3_01", "nickname": "V3测试01", "gender": "男",
+                    "birth_date": "1990-01-01", "rent_budget": 3500, "tidiness": "整洁", "lease_term": "1-2年",
+                    "store_id": 1, "schedule_type": "正常作息", "has_pet": "无", "smoking": "不吸烟",
+                    "self_intro": "测试申请方", "roommate_expectation": "希望室友正常作息",
+                    "preference": {"age_required": "加分", "budget_required": "加分", "schedule_required": "必须",
+                                   "store_required": "加分", "pet_required": "加分", "tidiness_required": "加分",
+                                   "lease_required": "加分", "schedule_accept": "正常作息"}},
+      "deliverable_passed_count": 1, "delivered_to_user": 1,
+      "candidates": [
+        {"id": 201, "nickname": "候选01", "gender": "男", "birth_date": "1991-02-02", "rent_budget": 3500,
+         "tidiness": "整洁", "lease_term": "1-2年", "store_id": 1, "schedule_type": "正常作息",
+         "has_pet": "无", "smoking": "不吸烟", "self_intro": "候选", "roommate_expectation": "正常作息",
+         "preference": {}, "delivered": true, "delivered_rank": 1, "audit_status": "通过",
+         "portrait": {"summary": "ok"}, "store_area": "浦东"}
+      ],
+      "rounds": [{"round_no": 1}], "funnel": {"stages": []}
+    }
+  ]
+}
+

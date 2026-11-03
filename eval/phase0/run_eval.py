@@ -3,10 +3,10 @@
 """Phase 0 AI 能力评测入口。
 
 用法：
-  python eval/run_eval.py --fixtures                 # 校验 40 条 golden case 的参考输出
-  python eval/run_eval.py --outputs eval/outputs     # 校验真实模型输出（<case-id>.json）
-  python eval/run_eval.py --fixtures --bad eval/fixtures/bad
-  python eval/run_eval.py --fixtures --json eval/report.json
+  python eval/phase0/run_eval.py --fixtures                 # 校验 40 条 golden case 的参考输出
+  python eval/phase0/run_eval.py --outputs eval/outputs     # 校验真实模型输出（<case-id>.json）
+  python eval/phase0/run_eval.py --fixtures --bad eval/phase0/fixtures/bad
+  python eval/phase0/run_eval.py --fixtures --json eval/phase0/report.json
 
 设计原则：
 - 只用标准库，CI 直接跑，不需要数据库/模型 Key；

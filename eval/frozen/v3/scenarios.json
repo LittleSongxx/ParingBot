@@ -1,0 +1,879 @@
+{
+  "version": "v3",
+  "suite": "v3",
+  "seed": 20261104,
+  "protocol_version": "v3-2026-11-04",
+  "as_of": "2026-11-04",
+  "scenario_count": 10,
+  "positive_count": 8,
+  "negative_count": 2,
+  "deliver_count": 8,
+  "grid": {
+    "axes": [
+      "store_id",
+      "gender",
+      "lease_term"
+    ],
+    "capacity_basis": "approved_candidates + 同性 + 租期档差<2 + 双向必须项（门店范围按申请方偏好）",
+    "tiers": {
+      "high": "eligible>=8",
+      "medium": "4-7",
+      "low": "1-3"
+    },
+    "tier_counts": {
+      "high": 3,
+      "medium": 3,
+      "low": 2
+    },
+    "sampling": "deterministic-without-replacement",
+    "diversity": {
+      "stores": 8,
+      "male": 4,
+      "female": 4,
+      "lease_terms": 4
+    },
+    "must_plan": {
+      "store": [
+        "V3_04",
+        "V3_06"
+      ],
+      "budget": [
+        "V3_05",
+        "V3_07"
+      ],
+      "pet": [
+        "V3_08"
+      ]
+    }
+  },
+  "scenarios": [
+    {
+      "key": "V3_01",
+      "account": "TEST_SCENARIO_V3_01",
+      "title": "V3-01 虹桥枢纽店 · 男 · 3-6个月 · 容量基线",
+      "run": true,
+      "deliver_count": 8,
+      "profile": {
+        "nickname": "V3场景租客01",
+        "gender": "男",
+        "birth_date": "1989-02-11",
+        "rent_budget": 3800,
+        "tidiness": "整洁",
+        "occupation": "数据分析师",
+        "lease_term": "3-6个月",
+        "store_id": 15,
+        "schedule_type": "正常作息",
+        "has_pet": "无",
+        "smoking": "不吸烟",
+        "self_intro": "我第 1 次来这座城市工作，在虹桥枢纽店附近做数据分析师。平时十二点左右睡，周末会稍微睡个懒觉，工作日节奏固定，下班回来不太折腾。周末做两顿饭、看部电影，公共区域用完顺手收拾。不抽烟，也不养宠物，生活比较安静。最近常做的事是看电影、听音乐，希望遇到好相处的室友。",
+        "roommate_expectation": "这是我第 1 次在这座城市找合租，希望遇到能长期相处的室友。希望室友和我年龄差不多（我今年 37 岁），作息能合得来，公共区域一起保持干净。有事提前说一声，相处简单一点就好。",
+        "interest_tags": [
+          "看电影",
+          "听音乐",
+          "看纪录片"
+        ]
+      },
+      "preference": {
+        "age_min": 34,
+        "age_max": 41,
+        "age_required": "必须",
+        "budget_min": 2900,
+        "budget_max": 4700,
+        "budget_required": "加分",
+        "tidiness_min": "一般",
+        "tidiness_required": "加分",
+        "store_scope": "同片区",
+        "store_required": "加分",
+        "schedule_accept": [
+          "正常作息"
+        ],
+        "schedule_required": "必须",
+        "lease_min": "不限",
+        "lease_required": "加分",
+        "pet_accept": "接受",
+        "pet_required": "加分"
+      },
+      "moments": [
+        "下班顺路在虹桥枢纽店附近买了个晚饭，回来把厨房台面擦干净才坐下。",
+        "这两天十二点前躺下，早上八点前出门，睡前把第二天要穿的衣服都放好了。",
+        "周末打算约朋友去听音乐、看纪录片，顺便把公共区域拖一遍。"
+      ],
+      "expect": {
+        "can_run": true,
+        "blocker": null,
+        "requested": 8,
+        "ex_ante_eligible": 8,
+        "ex_ante_unbounded": 17,
+        "note": "容量分层 高容量：门店范围内硬可匹配 8 人（不限门店 17 人）；交付要求 8 人"
+      },
+      "why": "门店×性别×租期格：虹桥枢纽店（闵行）/ 男 / 3-6个月；门店范围 同片区；必须项 年龄、作息；容量分层 高容量（eligible 8）",
+      "ex_ante_capacity": {
+        "tier": "high",
+        "tier_label": "高容量",
+        "eligible": 8,
+        "eligible_unbounded": 17,
+        "raw_cell": 14,
+        "store_scope": "同片区",
+        "store_id": 15,
+        "store": "虹桥枢纽店",
+        "area": "闵行",
+        "gender": "男",
+        "lease_term": "3-6个月",
+        "must_dimensions": [
+          "年龄",
+          "作息"
+        ],
+        "must_codes": [
+          "age",
+          "schedule"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "key": "V3_02",
+      "account": "TEST_SCENARIO_V3_02",
+      "title": "V3-02 徐家汇店 · 女 · 6-12个月 · 容量基线",
+      "run": true,
+      "deliver_count": 8,
+      "profile": {
+        "nickname": "V3场景租客02",
+        "gender": "女",
+        "birth_date": "1991-04-19",
+        "rent_budget": 3600,
+        "tidiness": "一般",
+        "occupation": "会计",
+        "lease_term": "6-12个月",
+        "store_id": 6,
+        "schedule_type": "正常作息",
+        "has_pet": "无",
+        "smoking": "不吸烟",
+        "self_intro": "我第 2 次来这座城市工作，在徐家汇店附近做会计。平时十二点左右睡，周末会稍微睡个懒觉，工作日节奏固定，下班回来不太折腾。周末做两顿饭、看部电影，公共区域用完顺手收拾。不抽烟，也不养宠物，生活比较安静。最近常做的事是跑步、健身，希望遇到好相处的室友。",
+        "roommate_expectation": "这是我第 2 次在这座城市找合租，希望遇到能长期相处的室友。希望室友和我年龄差不多（我今年 35 岁），作息能合得来，公共区域一起保持干净。有事提前说一声，相处简单一点就好。",
+        "interest_tags": [
+          "跑步",
+          "健身",
+          "羽毛球"
+        ]
+      },
+      "preference": {
+        "age_min": 32,
+        "age_max": 39,
+        "age_required": "必须",
+        "budget_min": 2700,
+        "budget_max": 4500,
+        "budget_required": "加分",
+        "tidiness_min": "一般",
+        "tidiness_required": "加分",
+        "store_scope": "同片区",
+        "store_required": "加分",
+        "schedule_accept": [
+          "正常作息"
+        ],
+        "schedule_required": "必须",
+        "lease_min": "不限",
+        "lease_required": "加分",
+        "pet_accept": "接受",
+        "pet_required": "加分"
+      },
+      "moments": [
+        "下班顺路在徐家汇店附近买了个晚饭，回来把厨房台面擦干净才坐下。",
+        "这两天十二点前躺下，早上八点前出门，睡前把第二天要穿的衣服都放好了。",
+        "周末打算约朋友去健身、羽毛球，顺便把公共区域拖一遍。"
+      ],
+      "expect": {
+        "can_run": true,
+        "blocker": null,
+        "requested": 8,
+        "ex_ante_eligible": 9,
+        "ex_ante_unbounded": 24,
+        "note": "容量分层 高容量：门店范围内硬可匹配 9 人（不限门店 24 人）；交付要求 8 人"
+      },
+      "why": "门店×性别×租期格：徐家汇店（徐汇）/ 女 / 6-12个月；门店范围 同片区；必须项 年龄、作息；容量分层 高容量（eligible 9）",
+      "ex_ante_capacity": {
+        "tier": "high",
+        "tier_label": "高容量",
+        "eligible": 9,
+        "eligible_unbounded": 24,
+        "raw_cell": 20,
+        "store_scope": "同片区",
+        "store_id": 6,
+        "store": "徐家汇店",
+        "area": "徐汇",
+        "gender": "女",
+        "lease_term": "6-12个月",
+        "must_dimensions": [
+          "年龄",
+          "作息"
+        ],
+        "must_codes": [
+          "age",
+          "schedule"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "key": "V3_03",
+      "account": "TEST_SCENARIO_V3_03",
+      "title": "V3-03 中山北路店 · 男 · 1-2年 · 容量基线",
+      "run": true,
+      "deliver_count": 8,
+      "profile": {
+        "nickname": "V3场景租客03",
+        "gender": "男",
+        "birth_date": "1992-06-06",
+        "rent_budget": 3200,
+        "tidiness": "整洁",
+        "occupation": "行政专员",
+        "lease_term": "1-2年",
+        "store_id": 20,
+        "schedule_type": "正常作息",
+        "has_pet": "无",
+        "smoking": "不吸烟",
+        "self_intro": "我第 3 次来这座城市工作，在中山北路店附近做行政专员。平时十二点左右睡，周末会稍微睡个懒觉，工作日节奏固定，下班回来不太折腾。周末做两顿饭、看部电影，公共区域用完顺手收拾。不抽烟，也不养宠物，生活比较安静。最近常做的事是咖啡、探店，希望遇到好相处的室友。",
+        "roommate_expectation": "这是我第 3 次在这座城市找合租，希望遇到能长期相处的室友。希望室友和我年龄差不多（我今年 34 岁），作息能合得来，公共区域一起保持干净。有事提前说一声，相处简单一点就好。",
+        "interest_tags": [
+          "咖啡",
+          "探店",
+          "烘焙"
+        ]
+      },
+      "preference": {
+        "age_min": 31,
+        "age_max": 38,
+        "age_required": "必须",
+        "budget_min": 2300,
+        "budget_max": 4100,
+        "budget_required": "加分",
+        "tidiness_min": "一般",
+        "tidiness_required": "加分",
+        "store_scope": "同片区",
+        "store_required": "加分",
+        "schedule_accept": [
+          "正常作息"
+        ],
+        "schedule_required": "必须",
+        "lease_min": "不限",
+        "lease_required": "加分",
+        "pet_accept": "接受",
+        "pet_required": "加分"
+      },
+      "moments": [
+        "下班顺路在中山北路店附近买了个晚饭，回来把厨房台面擦干净才坐下。",
+        "这两天十二点前躺下，早上八点前出门，睡前把第二天要穿的衣服都放好了。",
+        "周末打算约朋友去探店、烘焙，顺便把公共区域拖一遍。"
+      ],
+      "expect": {
+        "can_run": true,
+        "blocker": null,
+        "requested": 8,
+        "ex_ante_eligible": 9,
+        "ex_ante_unbounded": 21,
+        "note": "容量分层 高容量：门店范围内硬可匹配 9 人（不限门店 21 人）；交付要求 8 人"
+      },
+      "why": "门店×性别×租期格：中山北路店（普陀）/ 男 / 1-2年；门店范围 同片区；必须项 年龄、作息；容量分层 高容量（eligible 9）",
+      "ex_ante_capacity": {
+        "tier": "high",
+        "tier_label": "高容量",
+        "eligible": 9,
+        "eligible_unbounded": 21,
+        "raw_cell": 16,
+        "store_scope": "同片区",
+        "store_id": 20,
+        "store": "中山北路店",
+        "area": "普陀",
+        "gender": "男",
+        "lease_term": "1-2年",
+        "must_dimensions": [
+          "年龄",
+          "作息"
+        ],
+        "must_codes": [
+          "age",
+          "schedule"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "key": "V3_04",
+      "account": "TEST_SCENARIO_V3_04",
+      "title": "V3-04 紫竹店 · 女 · 2年以上 · 门店必须",
+      "run": true,
+      "deliver_count": 8,
+      "profile": {
+        "nickname": "V3场景租客04",
+        "gender": "女",
+        "birth_date": "1991-08-27",
+        "rent_budget": 3900,
+        "tidiness": "一般",
+        "occupation": "运维工程师",
+        "lease_term": "2年以上",
+        "store_id": 16,
+        "schedule_type": "早睡早起",
+        "has_pet": "无",
+        "smoking": "不吸烟",
+        "self_intro": "我第 4 次来这座城市工作，在紫竹店附近做运维工程师。平时晚上十一点前就休息，早上起得也早，工作日节奏固定，下班回来不太折腾。周末一般去公园走走，回来把房间和厨房都擦一遍。不抽烟，也不养宠物，这次换房子优先看紫竹店，通勤近一点最重要。。最近常做的事是看展、摄影，希望遇到好相处的室友。",
+        "roommate_expectation": "这是我第 4 次在这座城市找合租，希望遇到能长期相处的室友。希望室友和我年龄差不多（我今年 35 岁），作息能合得来，公共区域一起保持干净。最好也住在紫竹店附近，通勤方便一点。有事提前说一声，相处简单一点就好。",
+        "interest_tags": [
+          "看展",
+          "摄影",
+          "陶艺"
+        ]
+      },
+      "preference": {
+        "age_min": 32,
+        "age_max": 39,
+        "age_required": "必须",
+        "budget_min": 3000,
+        "budget_max": 4800,
+        "budget_required": "加分",
+        "tidiness_min": "一般",
+        "tidiness_required": "加分",
+        "store_scope": "同门店",
+        "store_required": "必须",
+        "schedule_accept": [
+          "早睡早起",
+          "正常作息"
+        ],
+        "schedule_required": "必须",
+        "lease_min": "不限",
+        "lease_required": "加分",
+        "pet_accept": "接受",
+        "pet_required": "加分"
+      },
+      "moments": [
+        "下班顺路在紫竹店附近买了个晚饭，回来把厨房台面擦干净才坐下。",
+        "这两天十一点熄灯，早上六点多自然醒，睡前把第二天要穿的衣服都放好了。",
+        "周末打算约朋友去摄影、陶艺，顺便把公共区域拖一遍。"
+      ],
+      "expect": {
+        "can_run": true,
+        "blocker": null,
+        "requested": 8,
+        "ex_ante_eligible": 5,
+        "ex_ante_unbounded": 5,
+        "note": "容量分层 中容量：门店范围内硬可匹配 5 人（不限门店 5 人）；交付要求 8 人"
+      },
+      "why": "门店×性别×租期格：紫竹店（闵行）/ 女 / 2年以上；门店范围 同门店；必须项 年龄、作息、门店；容量分层 中容量（eligible 5）",
+      "ex_ante_capacity": {
+        "tier": "medium",
+        "tier_label": "中容量",
+        "eligible": 5,
+        "eligible_unbounded": 5,
+        "raw_cell": 8,
+        "store_scope": "同门店",
+        "store_id": 16,
+        "store": "紫竹店",
+        "area": "闵行",
+        "gender": "女",
+        "lease_term": "2年以上",
+        "must_dimensions": [
+          "年龄",
+          "作息",
+          "门店"
+        ],
+        "must_codes": [
+          "age",
+          "schedule",
+          "store"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "key": "V3_05",
+      "account": "TEST_SCENARIO_V3_05",
+      "title": "V3-05 张江店 · 女 · 3-6个月 · 预算必须",
+      "run": true,
+      "deliver_count": 8,
+      "profile": {
+        "nickname": "V3场景租客05",
+        "gender": "女",
+        "birth_date": "1997-01-15",
+        "rent_budget": 4100,
+        "tidiness": "整洁",
+        "occupation": "中学教师",
+        "lease_term": "3-6个月",
+        "store_id": 1,
+        "schedule_type": "正常作息",
+        "has_pet": "无",
+        "smoking": "不吸烟",
+        "self_intro": "我第 5 次来这座城市工作，在张江店附近做中学教师。平时十二点左右睡，周末会稍微睡个懒觉，工作日节奏固定，下班回来不太折腾。周末做两顿饭、看部电影，公共区域用完顺手收拾。不抽烟，也不养宠物，预算卡得比较紧，月租希望控制在 4100 元上下。。最近常做的事是爬山、骑行，希望遇到好相处的室友。",
+        "roommate_expectation": "这是我第 5 次在这座城市找合租，希望遇到能长期相处的室友。希望室友和我年龄差不多（我今年 29 岁），作息能合得来，公共区域一起保持干净。大家的租金水平接近一些，我会控制在 4100 元左右。有事提前说一声，相处简单一点就好。",
+        "interest_tags": [
+          "爬山",
+          "骑行",
+          "露营"
+        ]
+      },
+      "preference": {
+        "age_min": 26,
+        "age_max": 33,
+        "age_required": "必须",
+        "budget_min": 3300,
+        "budget_max": 4900,
+        "budget_required": "必须",
+        "tidiness_min": "一般",
+        "tidiness_required": "加分",
+        "store_scope": "同门店",
+        "store_required": "加分",
+        "schedule_accept": [
+          "正常作息"
+        ],
+        "schedule_required": "必须",
+        "lease_min": "不限",
+        "lease_required": "加分",
+        "pet_accept": "接受",
+        "pet_required": "加分"
+      },
+      "moments": [
+        "下班顺路在张江店附近买了个晚饭，回来把厨房台面擦干净才坐下。",
+        "这两天十二点前躺下，早上八点前出门，睡前把第二天要穿的衣服都放好了。",
+        "周末打算约朋友去骑行、露营，顺便把公共区域拖一遍。"
+      ],
+      "expect": {
+        "can_run": true,
+        "blocker": null,
+        "requested": 8,
+        "ex_ante_eligible": 4,
+        "ex_ante_unbounded": 12,
+        "note": "容量分层 中容量：门店范围内硬可匹配 4 人（不限门店 12 人）；交付要求 8 人"
+      },
+      "why": "门店×性别×租期格：张江店（浦东）/ 女 / 3-6个月；门店范围 同门店；必须项 年龄、作息、预算；容量分层 中容量（eligible 4）",
+      "ex_ante_capacity": {
+        "tier": "medium",
+        "tier_label": "中容量",
+        "eligible": 4,
+        "eligible_unbounded": 12,
+        "raw_cell": 10,
+        "store_scope": "同门店",
+        "store_id": 1,
+        "store": "张江店",
+        "area": "浦东",
+        "gender": "女",
+        "lease_term": "3-6个月",
+        "must_dimensions": [
+          "年龄",
+          "作息",
+          "预算"
+        ],
+        "must_codes": [
+          "age",
+          "schedule",
+          "budget"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "key": "V3_06",
+      "account": "TEST_SCENARIO_V3_06",
+      "title": "V3-06 大桥店 · 女 · 1-2年 · 门店必须",
+      "run": true,
+      "deliver_count": 8,
+      "profile": {
+        "nickname": "V3场景租客06",
+        "gender": "女",
+        "birth_date": "1992-03-23",
+        "rent_budget": 4000,
+        "tidiness": "一般",
+        "occupation": "市场专员",
+        "lease_term": "1-2年",
+        "store_id": 12,
+        "schedule_type": "正常作息",
+        "has_pet": "无",
+        "smoking": "不吸烟",
+        "self_intro": "我第 6 次来这座城市工作，在大桥店附近做市场专员。平时十二点左右睡，周末会稍微睡个懒觉，工作日节奏固定，下班回来不太折腾。周末做两顿饭、看部电影，公共区域用完顺手收拾。不抽烟，也不养宠物，这次换房子优先看大桥店，通勤近一点最重要。。最近常做的事是小说、历史，希望遇到好相处的室友。",
+        "roommate_expectation": "这是我第 6 次在这座城市找合租，希望遇到能长期相处的室友。希望室友和我年龄差不多（我今年 34 岁），作息能合得来，公共区域一起保持干净。最好也住在大桥店附近，通勤方便一点。有事提前说一声，相处简单一点就好。",
+        "interest_tags": [
+          "小说",
+          "历史",
+          "心理学"
+        ]
+      },
+      "preference": {
+        "age_min": 31,
+        "age_max": 38,
+        "age_required": "必须",
+        "budget_min": 3100,
+        "budget_max": 4900,
+        "budget_required": "加分",
+        "tidiness_min": "一般",
+        "tidiness_required": "加分",
+        "store_scope": "同门店",
+        "store_required": "必须",
+        "schedule_accept": [
+          "正常作息"
+        ],
+        "schedule_required": "必须",
+        "lease_min": "不限",
+        "lease_required": "加分",
+        "pet_accept": "接受",
+        "pet_required": "加分"
+      },
+      "moments": [
+        "下班顺路在大桥店附近买了个晚饭，回来把厨房台面擦干净才坐下。",
+        "这两天十二点前躺下，早上八点前出门，睡前把第二天要穿的衣服都放好了。",
+        "周末打算约朋友去历史、心理学，顺便把公共区域拖一遍。"
+      ],
+      "expect": {
+        "can_run": true,
+        "blocker": null,
+        "requested": 8,
+        "ex_ante_eligible": 4,
+        "ex_ante_unbounded": 4,
+        "note": "容量分层 中容量：门店范围内硬可匹配 4 人（不限门店 4 人）；交付要求 8 人"
+      },
+      "why": "门店×性别×租期格：大桥店（杨浦）/ 女 / 1-2年；门店范围 同门店；必须项 年龄、作息、门店；容量分层 中容量（eligible 4）",
+      "ex_ante_capacity": {
+        "tier": "medium",
+        "tier_label": "中容量",
+        "eligible": 4,
+        "eligible_unbounded": 4,
+        "raw_cell": 19,
+        "store_scope": "同门店",
+        "store_id": 12,
+        "store": "大桥店",
+        "area": "杨浦",
+        "gender": "女",
+        "lease_term": "1-2年",
+        "must_dimensions": [
+          "年龄",
+          "作息",
+          "门店"
+        ],
+        "must_codes": [
+          "age",
+          "schedule",
+          "store"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "key": "V3_07",
+      "account": "TEST_SCENARIO_V3_07",
+      "title": "V3-07 七宝店 · 男 · 1-2年 · 预算必须",
+      "run": true,
+      "deliver_count": 8,
+      "profile": {
+        "nickname": "V3场景租客07",
+        "gender": "男",
+        "birth_date": "1993-05-09",
+        "rent_budget": 3400,
+        "tidiness": "整洁",
+        "occupation": "护理师",
+        "lease_term": "1-2年",
+        "store_id": 14,
+        "schedule_type": "正常作息",
+        "has_pet": "无",
+        "smoking": "不吸烟",
+        "self_intro": "我第 7 次来这座城市工作，在七宝店附近做护理师。平时十二点左右睡，周末会稍微睡个懒觉，工作日节奏固定，下班回来不太折腾。周末做两顿饭、看部电影，公共区域用完顺手收拾。不抽烟，也不养宠物，预算卡得比较紧，月租希望控制在 3400 元上下。。最近常做的事是桌游、剧本杀，希望遇到好相处的室友。",
+        "roommate_expectation": "这是我第 7 次在这座城市找合租，希望遇到能长期相处的室友。希望室友和我年龄差不多（我今年 33 岁），作息能合得来，公共区域一起保持干净。大家的租金水平接近一些，我会控制在 3400 元左右。有事提前说一声，相处简单一点就好。",
+        "interest_tags": [
+          "桌游",
+          "剧本杀",
+          "密室逃脱"
+        ]
+      },
+      "preference": {
+        "age_min": 30,
+        "age_max": 37,
+        "age_required": "必须",
+        "budget_min": 3000,
+        "budget_max": 3800,
+        "budget_required": "必须",
+        "tidiness_min": "一般",
+        "tidiness_required": "加分",
+        "store_scope": "同门店",
+        "store_required": "加分",
+        "schedule_accept": [
+          "正常作息"
+        ],
+        "schedule_required": "必须",
+        "lease_min": "不限",
+        "lease_required": "加分",
+        "pet_accept": "接受",
+        "pet_required": "加分"
+      },
+      "moments": [
+        "下班顺路在七宝店附近买了个晚饭，回来把厨房台面擦干净才坐下。",
+        "这两天十二点前躺下，早上八点前出门，睡前把第二天要穿的衣服都放好了。",
+        "周末打算约朋友去剧本杀、密室逃脱，顺便把公共区域拖一遍。"
+      ],
+      "expect": {
+        "can_run": true,
+        "blocker": null,
+        "requested": 8,
+        "ex_ante_eligible": 1,
+        "ex_ante_unbounded": 8,
+        "note": "容量分层 低容量：门店范围内硬可匹配 1 人（不限门店 8 人）；交付要求 8 人"
+      },
+      "why": "门店×性别×租期格：七宝店（闵行）/ 男 / 1-2年；门店范围 同门店；必须项 年龄、作息、预算；容量分层 低容量（eligible 1）",
+      "ex_ante_capacity": {
+        "tier": "low",
+        "tier_label": "低容量",
+        "eligible": 1,
+        "eligible_unbounded": 8,
+        "raw_cell": 15,
+        "store_scope": "同门店",
+        "store_id": 14,
+        "store": "七宝店",
+        "area": "闵行",
+        "gender": "男",
+        "lease_term": "1-2年",
+        "must_dimensions": [
+          "年龄",
+          "作息",
+          "预算"
+        ],
+        "must_codes": [
+          "age",
+          "schedule",
+          "budget"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "key": "V3_08",
+      "account": "TEST_SCENARIO_V3_08",
+      "title": "V3-08 金桥店 · 男 · 1-2年 · 养宠必须",
+      "run": true,
+      "deliver_count": 8,
+      "profile": {
+        "nickname": "V3场景租客08",
+        "gender": "男",
+        "birth_date": "1996-07-21",
+        "rent_budget": 3000,
+        "tidiness": "一般",
+        "occupation": "物流调度",
+        "lease_term": "1-2年",
+        "store_id": 2,
+        "schedule_type": "正常作息",
+        "has_pet": "无",
+        "smoking": "不吸烟",
+        "self_intro": "我第 8 次来这座城市工作，在金桥店附近做物流调度。平时十二点左右睡，周末会稍微睡个懒觉，工作日节奏固定，下班回来不太折腾。周末做两顿饭、看部电影，公共区域用完顺手收拾。不抽烟，也不养宠物，对动物毛发有点过敏，希望室友不养宠物。。最近常做的事是养猫、撸猫，希望遇到好相处的室友。",
+        "roommate_expectation": "这是我第 8 次在这座城市找合租，希望遇到能长期相处的室友。希望室友和我年龄差不多（我今年 30 岁），作息能合得来，公共区域一起保持干净。我不太能接受室友养宠物，希望理解。有事提前说一声，相处简单一点就好。",
+        "interest_tags": [
+          "养猫",
+          "撸猫",
+          "宠物摄影"
+        ]
+      },
+      "preference": {
+        "age_min": 27,
+        "age_max": 34,
+        "age_required": "必须",
+        "budget_min": 2100,
+        "budget_max": 3900,
+        "budget_required": "加分",
+        "tidiness_min": "一般",
+        "tidiness_required": "加分",
+        "store_scope": "同门店",
+        "store_required": "加分",
+        "schedule_accept": [
+          "正常作息"
+        ],
+        "schedule_required": "必须",
+        "lease_min": "不限",
+        "lease_required": "加分",
+        "pet_accept": "不接受",
+        "pet_required": "必须"
+      },
+      "moments": [
+        "下班顺路在金桥店附近买了个晚饭，回来把厨房台面擦干净才坐下。",
+        "这两天十二点前躺下，早上八点前出门，睡前把第二天要穿的衣服都放好了。",
+        "周末打算约朋友去撸猫、宠物摄影，顺便把公共区域拖一遍。"
+      ],
+      "expect": {
+        "can_run": true,
+        "blocker": null,
+        "requested": 8,
+        "ex_ante_eligible": 1,
+        "ex_ante_unbounded": 15,
+        "note": "容量分层 低容量：门店范围内硬可匹配 1 人（不限门店 15 人）；交付要求 8 人"
+      },
+      "why": "门店×性别×租期格：金桥店（浦东）/ 男 / 1-2年；门店范围 同门店；必须项 年龄、作息、宠物态度；容量分层 低容量（eligible 1）",
+      "ex_ante_capacity": {
+        "tier": "low",
+        "tier_label": "低容量",
+        "eligible": 1,
+        "eligible_unbounded": 15,
+        "raw_cell": 19,
+        "store_scope": "同门店",
+        "store_id": 2,
+        "store": "金桥店",
+        "area": "浦东",
+        "gender": "男",
+        "lease_term": "1-2年",
+        "must_dimensions": [
+          "年龄",
+          "作息",
+          "宠物态度"
+        ],
+        "must_codes": [
+          "age",
+          "schedule",
+          "pet"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "key": "V3_09",
+      "account": "TEST_SCENARIO_V3_09",
+      "title": "V3-09 档案不完整：无租客动态",
+      "run": false,
+      "deliver_count": 8,
+      "profile": {
+        "nickname": "V3场景租客09",
+        "gender": "女",
+        "birth_date": "1992-09-12",
+        "rent_budget": 3000,
+        "tidiness": "整洁",
+        "occupation": "翻译",
+        "lease_term": "1-2年",
+        "store_id": 4,
+        "schedule_type": "正常作息",
+        "has_pet": "无",
+        "smoking": "不吸烟",
+        "self_intro": "我第 9 次来这座城市工作，在川沙店附近做翻译。平时十二点左右睡，周末会稍微睡个懒觉，工作日节奏固定，下班回来不太折腾。周末做两顿饭、看部电影，公共区域用完顺手收拾。不抽烟，也不养宠物，生活比较安静。最近常做的事是游泳、瑜伽，希望遇到好相处的室友。",
+        "roommate_expectation": "这是我第 9 次在这座城市找合租，希望遇到能长期相处的室友。希望室友和我年龄差不多（我今年 34 岁），作息能合得来，公共区域一起保持干净。有事提前说一声，相处简单一点就好。",
+        "interest_tags": [
+          "游泳",
+          "瑜伽",
+          "篮球"
+        ]
+      },
+      "preference": {
+        "age_min": 31,
+        "age_max": 38,
+        "age_required": "必须",
+        "budget_min": 2100,
+        "budget_max": 3900,
+        "budget_required": "加分",
+        "tidiness_min": "一般",
+        "tidiness_required": "加分",
+        "store_scope": "同片区",
+        "store_required": "加分",
+        "schedule_accept": [
+          "正常作息"
+        ],
+        "schedule_required": "必须",
+        "lease_min": "不限",
+        "lease_required": "加分",
+        "pet_accept": "接受",
+        "pet_required": "加分"
+      },
+      "moments": [],
+      "expect": {
+        "can_run": false,
+        "blocker": "moment",
+        "requested": 8,
+        "note": "有档案、有偏好、没有动态：readiness 应在「租客动态」阻断，不调模型"
+      },
+      "why": "负向 readiness：profile/preference 齐全，moments 为空，readiness 应在 moment 项阻断",
+      "ex_ante_capacity": {
+        "tier": "negative",
+        "tier_label": "负向",
+        "eligible": 8,
+        "store_scope": "同片区",
+        "store_id": 4,
+        "store": "川沙店",
+        "area": "浦东",
+        "gender": "女",
+        "lease_term": "1-2年",
+        "must_dimensions": [
+          "年龄",
+          "作息"
+        ],
+        "must_codes": [
+          "age",
+          "schedule"
+        ],
+        "requested": 8
+      }
+    },
+    {
+      "key": "V3_10",
+      "account": "TEST_SCENARIO_V3_10",
+      "title": "V3-10 档案不完整：无自我介绍",
+      "run": false,
+      "deliver_count": 8,
+      "profile": {
+        "nickname": "V3场景租客10",
+        "gender": "女",
+        "birth_date": "1992-10-18",
+        "rent_budget": 3000,
+        "tidiness": "一般",
+        "occupation": "室内设计师",
+        "lease_term": "1-2年",
+        "store_id": 4,
+        "schedule_type": "正常作息",
+        "has_pet": "无",
+        "smoking": "不吸烟",
+        "self_intro": "",
+        "roommate_expectation": "这是我第 10 次在这座城市找合租，希望遇到能长期相处的室友。希望室友和我年龄差不多（我今年 34 岁），作息能合得来，公共区域一起保持干净。有事提前说一声，相处简单一点就好。",
+        "interest_tags": [
+          "听播客",
+          "书法",
+          "绘画"
+        ]
+      },
+      "preference": {
+        "age_min": 31,
+        "age_max": 38,
+        "age_required": "必须",
+        "budget_min": 2100,
+        "budget_max": 3900,
+        "budget_required": "加分",
+        "tidiness_min": "一般",
+        "tidiness_required": "加分",
+        "store_scope": "同片区",
+        "store_required": "加分",
+        "schedule_accept": [
+          "正常作息"
+        ],
+        "schedule_required": "必须",
+        "lease_min": "不限",
+        "lease_required": "加分",
+        "pet_accept": "接受",
+        "pet_required": "加分"
+      },
+      "moments": [
+        "昨天晚上在川沙店附近跑了会儿步，回来洗了个澡就睡了。",
+        "今天把房间里的衣服整理了一遍，准备这周末去看看房子。"
+      ],
+      "expect": {
+        "can_run": false,
+        "blocker": "intro",
+        "requested": 8,
+        "note": "自我介绍是保存档案的业务必填项：通过 API 建档会在保存阶段被拒收；若允许空值，readiness 应在「自我介绍」项阻断"
+      },
+      "why": "负向 readiness：self_intro 为空；注意业务校验要求自我介绍必填，run_matrix 需兼容「建档即被拒」这一可观测结果",
+      "ex_ante_capacity": {
+        "tier": "negative",
+        "tier_label": "负向",
+        "eligible": 8,
+        "store_scope": "同片区",
+        "store_id": 4,
+        "store": "川沙店",
+        "area": "浦东",
+        "gender": "女",
+        "lease_term": "1-2年",
+        "must_dimensions": [
+          "年龄",
+          "作息"
+        ],
+        "must_codes": [
+          "age",
+          "schedule"
+        ],
+        "requested": 8
+      }
+    }
+  ]
+}

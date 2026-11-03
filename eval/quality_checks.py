@@ -52,7 +52,8 @@ def _rank(values, value):
 
 
 def _must_dims(preference):
-    return [key for key, value in (preference or {}).items()
+    # 返回维度名（age/budget/...），与 _has_constraint/_violates 的编码一致。
+    return [key[:-len("_required")] for key, value in (preference or {}).items()
             if key.endswith("_required") and value == "必须"]
 
 
@@ -94,7 +95,9 @@ def _violates(applicant, candidate, preference, code, as_of):
         if scope == "同门店":
             return bool(applicant.get("store")) and applicant.get("store") != candidate.get("store")
         if scope == "同片区":
-            return False  # 门店片区映射不在 bundle 里，交给人工/后端复核
+            left = applicant.get("store_area")
+            right = candidate.get("store_area")
+            return bool(left) and bool(right) and left != right
         return False
     if code == "schedule":
         return bool(applicant.get("schedule_type")) and applicant.get("schedule_type") not in set(_terms(preference.get("schedule_accept")))
@@ -272,3 +275,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     sys.exit(main())
+

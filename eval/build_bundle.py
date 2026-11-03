@@ -6,16 +6,16 @@
   docker compose exec -T backend python - < eval/build_quality_bundle.py > /tmp/bundle.json
 
 默认导出 member02 + 所有 TEST_SCENARIO_* 申请人的最新一次「匹配编排」任务。
-输出格式与 eval/quality_checks.py、eval/golden_matching.py 共用。
+输出格式与 eval/quality_checks.py 复用；meta 记录 oracle/环境指纹。
 """
-import asyncio, json
+import asyncio, json, os
 from datetime import datetime
 
 from tortoise import Tortoise
 from settings import TORTOISE_ORM
-from models import (AgentRun, MatchTask, MatchCandidate, MemberProfile, MemberPortrait,
-                    MemberMoment, RoommatePreference, User)
-from service import auditor_service, match_service, trace_service
+from models import (AgentRun, AiModelConfig, MatchTask, MatchCandidate, MemberProfile,
+                    MemberPortrait, MemberMoment, RoommatePreference, User)
+from service import auditor_service, match_service, member_service, trace_service
 
 
 def dt(value):
@@ -43,6 +43,7 @@ async def profile_bundle(member_id):
                          if field not in ("id", "member_id")} if portrait else None)
     data["moments"] = [{"content": moment.content, "time": dt(moment.create_time)}
                        for moment in moments]
+    data["store_area"] = member_service.area_name(profile.store_id) if profile.store_id else None
     return data
 
 
@@ -104,7 +105,26 @@ async def main():
             "rounds": await match_service.round_rows(run.id),
             "funnel": await trace_service.funnel(task.id),
         })
-    print(json.dumps({"generated_at": dt(datetime.now()), "runs": bundles},
+    model_rows = await AiModelConfig.filter(enabled="是").order_by("model_purpose")
+    model_configs = [{
+        "purpose": row.model_purpose,
+        "model_name": row.model_name,
+        "base_url": row.base_url,
+        "temperature": str(row.temperature) if row.temperature is not None else None,
+        "max_tokens": row.max_tokens,
+    } for row in model_rows]
+    meta = {
+        "generated_at": dt(datetime.now()),
+        "code_commit": os.environ.get("GIT_COMMIT", "unknown"),
+        "scenario_suite": os.environ.get("EVAL_SUITE", "unknown"),
+        "db_profile": os.environ.get("DB_PROFILE", "unknown"),
+        "labels_hash": os.environ.get("LABELS_HASH", ""),
+        "scenarios_hash": os.environ.get("SCENARIOS_HASH", ""),
+        "run_timeout_seconds": os.environ.get("MATCH_TIMEOUT_SECONDS", "600"),
+        "warm_portraits": False,
+        "model_configs": model_configs,
+    }
+    print(json.dumps({"generated_at": dt(datetime.now()), "meta": meta, "runs": bundles},
                      ensure_ascii=False, indent=1))
     await Tortoise.close_connections()
 
