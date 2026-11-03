@@ -7,23 +7,6 @@ SET `gender`='男', `birth_date`='1998-09-21', `rent_budget`=3600, `tidiness`='�
     `store_id`=12, `schedule_type`='正常作息', `lease_term`='6-12个月', `has_pet`='无',
     `smoking`='不吸烟', `audit_status`='已通过', `enabled`='是',
     `self_intro`='在漕河泾做销售，计划住一年左右；作息正常，平时打篮球。', `roommate_expectation`='希望室友作息合拍、好沟通，预算和租期对得上。'
-WHERE `id`=1;
-
-UPDATE `roommate_preference`
-SET `age_min`=24, `age_max`=34, `age_required`='必须',
-    `budget_min`=3000, `budget_max`=4200, `budget_required`='必须',
-    `tidiness_min`='一般', `tidiness_required`='加分',
-    `store_scope`='同片区', `store_required`='必须',
-    `schedule_accept`='正常作息,正常作息', `schedule_required`='加分',
-    `lease_min`='6-12个月', `lease_required`='加分',
-    `pet_accept`='无所谓', `pet_required`='加分'
-WHERE `member_id`=1;
-
-UPDATE `member_profile`
-SET `gender`='男', `birth_date`='1998-09-21', `rent_budget`=3600, `tidiness`='一般',
-    `store_id`=12, `schedule_type`='正常作息', `lease_term`='6-12个月', `has_pet`='无',
-    `smoking`='不吸烟', `audit_status`='已通过', `enabled`='是',
-    `self_intro`='在漕河泾做销售，计划住一年左右；作息正常，平时打篮球。', `roommate_expectation`='希望室友作息合拍、好沟通，预算和租期对得上。'
 WHERE `id`=129;
 
 UPDATE `roommate_preference`

@@ -768,7 +768,7 @@ holdout_gate 默认已纳入 v2 的 6 个场景，阈值仍为平均 ≥4/8、�
 
 ## 四十二、Holdout v2 补流动性后验证（2026-11-03 15:40）
 
-针对 v2 的 S42/S43/S46/S47 门店级候选缺口，新增 `19-holdout-v2-liquidity.sql`（32 位候选）。
+针对 v2 的 S42/S43/S46/S47 门店级候选缺口，新增 `19-holdout-v2-liquidity.sql`（31 位候选，排除演示申请人 #1）。
 
 v2 3 trials：
 
