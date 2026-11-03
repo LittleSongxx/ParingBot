@@ -83,3 +83,9 @@
 
 见 `docs/release-checklist.md`：CI 三件套、freeze-guard、eval unittest、v3 verify（发布模式含 judge/cost）、
 人工抽检。任何一项缺失即不得发布质量结论。
+
+## 10. 历史数据说明
+
+git 历史提交中仍保留旧版评测脚本、被污染供给 SQL 与旧 RESULTS 数字（HEAD 已删除/重写）。
+历史数据只用于追溯，不得引用为质量证据；如需对外仓库说明，请在 README/发布页标注
+"历史提交中的评测数据不可用"。
