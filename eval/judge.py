@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import re
 import sys
 import urllib.request
@@ -21,7 +20,7 @@ from lib.env import load_env  # noqa: E402
 DEFAULT_ENV = ROOT.parent / ".env.eval"
 POINT_PROMPT = """你是独立合租匹配评审。只根据双方资料判断候选是否适合该申请方，不要参考已有审核结论。
 评分 1-5：1=明显不适合，3=一般，5=非常合适。资料不足时 score=null 并说明缺什么。
-只输出 JSON，不要解释：{"score": 1-5 或 null, "reason": "一句话", "missing": "缺什么/无"}。
+只输出 JSON：{"score": 1-5 或 null, "reason": "一句话", "missing": "缺什么/无"}。
 
 【申请方】
 {applicant}
@@ -56,7 +55,7 @@ def text(item: dict) -> str:
     }, ensure_ascii=False, default=str)
 
 
-def call(env: dict, prompt: str, model: str, base_url: str, api_key: str) -> dict:
+def call(prompt: str, model: str, base_url: str, api_key: str) -> dict:
     payload = {"model": model, "temperature": 0.0, "max_tokens": 1200,
                "response_format": {"type": "json_object"},
                "messages": [{"role": "user", "content": prompt}]}
@@ -82,6 +81,46 @@ def delivered(bundle: dict) -> list[dict]:
     return rows
 
 
+def pairwise(rows: list[dict], model: str, base_url: str, api_key: str) -> dict:
+    pairs = []
+    for row in rows:
+        others = [item for item in (row["run"].get("candidates") or []) if not item.get("delivered")]
+        if others:
+            pairs.append((row["applicant"], row["candidate"], others[0]))
+    if not pairs:
+        raise SystemExit("pairwise 需要 run 内存在未交付候选；当前 bundle 没有，改用 pointwise")
+    wins = 0
+    comparisons = 0
+    rows_out = []
+    for index, (app, delivered_candidate, rejected_candidate) in enumerate(pairs):
+        verdicts = []
+        for swapped in (False, True):
+            left, right = (rejected_candidate, delivered_candidate) if swapped else (delivered_candidate, rejected_candidate)
+            prompt = PAIR_PROMPT.format(applicant=text(app), candidate_a=text(left), candidate_b=text(right))
+            try:
+                data = call(prompt, model, base_url, api_key)
+                verdicts.append(data.get("winner"))
+            except Exception as exc:  # noqa: BLE001
+                verdicts.append("error:" + str(exc))
+        consistent = False
+        if len(verdicts) == 2 and verdicts[0] in ("A", "B", "tie") and verdicts[1] in ("A", "B", "tie"):
+            if verdicts[0] == "tie" and verdicts[1] == "tie":
+                consistent = True
+            elif verdicts[0] == "A" and verdicts[1] == "B":
+                consistent = True
+            elif verdicts[0] == "B" and verdicts[1] == "A":
+                consistent = True
+            if consistent and verdicts[0] != "tie":
+                wins += 1
+            comparisons += 1
+        rows_out.append({"index": index, "delivered": delivered_candidate.get("nickname"),
+                         "rejected": rejected_candidate.get("nickname"), "verdicts": verdicts,
+                         "consistent_after_swap": consistent})
+    return {"mode": "pairwise", "model": model, "pairs": rows_out,
+            "aggregate": {"pairs": len(pairs), "valid": comparisons, "delivered_wins": wins,
+                          "delivered_win_rate": round(wins / comparisons, 3) if comparisons else None}}
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="独立 judge（跨模型族）")
     parser.add_argument("--bundle", required=True, type=Path)
@@ -94,10 +133,10 @@ def main(argv=None) -> int:
     parser.add_argument("--json", type=Path, default=None)
     args = parser.parse_args(argv)
     env = load_env(args.env_file)
-    provider = env.get("EVAL_JUDGE_PROVIDER")
-    api_key = env.get("EVAL_JUDGE_API_KEY") or ""
-    base_url = env.get("EVAL_JUDGE_BASE_URL") or ""
-    model = env.get("EVAL_JUDGE_MODEL") or ""
+    provider = env.get("EVAL_JUDGE_PROVIDER", "")
+    api_key = env.get("EVAL_JUDGE_API_KEY", "")
+    base_url = env.get("EVAL_JUDGE_BASE_URL", "")
+    model = env.get("EVAL_JUDGE_MODEL", "")
     if not all([provider, api_key, base_url, model]):
         raise SystemExit("缺少 EVAL_JUDGE_PROVIDER/BASE_URL/API_KEY/MODEL；judge 必须独立配置")
     bundle = json.loads(args.bundle.read_text(encoding="utf-8"))
@@ -107,30 +146,28 @@ def main(argv=None) -> int:
     rows = delivered(bundle)
     if not rows:
         raise SystemExit("bundle 中没有交付候选")
-    scored = []
-    for index, row in enumerate(rows):
-        if args.mode == "pointwise":
+    if args.mode == "pairwise":
+        result = pairwise(rows, model, base_url, api_key)
+    else:
+        scored = []
+        for index, row in enumerate(rows):
             prompt = POINT_PROMPT.format(applicant=text(row["applicant"]), candidate=text(row["candidate"]))
             try:
-                data = call(env, prompt, model, base_url, api_key)
+                data = call(prompt, model, base_url, api_key)
                 scored.append({"index": index, "candidate": row["candidate"].get("nickname"),
                                "score": data.get("score"), "reason": data.get("reason")})
             except Exception as exc:  # noqa: BLE001
                 scored.append({"index": index, "candidate": row["candidate"].get("nickname"),
                                "score": None, "error": str(exc)})
-    scores = [item["score"] for item in scored if isinstance(item.get("score"), (int, float))]
-    result = {
-        "mode": args.mode, "provider": provider, "model": model,
-        "rows": scored,
-        "aggregate": {"judged": len(scores), "errors": len(scored) - len(scores),
-                      "avg_score": round(sum(scores) / len(scores), 3) if scores else None},
-    }
-    lines = ["# 独立 judge 报告", "", f"- 模式：{args.mode}；模型：{model}（{provider}）",
-             f"- 已评：{result['aggregate']['judged']}；失败：{result['aggregate']['errors']}",
-             f"- 平均分：{result['aggregate']['avg_score']}", "",
-             "> judge 为探索性外部信号，不是人工真值；不得作为唯一质量依据。"]
+        scores = [item["score"] for item in scored if isinstance(item.get("score"), (int, float))]
+        result = {"mode": "pointwise", "provider": provider, "model": model, "rows": scored,
+                  "aggregate": {"judged": len(scores), "errors": len(scored) - len(scores),
+                                "avg_score": round(sum(scores) / len(scores), 3) if scores else None}}
     if args.json:
         args.json.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
+    lines = ["# 独立 judge 报告", "", f"- 模式：{args.mode}；模型：{model}（{provider}）",
+             f"- 聚合：{json.dumps(result['aggregate'], ensure_ascii=False)}", "",
+             "> judge 为探索性外部信号，不是人工真值；不得作为唯一质量依据。"]
     if args.out:
         args.out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(json.dumps(result["aggregate"], ensure_ascii=False))
