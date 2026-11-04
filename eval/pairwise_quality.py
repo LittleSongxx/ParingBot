@@ -121,7 +121,7 @@ def pick_control(applicant: dict, approved: list, preferences: dict, rng: random
         return candidates[rng.randrange(min(3, len(candidates)))][1]
     return rng.choice(approved)
 
-def call(env: dict, pairs: list[dict], max_tokens: int = 2048) -> list[dict]:
+def call(env: dict, pairs: list[dict], max_tokens: int = 8192) -> list[dict]:
     base_url = env["EVAL_JUDGE_BASE_URL"].rstrip("/")
     api_key = env["EVAL_JUDGE_API_KEY"]
     model = env["EVAL_JUDGE_MODEL"]
@@ -135,7 +135,8 @@ def call(env: dict, pairs: list[dict], max_tokens: int = 2048) -> list[dict]:
         method="POST")
     with urllib.request.urlopen(request, timeout=180) as response:
         body = json.loads(response.read().decode("utf-8"))
-    content = body["choices"][0]["message"].get("content") or ""
+    message = body["choices"][0]["message"]
+    content = message.get("content") or message.get("reasoning_content") or ""
     content = re.sub(r"```(?:json)?", "", content).strip("` \n")
     match = re.search(r"\[.*\]", content, re.S)
     if not match:
