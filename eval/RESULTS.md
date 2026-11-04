@@ -153,3 +153,13 @@
   v4 scenarios 重新冻结（sha256 f52ad0…），`check_v4_freeze` 现在会拒绝明显自相矛盾的档案；
 - 影响：这是**数据质量/可观测性**改进，不是匹配质量提升；v4 pilot 结果仍基于旧标签版本，
   但场景/账号不变，后续全量 v4 使用新数据。
+
+## 15. 内容质量指标（2026-11-04，代理评审）
+
+- 此前内容质量（画像/解释）为 **N/A**；新增 `eval/content_quality.py`，用异族模型对
+  bundle 里的 portrait（summary + tags）按 faithful/coherent/readable/respectful/overall 打分；
+- 20 条样本（申请方 + 交付候选）结果：
+  - **overall 4.875/5**、faithful 4.875、coherent 5.0、readable 5.0、respectful 5.0；
+  - 规则 warning：**2/20**（“不养宠物”否定句已排除误报）；
+- 结论：内容质量在代理视角**较高**；但仍是 LLM 代理评审，不是人工真值，不能代替内容人工审核；
+- 建议把该脚本作为 live-eval 的可选步骤（需 EVAL_JUDGE_*），与匹配质量并列报告。
