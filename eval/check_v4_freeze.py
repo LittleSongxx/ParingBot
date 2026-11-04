@@ -16,6 +16,9 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "human_eval"))
+from data_consistency import assess_person  # noqa: E402
+
 EVAL_DIR = Path(__file__).resolve().parent
 BASE = EVAL_DIR / "frozen" / "v4"
 
@@ -56,6 +59,10 @@ def check(base: Path = BASE) -> list[str]:
             errors.append(f"{item.get('key')} 容量为 0")
     if tiers != {"high": 16, "medium": 12, "low": 12}:
         errors.append(f"容量层不匹配：{tiers}")
+    for item in positives:
+        result = assess_person(item.get("profile") or {})
+        if result["score"] == 0:
+            errors.append(f"{item.get('key')} 档案自相矛盾：{result['reasons']}")
     blockers = sorted({(item.get("expect") or {}).get("blocker") for item in negatives})
     if blockers != ["intro", "moment"]:
         errors.append(f"负向 blocker 不匹配：{blockers}")

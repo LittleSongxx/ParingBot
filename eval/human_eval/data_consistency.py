@@ -17,7 +17,10 @@ PET_TAGS = {
     "养猫", "撸猫", "养狗", "遛狗", "养仓鼠", "仓鼠", "爬宠", "爬行动物",
     "养鱼", "水族", "宠物摄影", "猫咖", "狗咖",
 }
-NO_PET_PHRASES = ("不养宠物", "不能接受宠物", "不接受宠物", "对动物毛发过敏", "动物毛发过敏")
+NO_PET_PHRASES = (
+    "不养宠物", "不能接受宠物", "不接受宠物", "对动物毛发过敏", "动物毛发过敏",
+    "不能接受室友养宠", "不太能接受室友养宠", "不能接受室友养宠物",
+)
 
 
 def _pref_detail(person: dict) -> dict:
@@ -45,23 +48,42 @@ def _tags(person: dict) -> set[str]:
     return set()
 
 
+def _person_reasons(person: dict) -> list[str]:
+    reasons: list[str] = []
+    tags = _tags(person) & PET_TAGS
+    has_pet = person.get("has_pet")
+    accept = _pet_accept(person)
+    text = _text(person)
+    says_no = any(phrase in text for phrase in NO_PET_PHRASES)
+    if has_pet == "无" and tags and (says_no or accept == "不接受"):
+        reasons.append(f"has_pet=无 但兴趣含{','.join(sorted(tags))} 且有不养/过敏表述")
+    elif has_pet == "有" and accept == "不接受":
+        reasons.append("has_pet=有 但 pet_accept=不接受")
+    elif has_pet == "无" and tags:
+        reasons.append(f"兴趣含{','.join(sorted(tags))} 但 has_pet=无（轻微歧义）")
+    if has_pet in (None, "") or "interest_tags" not in person:
+        reasons.append("关键字段缺失")
+    return reasons
+
+
+def assess_person(person: dict) -> dict:
+    """单个档案的自洽性：0=明显矛盾，1=轻微缺失/歧义，2=自洽。"""
+    reasons = _person_reasons(person or {})
+    severe = [reason for reason in reasons if "轻微" not in reason and "缺失" not in reason]
+    if severe:
+        score = 0
+    elif reasons:
+        score = 1
+    else:
+        score = 2
+    return {"score": score, "reasons": reasons}
+
+
 def assess(pair: dict) -> dict:
     reasons: list[str] = []
     for side in ("applicant", "candidate"):
-        person = pair.get(side) or {}
-        tags = _tags(person) & PET_TAGS
-        has_pet = person.get("has_pet")
-        accept = _pet_accept(person)
-        text = _text(person)
-        says_no = any(phrase in text for phrase in NO_PET_PHRASES)
-        if has_pet == "无" and tags and (says_no or accept == "不接受"):
-            reasons.append(f"{side}: has_pet=无 但兴趣含{','.join(sorted(tags))} 且有不养/过敏表述")
-        elif has_pet == "有" and accept == "不接受":
-            reasons.append(f"{side}: has_pet=有 但 pet_accept=不接受")
-        elif has_pet == "无" and tags:
-            reasons.append(f"{side}: 兴趣含{','.join(sorted(tags))} 但 has_pet=无（轻微歧义）")
-        if has_pet in (None, "") or "interest_tags" not in person:
-            reasons.append(f"{side}: 关键字段缺失")
+        for reason in _person_reasons(pair.get(side) or {}):
+            reasons.append(f"{side}: {reason}")
     severe = [reason for reason in reasons if "轻微" not in reason and "缺失" not in reason]
     if severe:
         score = 0

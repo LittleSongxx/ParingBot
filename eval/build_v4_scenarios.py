@@ -101,9 +101,29 @@ def _select(cell_sets: list[list[dict]], counts: list[int], seed_value: int) -> 
     return selected
 
 
+
+# v4 数据质量：生成档案后去掉“无宠物/不接受宠物”档案里的养宠类兴趣标签，
+# 避免 v3 面板发现的“兴趣含养猫 vs has_pet=无/过敏”自相矛盾。
+PET_TAGS = ("养猫", "撸猫", "养狗", "遛狗", "养仓鼠", "仓鼠", "爬宠", "爬行动物",
+            "养鱼", "水族", "宠物摄影", "猫咖", "狗咖")
+FALLBACK_TAGS = ("看电影", "听音乐", "跑步", "咖啡", "看展", "爬山", "小说", "桌游")
+
+
+def _clean_tags(tags, has_pet):
+    tags = [tag for tag in (tags or []) if tag not in PET_TAGS] if has_pet == "无" else list(tags or [])
+    for fallback in FALLBACK_TAGS:
+        if len(tags) >= 3:
+            break
+        if fallback not in tags:
+            tags.append(fallback)
+    return tags[:3]
+
+
 def _positive(spec: dict, cell: dict, seq: int) -> dict:
     applicant, profile, preference, _app_pref, must_codes = v3._make_applicant(
         spec, cell["store_id"], cell["gender"], cell["lease_term"], AS_OF)
+    profile = dict(profile)
+    profile["interest_tags"] = _clean_tags(profile.get("interest_tags"), profile.get("has_pet"))
     store_name = rules.store_name(cell["store_id"]) or str(cell["store_id"])
     suffix = {"store": "门店必须", "budget": "预算必须", "pet": "养宠必须"}.get(spec.get("extra"), "容量基线")
     return {

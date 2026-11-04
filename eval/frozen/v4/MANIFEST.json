@@ -3,7 +3,7 @@
   "protocol_version": "v4-2026-11-04",
   "seed": 20261104,
   "as_of": "2026-11-04",
-  "status": "design-frozen; labels pending human/judge",
+  "status": "design-frozen; labels pending human/judge; profiles sanitized for pet-tag consistency",
   "scenario_count": 48,
   "positive_count": 40,
   "negative_count": 8,
@@ -11,7 +11,7 @@
   "generator": "eval/build_v4_scenarios.py",
   "scenarios": {
     "file": "eval/frozen/v4/scenarios.json",
-    "sha256": "b0c535c6e32a2290051c0d742a101740671e5ce5117e55e928626f662cb1508e"
+    "sha256": "f52ad089ec4d6063aa9757006549c517ee2330a28dbbe93aff7f7f208922fda7"
   },
   "labels": {
     "status": "pending",

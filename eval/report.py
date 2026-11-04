@@ -124,6 +124,8 @@ def build(args) -> tuple[dict, str]:
     checks = [quality_checks.check_run(item) for item in bundle.get("runs", [])]
     quality_errors = [error for check in checks for error in check["errors"]]
     hard_violations = sum(len(check.get("hard_rule_violations") or []) for check in checks)
+    profile_warnings = [warning for check in checks
+                        for warning in check.get("profile_consistency_warnings") or []]
     safety_findings = safety_checks.scan_bundle(bundle)
     safety_errors = [item for item in safety_findings if item.get("severity") == "error"]
 
@@ -221,6 +223,7 @@ def build(args) -> tuple[dict, str]:
         "quality": {
             "hard_rule_violations": hard_violations,
             "data_consistency_errors": quality_errors,
+            "profile_consistency_warnings": profile_warnings,
             "checks": checks,
         },
         "safety": {
@@ -287,6 +290,7 @@ def render(result: dict) -> str:
         "",
         f"- 硬规则违规：{result['quality']['hard_rule_violations']}",
         f"- 数据一致性错误：{len(result['quality']['data_consistency_errors'])}",
+        f"- 档案自洽 warning：{len(result['quality'].get('profile_consistency_warnings') or [])}（不门禁）",
         f"- 安全 error / warning：{safety['errors']} / {safety['warnings']}",
         f"- 成本：{cost['estimated_cost']}（token {cost['total_tokens']}）",
         f"- 延迟 P50/P95：{latency['p50_seconds']}s / {latency['p95_seconds']}s",

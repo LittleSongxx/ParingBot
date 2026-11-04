@@ -64,6 +64,19 @@ class SafetyChecksTest(unittest.TestCase):
         self.assertTrue(safety_checks.scan_text("保证一定合适", "run.output_summary", 1, "x"))
 
 
+class ProfileConsistencyTest(unittest.TestCase):
+    def test_profile_consistency_warnings(self):
+        bundle = run_bundle(candidate_preference={"pet_required": "必须", "pet_accept": "不接受"})
+        bundle["candidates"][0].update({
+            "interest_tags": "茶道,养猫",
+            "has_pet": "无",
+            "roommate_expectation": "对动物毛发过敏，不能接受室友养宠物",
+        })
+        result = quality_checks.check_run(bundle)
+        self.assertTrue(result["profile_consistency_warnings"])
+        self.assertFalse(result["hard_rule_violations"])
+
+
 class ReportGateTest(unittest.TestCase):
     def _args(self, mode="baseline", baseline=None, matrix=None):
         return [
@@ -125,3 +138,4 @@ class JudgePromptTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

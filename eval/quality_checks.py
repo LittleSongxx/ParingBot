@@ -25,6 +25,8 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
+from human_eval import data_consistency
+
 LEASE_TERMS = ("3个月以下", "3-6个月", "6-12个月", "1-2年", "2年以上")
 TIDINESS_LEVELS = ("随意", "一般", "整洁", "洁癖")
 SCHEDULE_TYPES = ("早睡早起", "正常作息", "夜猫子")
@@ -182,6 +184,12 @@ def check_run(run_bundle):
         if problems:
             violations.append({"candidate": candidate.get("nickname"), "candidate_id": candidate.get("id"),
                                "problems": problems})
+    profile_warnings = []
+    people = [("applicant", applicant)] + [("candidate", row) for row in delivered]
+    for role, person in people:
+        result = data_consistency.assess_person(person)
+        if result["score"] == 0:
+            profile_warnings.append({"role": role, "reasons": result["reasons"]})
     summary_numbers = parse_summary(run.get("summary"))
     funnel = run_bundle.get("funnel") or {}
     stages = {stage.get("key"): stage.get("value") for stage in (funnel.get("stages") or [])}
@@ -227,6 +235,7 @@ def check_run(run_bundle):
         "counts": counts, "summary_numbers": summary_numbers,
         "summary_errors": summary_errors,
         "hard_rule_violations": violations,
+        "profile_consistency_warnings": profile_warnings,
         "evidence": {"delivered": len(delivered),
                      "with_portrait": len(delivered) - len(portrait_missing),
                      "with_evidence": sum(1 for row in delivered
