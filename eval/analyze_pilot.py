@@ -51,12 +51,29 @@ def analyze(matrix: dict, scenarios: dict) -> dict:
         full = [value == expected for value in delivered]
         cap = [value >= target for value in delivered]
         any_ok = [value > 0 for value in delivered]
+        causes = []
+        for run in runs:
+            counts = run.get("counts") or {}
+            total = int(counts.get("total") or 0)
+            passed = int(counts.get("passed") or 0)
+            value = int(run.get("delivered") or 0)
+            if value >= target:
+                continue
+            if total < target:
+                causes.append("supply")
+            elif passed < target:
+                causes.append("audit")
+            else:
+                causes.append("other")
         rows.append({
             "key": key,
             "tier": (scenario.get("ex_ante_capacity") or {}).get("tier"),
             "delivered": delivered,
             "expected": expected,
             "target": target,
+            "target_shortfall": any(value < target for value in delivered),
+            "shortfall_causes": causes,
+            "capacity_limited": target < expected,
             "delivery_rate": round(statistics.mean([value / expected for value in delivered]), 4),
             "pass_full": all(full),
             "pass_cap": all(cap),
@@ -84,6 +101,12 @@ def analyze(matrix: dict, scenarios: dict) -> dict:
         "pass_any": round(sum(1 for row in rows if row["pass_any"]) / len(rows), 4) if rows else 0.0,
         "consistency": round(sum(1 for row in rows if row["consistent"]) / len(rows), 4) if rows else 0.0,
         "failures": sum(row["failures"] for row in rows),
+        "shortfall": {
+            "scenarios_target_short": sum(1 for row in rows if row.get("target_shortfall")),
+            "causes": {cause: sum(1 for row in rows if cause in (row.get("shortfall_causes") or []))
+                       for cause in ("supply", "audit", "other")},
+            "capacity_limited": sum(1 for row in rows if row.get("capacity_limited")),
+        },
         "tier_stats": tier_stats,
         "rows": rows,
     }
@@ -101,9 +124,14 @@ def render(result: dict) -> str:
              "| 层 | n | 交付率 | pass^k(cap) |", "|---|---|---|---|"]
     for tier, item in result["tier_stats"].items():
         lines.append(f"| {tier} | {item['n']} | {item['delivery_rate']:.2%} | {item['pass_cap']:.3f} |")
-    lines += ["", "| 场景 | tier | delivered | target | pass_cap |", "|---|---|---|---|---|"]
+    lines += ["", "| 场景 | tier | delivered | target | pass_cap | 短交付原因 |",
+              "|---|---|---|---|---|---|"]
     for row in result["rows"]:
-        lines.append(f"| {row['key']} | {row['tier']} | {row['delivered']} | {row['target']} | {row['pass_cap']} |")
+        lines.append(f"| {row['key']} | {row['tier']} | {row['delivered']} | {row['target']} | "
+                     f"{row['pass_cap']} | {','.join(row.get('shortfall_causes') or []) or '-'} |")
+    shortfall = result["shortfall"]
+    lines += ["", f"- 短交付场景：{shortfall['scenarios_target_short']} 个；原因 {shortfall['causes']}；"
+              f"容量上限低于 requested：{shortfall['capacity_limited']} 个"]
     lines += ["", "> 这是真实运行结果；样本仍小（pilot），不能当作完整 v4 质量结论。"]
     return "\n".join(lines) + "\n"
 

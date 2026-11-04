@@ -30,6 +30,7 @@ class PilotAnalysisTest(unittest.TestCase):
         self.assertEqual(result["scenarios"], 2)
         self.assertEqual(result["pass_full"], 0.5)
         self.assertEqual(result["pass_cap"], 0.5)
+        self.assertTrue(result["shortfall"]["scenarios_target_short"] >= 0)
         self.assertEqual(result["consistency"], 1.0)
         self.assertLessEqual(result["delivery_ci95"]["lo"], result["delivery_ci95"]["hi"])
 
