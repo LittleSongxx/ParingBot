@@ -41,12 +41,13 @@ overall(1-5，按规则计算), reason(<=40字)。
 - hard_gate=1 当且仅当 同性 + 双方必须项互相满足 + 租期档差<2；任一不满足=0。
 - lifestyle_conflicts：schedule=夜猫子 vs 早睡/正常；smoking=经常吸烟 vs 不吸烟；
   pet=一方养宠/过敏且另一方不接受；tidiness=整洁度相差>=2档。
-- commute: 2=同门店，1=同片区/同城，0=跨区/异地。
+- commute: 2=同 store_id；1=同片区但不同 store；0=跨区/异地；无 store_id 时同片区只能记 1。
 - lease_stability: 2=档位相同，1=相邻一档，0=相差>=2档。
 - data_consistency: 2=完整自洽，1=轻微缺失，0=明显矛盾（兴趣/自述 vs 字段）。
 - boundary: 2=无隐私/越权/承诺，1=轻微，0=严重。
 - overall 规则：hard_gate=0 -> 1；冲突>=2 -> 2；冲突=1 -> 3；
-  否则 bonus=同门店(1)+同档租期(1)+数据自洽(1)+边界干净(1)，bonus>=3 -> 5 否则 4。
+  否则 bonus=同门店(1)+同档租期(1)+数据自洽(1)+边界干净(1)，bonus>=3 -> 5 否则 4；
+  若 data_consistency=0，则 overall=min(overall,3)。
 只输出 JSON 数组，不要 markdown/解释。
 """
 

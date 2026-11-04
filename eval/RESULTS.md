@@ -85,3 +85,21 @@
 - **重要限定**：overall κ 提升部分是“确定性汇总”造成的结构性一致，item-level 仍有分歧；
   data 矛盾上限测试后 κ=0.828/0.927；v2.1 需补 store_id、明确同门店/同片区定义，再跑 5 评者；
 - 这是评分量表一致性，不是“匹配质量提升”；代理评审仍不能替代人工（见 `eval/human_eval/PROXY.md`）。
+
+## 9. Rubric v2.1 校准（P0 收尾，2026-11-04）
+
+- 在 v2 基础上：盲评材料加入 `store_id/store_name`；明确 commute（同 store_id=2、同片区=1、跨区=0）；
+  `data_consistency=0` 时 overall≤3；
+- 5 位评者（4 DeepSeek 子 Agent + Qwen3.7-plus）×16 对：
+  - overall κ **0.896**（v2 0.832）；加权 κ **0.941**；Spearman **0.944**；
+  - hard_gate κ **1.000**；commute 完全一致率 **1.000**（v2 0.662）；data 一致率 0.719（仍是分歧点）；
+  - 交付组 3.833 vs 随机对照 1.000（样本与 v2 不同，不做直接对比）；
+- 结论：commute 歧义已修复；data 判定（养鱼/爬宠/养仓鼠 vs has_pet）仍需白名单；仍是代理评审，不是人工真值。
+
+## 10. P1：v4 评测集设计（2026-11-04）
+
+- 生成 **40 正向 + 8 负向**（4 缺动态 + 4 缺自我介绍），确定性 seed=20261104；
+- 容量层 高 16 / 中 12 / 低 12；19 男 / 21 女；16 门店；5 个租期档；
+- 文件：`eval/frozen/v4/scenarios.json`（sha256 见 `MANIFEST.json`）、`DESIGN.md`、`DATASHEET.md`、`COVERAGE.md`；
+- **标签 pending**：不使用 heuristic gold，需人工/judge 分级 0–3；标签完成前 v4 不接门禁；
+- 下一步：12 场景×3 trials 方法验证 → 40×3 全量 → 100 对标签/校准。
