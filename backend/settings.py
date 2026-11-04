@@ -145,6 +145,8 @@ MAX_UPLOAD_MB = _env_int("MAX_UPLOAD_MB", 5)
 # ---------- 智能匹配 ----------
 # 一次匹配运行的超时时间，超时后运行标记为中断，页面可以重新发起
 MATCH_TIMEOUT_SECONDS = _env_int("MATCH_TIMEOUT_SECONDS", 600)
+# 质量门禁：开时把明确的生活习惯冲突候选从交付名单剔除（默认关，用于 A/B）
+QUALITY_GATE = _env_str("QUALITY_GATE", "off").strip().lower() in ("1", "true", "yes", "on")
 
 # ---------- 启动 ----------
 HOST = _env_str("HOST", "localhost")

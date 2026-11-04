@@ -34,7 +34,7 @@ from models import (AgentDefinition, AgentRun, AgentStep, AiModelConfig, Functio
                     PromptTemplate, RoommatePreference, User)
 from service import (agent_service, auditor_service, config_service, member_service,
                      preference_service, screener_service)
-from settings import MATCH_TIMEOUT_SECONDS
+from settings import MATCH_TIMEOUT_SECONDS, QUALITY_GATE
 
 # 运行类型，一次匹配编排对应一条运行记录
 RUN_TYPE = "匹配编排"
@@ -345,6 +345,31 @@ def _suitability_score(applicant: MemberProfile, candidate: MemberProfile,
     return score
 
 
+
+
+def _severe_quality_conflict(applicant, candidate, preference) -> bool:
+    """质量门禁用：明显生活习惯冲突（与排序惩罚同口径，但用于剔除）。
+
+    只挡最确定的三类：不吸烟 vs 经常吸烟、宠物不接受 vs 有宠、整洁度低于
+    申请方最低要求 2 档及以上。默认关闭，由 env QUALITY_GATE 控制。
+    """
+    if applicant is None or candidate is None:
+        return False
+    if applicant.smoking == "不吸烟" and candidate.smoking == "经常":
+        return True
+    if preference is not None and candidate.has_pet == "有" and preference.pet_accept == "不接受":
+        return True
+    if preference is not None and candidate.tidiness and preference.tidiness_min:
+        try:
+            gap = (member_service.TIDINESS_LEVELS.index(candidate.tidiness)
+                   - member_service.TIDINESS_LEVELS.index(preference.tidiness_min))
+            if gap <= -2:
+                return True
+        except ValueError:
+            pass
+    return False
+
+
 def _deliverable_sort_key(row: MatchCandidate):
     """交付名单的排序键：初筛得分高的在前，同分按审核轮次近的在前，最后用 id 兜底。
 
@@ -397,6 +422,16 @@ async def deliverable(task_id: int) -> tuple[list, str | None]:
     if applicant is not None:
         candidate_ids = [row.candidate_member_id for row in passed]
         members = {item.id: item for item in await MemberProfile.filter(id__in=candidate_ids)}
+        if QUALITY_GATE:
+            blocked = [row for row in passed
+                       if members.get(row.candidate_member_id) is not None
+                       and _severe_quality_conflict(applicant, members[row.candidate_member_id], preference)]
+            if blocked:
+                blocked_ids = {row.id for row in blocked}
+                passed = [row for row in passed if row.id not in blocked_ids]
+                extra = f"质量门禁剔除 {len(blocked)} 人（吸烟/整洁/宠物明确冲突）"
+                note = f"{note}；{extra}" if note else extra
+
         def rank_key(row: MatchCandidate):
             member = members.get(row.candidate_member_id)
             suitability = _suitability_score(applicant, member, preference) if member else 0

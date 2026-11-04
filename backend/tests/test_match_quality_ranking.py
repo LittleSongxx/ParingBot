@@ -1,4 +1,4 @@
-"""质量感知排序惩罚的纯单元测试（不连数据库、不调模型）。"""
+"""质量感知排序惩罚 / 质量门禁的纯单元测试（不连数据库、不调模型）。"""
 from datetime import date
 from types import SimpleNamespace
 
@@ -45,3 +45,14 @@ class QualityRankingTest:
         pet = match_service._suitability_score(
             applicant, _member(has_pet="有"), preference)
         assert pet < clean
+
+    def test_severity_gate(self):
+        applicant, preference = _member(), _preference(pet_accept="不接受")
+        assert match_service._severe_quality_conflict(
+            applicant, _member(smoking="经常"), _preference())
+        assert match_service._severe_quality_conflict(
+            applicant, _member(tidiness="随意"), _preference(tidiness_min="整洁"))
+        assert match_service._severe_quality_conflict(
+            applicant, _member(has_pet="有"), preference)
+        assert not match_service._severe_quality_conflict(
+            applicant, _member(), _preference())

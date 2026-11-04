@@ -14,6 +14,10 @@ on:
         description: "每个场景 trial 次数"
         required: true
         default: "1"
+      quality_gate:
+        description: "质量门禁：on 时剔除明确生活习惯冲突候选（默认 off）"
+        required: false
+        default: "off"
       price_input_per_m:
         description: "输入 token 单价（每百万，发布前必填）"
         required: false
@@ -55,6 +59,7 @@ jobs:
           APP_PORT=8080
           PUBLIC_BASE_URL=
           MATCH_TIMEOUT_SECONDS=600
+          QUALITY_GATE=${{ github.event.inputs.quality_gate || 'off' }}
           MAX_UPLOAD_MB=5
           TZ=Asia/Shanghai
           LOGIN_MAX_FAILS=20
@@ -189,3 +194,4 @@ jobs:
             eval/frozen/v3/*.json
           if-no-files-found: ignore
           retention-days: 14
+
