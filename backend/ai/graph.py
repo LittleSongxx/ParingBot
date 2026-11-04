@@ -57,6 +57,8 @@ REASON_SAMPLE_LIMIT = 80
 # 两种收尾原因，写进运行记录的最后结论里
 FINISH_ROUND_LIMIT = "调度轮次用尽"
 FINISH_BY_SUPERVISOR = "主管判断可以收尾"
+# 候选池连续两轮没有任何变化、且通过人数不足时提前收尾：池子已经没增量，继续调度只是烧时间
+FINISH_STAGNANT = "候选池连续无变化，提前收尾"
 
 
 class MatchState(TypedDict):
@@ -79,6 +81,9 @@ class MatchState(TypedDict):
     last_summary: str
     # 收尾原因，写进 agent_run.output_summary
     finish_reason: str
+    # 候选池签名（total/passed/rejected/pending）与连续无变化轮次，用于供给不足时提前收尾
+    pool_signature: str
+    stagnant_rounds: int
 
 
 def pool_counts(pool: list) -> dict:
@@ -107,6 +112,24 @@ def needs_shortfall_topup(counts: dict, deliver_count: int, relax_used: int,
             and counts.get("total", 0) >= deliver_count
             and counts.get("pending", 0) == 0
             and relax_used < relax_limit)
+
+
+
+
+def next_stagnant_rounds(previous_signature: str | None, signature: str,
+                         previous_rounds: int | None) -> int:
+    """候选池签名连续不变的轮数。"""
+    if previous_signature == signature:
+        return int(previous_rounds or 0) + 1
+    return 0
+
+
+def should_stop_on_stagnation(stagnant_rounds: int, counts: dict, deliver_count: int) -> bool:
+    """候选池连续 2 轮无变化、且通过人数仍不足时，允许提前收尾。"""
+    return (stagnant_rounds >= 2
+            and counts.get("pending", 0) == 0
+            and counts.get("passed", 0) < deliver_count
+            and counts.get("total", 0) < deliver_count)
 
 
 def _missing_dimensions(pool: list) -> list:
@@ -419,6 +442,14 @@ async def supervisor_node(state: MatchState) -> dict:
             error_message=exc.message, started=precise_now())
         raise
     counts = pool_counts(await MatchCandidate.filter(task_id=task.id))
+    signature = f"{counts['total']}/{counts['passed']}/{counts['rejected']}/{counts['pending']}"
+    stagnant = next_stagnant_rounds(state.get("pool_signature"), signature,
+                                    state.get("stagnant_rounds"))
+    # 供给不足且连续无增量：允许提前收尾，避免在空池上空转。
+    if (decision["next_agent"] != AGENT_FINISH
+            and should_stop_on_stagnation(stagnant, counts, task.deliver_count)):
+        decision = {"next_agent": AGENT_FINISH, "instruction": "",
+                    "rationale": "代码门禁：候选池连续两轮无变化且通过人数不足，提前收尾"}
     # 通过人数不足但池子人数够：主管收尾前强制补一轮筛选，而不是接受短交付。
     history = await _relax_history(task.id)
     relax_limit = await tool_box.relax_limit()
@@ -439,9 +470,12 @@ async def supervisor_node(state: MatchState) -> dict:
     # 运行中的实时轮次：页面轮询 current_round 时不用等收尾才有值
     await AgentRun.filter(id=state["run_id"]).update(current_round=round_no)
     finished = decision["next_agent"] == AGENT_FINISH
+    finished_by_stagnation = finished and decision.get("rationale") == "代码门禁：候选池连续两轮无变化且通过人数不足，提前收尾"
     return {"round_no": round_no, "next_agent": decision["next_agent"],
             "instruction": decision["instruction"],
-            "finish_reason": FINISH_BY_SUPERVISOR if finished else ""}
+            "pool_signature": signature, "stagnant_rounds": stagnant,
+            "finish_reason": (FINISH_STAGNANT if finished_by_stagnation
+                              else FINISH_BY_SUPERVISOR if finished else "")}
 
 
 async def portrait_node(state: MatchState) -> dict:
