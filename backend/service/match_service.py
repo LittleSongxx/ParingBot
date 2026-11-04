@@ -326,6 +326,22 @@ def _suitability_score(applicant: MemberProfile, candidate: MemberProfile,
     def interests(value):
         return {item.strip() for item in str(value or "").replace("，", ",").split(",") if item.strip()}
     score += min(2, len(interests(applicant.interest_tags) & interests(candidate.interest_tags)))
+    # 质量感知惩罚：只影响排序，不改变“是否可交付”；用于把明显的生活习惯冲突排后面。
+    # 依据是 40 对代理盲评：吸烟/整洁冲突是被评者一致扣分的低质匹配（P09/P12/P01/P07 等）。
+    if applicant.smoking == "不吸烟":
+        if candidate.smoking == "经常":
+            score -= 4
+        elif candidate.smoking == "偶尔":
+            score -= 1
+    if preference is not None and candidate.tidiness and preference.tidiness_min:
+        try:
+            if (member_service.TIDINESS_LEVELS.index(candidate.tidiness)
+                    < member_service.TIDINESS_LEVELS.index(preference.tidiness_min)):
+                score -= 2
+        except ValueError:
+            pass
+    if preference is not None and candidate.has_pet == "有" and preference.pet_accept == "不接受":
+        score -= 4
     return score
 
 
