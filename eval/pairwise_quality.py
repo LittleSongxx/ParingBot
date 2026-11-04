@@ -83,6 +83,44 @@ def person_from_member(member, preference) -> dict:
     }
 
 
+
+
+def pick_control(applicant: dict, approved: list, preferences: dict, rng: random.Random,
+                mode: str) -> object:
+    """选对照候选：random=随机池；hard=同性别同片区但带一个软冲突的难负例。"""
+    if mode == "random":
+        return rng.choice(approved)
+    detail = (applicant.get("preference") or {}).get("detail") or {}
+    area = applicant.get("store") or rules.area_of(applicant.get("store_id") or 0)
+    pet_accept = detail.get("pet_accept")
+    schedule_accept = str(detail.get("schedule_accept") or "")
+    budget_min = detail.get("budget_min")
+    budget_max = detail.get("budget_max")
+    candidates = []
+    for member in approved:
+        if member.gender != applicant.get("gender"):
+            continue
+        if rules.area_of(member.store_id) != area:
+            continue
+        conflicts = 0
+        if applicant.get("smoking") == "不吸烟" and getattr(member, "smoking", None) == "经常":
+            conflicts += 1
+        if pet_accept == "不接受" and getattr(member, "has_pet", None) == "有":
+            conflicts += 1
+        if schedule_accept and getattr(member, "schedule_type", None) not in schedule_accept:
+            conflicts += 1
+        try:
+            if budget_min and budget_max and not (float(budget_min) <= member.rent_budget <= float(budget_max)):
+                conflicts += 1
+        except (TypeError, ValueError):
+            pass
+        if conflicts:
+            candidates.append((conflicts, member))
+    if candidates:
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return candidates[rng.randrange(min(3, len(candidates)))][1]
+    return rng.choice(approved)
+
 def call(env: dict, pairs: list[dict], max_tokens: int = 2048) -> list[dict]:
     base_url = env["EVAL_JUDGE_BASE_URL"].rstrip("/")
     api_key = env["EVAL_JUDGE_API_KEY"]
@@ -131,6 +169,7 @@ def main(argv=None) -> int:
     parser.add_argument("--key", required=True, type=Path)
     parser.add_argument("--env-file", type=Path, default=Path(".env.eval"))
     parser.add_argument("--limit", type=int, default=12)
+    parser.add_argument("--control", choices=("random", "hard"), default="random")
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--json", type=Path, default=None)
     args = parser.parse_args(argv)
@@ -148,7 +187,8 @@ def main(argv=None) -> int:
     for index, pid in enumerate(pair_ids):
         applicant = blind[pid]["applicant"]
         delivered = blind[pid]["candidate"]
-        control = person_from_member(approved[index % len(approved)], data.preferences.get(approved[index % len(approved)].id))
+        chosen = pick_control(applicant, approved, data.preferences, random.Random(20261104 + index), args.control)
+        control = person_from_member(chosen, data.preferences.get(chosen.id))
         pairs.append({"pair_id": pid, "applicant": applicant, "A": delivered, "B": control,
                       "A_role": "delivered", "B_role": "control"})
     forward = []
@@ -173,10 +213,10 @@ def main(argv=None) -> int:
         rows.append({"pair_id": pid, "forward": f, "backward": b_as_forward,
                      "delivered_win": f == "A", "control_win": f == "B"})
     summary = summarize(rows)
-    result = {"summary": summary, "rows": rows, "note": "成对代理评审，不是人工真值。"}
+    result = {"summary": summary, "rows": rows, "control": args.control, "note": "成对代理评审，不是人工真值。"}
     if args.json:
         args.json.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
-    lines = ["# 成对质量评审（交付 vs 随机池，代理）", "",
+    lines = [f"# 成对质量评审（交付 vs {args.control} 对照，代理）", "",
              f"- 样本：{summary['n']} 对；delivered 胜率 {summary['delivered_win_rate']:.2%}；"
              f"位置一致性 **{summary['position_consistency']:.2f}**；可用性 **{summary['usable']}**",
              "", "| pair | forward | backward(归一) | delivered win |", "|---|---|---|---|"]
