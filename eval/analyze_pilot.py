@@ -36,8 +36,14 @@ def analyze(matrix: dict, scenarios: dict) -> dict:
         scenario = scenario_map.get(key) or {}
         runs = record.get("runs") or []
         expected = int((scenario.get("expect") or {}).get("requested") or 8)
-        eligible = int((scenario.get("expect") or {}).get("ex_ante_eligible") or 0)
-        target = min(expected, eligible) if eligible else expected
+        # 目标交付上限：ex_ante_unbounded（不限门店）才是“实际可达到”的上界。
+        # scoped eligible 只是申请方门店偏好范围内的人数；门店只是加分项时，
+        # 交付名单可以超出该范围，用 scoped 当 target 会把 pass^k 人为抬高。
+        capacity = scenario.get("ex_ante_capacity") or {}
+        eligible = (capacity.get("eligible_unbounded")
+                    or (scenario.get("expect") or {}).get("ex_ante_unbounded")
+                    or (scenario.get("expect") or {}).get("ex_ante_eligible") or 0)
+        target = min(expected, int(eligible)) if eligible else expected
         delivered = [int(run.get("delivered") or 0) for run in runs]
         if not delivered:
             continue

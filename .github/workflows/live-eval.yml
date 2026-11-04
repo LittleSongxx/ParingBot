@@ -152,6 +152,20 @@ jobs:
               --sample-not-delivered 8 --out judge-report.md --json judge-report.json || true
           fi
 
+      - name: Optional content quality
+        env:
+          EVAL_JUDGE_API_KEY: ${{ secrets.EVAL_JUDGE_API_KEY }}
+        run: |
+          if [ -z "$EVAL_JUDGE_API_KEY" ]; then
+            echo "未配置 EVAL_JUDGE_API_KEY，跳过内容质量代理评审"
+          else
+            printf '\nEVAL_JUDGE_PROVIDER=%s\nEVAL_JUDGE_BASE_URL=%s\nEVAL_JUDGE_API_KEY=%s\nEVAL_JUDGE_MODEL=%s\n' \
+              "${{ secrets.EVAL_JUDGE_PROVIDER }}" "${{ secrets.EVAL_JUDGE_BASE_URL }}" \
+              "$EVAL_JUDGE_API_KEY" "${{ secrets.EVAL_JUDGE_MODEL }}" >> .env.eval
+            python eval/content_quality.py --bundle quality-bundle.json --limit 20 \
+              --env-file .env.eval --out content-report.md --json content-report.json || true
+          fi
+
       - name: Report + gates
         env:
           MODE: ${{ github.event.inputs.mode || 'verify' }}
@@ -189,6 +203,8 @@ jobs:
             safety-report.json
             judge-report.md
             judge-report.json
+            content-report.md
+            content-report.json
             v3-baseline.json
             eval/reports
             eval/frozen/v3/*.json
