@@ -1,0 +1,127 @@
+name: live-eval-v4-pilot
+
+# v4 试跑：9 个场景 ×3 trials（高/中/低各 3），只跑矩阵，不接门禁。
+# 目的：验证 pass^k/CI 与运行时成本，为 v4 标签与全量 40×3 做准备。
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: live-eval-v4-pilot
+  cancel-in-progress: false
+
+jobs:
+  live-eval-v4-pilot:
+    name: live-eval-v4-pilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      APP_BASE: http://127.0.0.1:8080
+      MATCH_TIMEOUT_SECONDS: "600"
+      PILOT_KEYS: "V4_01,V4_02,V4_03,V4_17,V4_18,V4_19,V4_29,V4_30,V4_31"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare .env
+        run: |
+          cat > .env <<EOF
+          MYSQL_ROOT_PASSWORD=ci-root-password
+          MYSQL_DATABASE=paringbot
+          MYSQL_USER=paringbot
+          MYSQL_PASSWORD=ci-paringbot-password
+          JWT_SECRET=ci-only-jwt-secret-not-for-production
+          APP_PORT=8080
+          PUBLIC_BASE_URL=
+          MATCH_TIMEOUT_SECONDS=600
+          MAX_UPLOAD_MB=5
+          TZ=Asia/Shanghai
+          LOGIN_MAX_FAILS=20
+          LOGIN_FAIL_WINDOW_SECONDS=300
+          LOGIN_LOCK_SECONDS=300
+          LOGIN_RATE_LIMIT_ENABLED=true
+          CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+          EOF
+          sed -i 's/^[[:space:]]*//' .env
+
+      - name: Build and start eval stack
+        run: docker compose -f docker-compose.yml -f docker-compose.eval.yml up -d --build
+
+      - name: Wait for API readiness
+        run: |
+          for attempt in $(seq 1 120); do
+            if curl -fsS -X POST "$APP_BASE/api/login" \
+              -H 'Content-Type: application/json' \
+              -d '{"username":"admin","password":"admin123"}' | grep -q '"code":"200"'; then
+              echo "stack ready after ${attempt} attempt(s)"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::ParingBot stack did not become ready in 10 minutes"
+          docker compose logs --tail=200
+          exit 1
+
+      - name: Guard model key
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo "::error::缺少 DEEPSEEK_API_KEY secret"
+            exit 1
+          fi
+
+      - name: Configure live models
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          RUN_LABEL: v4-pilot-${{ github.run_id }}
+        run: |
+          cat > .env.eval <<EOF
+          EVAL_PROVIDER=deepseek
+          EVAL_API_KEY=${DEEPSEEK_API_KEY}
+          EVAL_MAX_TOKENS=8192
+          EVAL_APP_BASE=${APP_BASE}
+          EVAL_ADMIN_USERNAME=admin
+          EVAL_ADMIN_PASSWORD=admin123
+          EVAL_SUITE=v4
+          DB_PROFILE=eval
+          EVAL_LABEL=${RUN_LABEL}
+          EVAL_TRIALS=3
+          EVAL_POLL_SECONDS=3
+          EVAL_MAX_WAIT_SECONDS=650
+          EOF
+          sed -i 's/^[[:space:]]*//' .env.eval
+          python eval/configure_models.py --env-file .env.eval
+
+      - name: Freeze checks
+        run: |
+          python eval/check_freeze.py
+          python eval/check_v4_freeze.py
+
+      - name: Run v4 pilot matrix (9 scenarios x 3 trials)
+        env:
+          RUN_LABEL: v4-pilot-${{ github.run_id }}
+        run: |
+          python eval/run_matrix.py --suite v4 --only "$PILOT_KEYS" --trials 3 \
+            --label "$RUN_LABEL" --stamp v4-pilot
+
+      - name: Analyze pilot
+        run: |
+          python eval/analyze_pilot.py \
+            --matrix eval/reports/scenario-matrix-v4-pilot/matrix.json \
+            --scenarios eval/frozen/v4/scenarios.json \
+            --out v4-pilot-report.md --json v4-pilot-report.json
+
+      - name: Dump compose logs on failure
+        if: failure()
+        run: docker compose logs --tail=300
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-eval-v4-pilot-${{ github.run_id }}
+          path: |
+            eval/reports
+            v4-pilot-report.md
+            v4-pilot-report.json
+          if-no-files-found: ignore
+          retention-days: 14

@@ -65,6 +65,8 @@ jobs:
           python-version: "3.13"
       - name: validate v3 frozen set and eval profile
         run: python eval/check_freeze.py
+      - name: validate v4 scenario freeze (labels pending)
+        run: python eval/check_v4_freeze.py
 
   frontend:
     runs-on: ubuntu-latest
@@ -174,3 +176,4 @@ jobs:
             e2e/test-results
           if-no-files-found: ignore
           retention-days: 7
+

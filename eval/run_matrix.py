@@ -24,8 +24,8 @@ from lib.env import load_env  # noqa: E402
 
 
 def load_suite(suite: str) -> list[dict]:
-    if suite == "v3":
-        payload = json.loads((ROOT / "frozen" / "v3" / "scenarios.json").read_text(encoding="utf-8"))
+    if suite in ("v3", "v4"):
+        payload = json.loads((ROOT / "frozen" / suite / "scenarios.json").read_text(encoding="utf-8"))
         return payload["scenarios"]
     payload = json.loads((ROOT / "suites" / "demo.json").read_text(encoding="utf-8"))
     return payload["scenarios"]
@@ -265,7 +265,7 @@ def write_outputs(records: list[dict], env: dict, args, stamp: str) -> Path:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="场景矩阵评测（真实多 Agent 匹配）")
     parser.add_argument("--env-file", type=Path, default=DEFAULT_ENV)
-    parser.add_argument("--suite", choices=("demo", "v3"), default="v3")
+    parser.add_argument("--suite", choices=("demo", "v3", "v4"), default="v3")
     parser.add_argument("--phase", choices=("ready", "run"), default="run")
     parser.add_argument("--only", help="只跑这些场景，逗号分隔，例如 S1,S3")
     parser.add_argument("--trials", type=int, help="覆盖每个场景的 trial 数")
