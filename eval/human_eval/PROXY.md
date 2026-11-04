@@ -14,6 +14,11 @@
 ## 步骤
 
 ```bash
+# 1) 异族模型盲评（只读 blind_set，信息隔离）
+python eval/human_eval/llm_annotator.py --blind proxy-eval/blind_set.json \
+  --out proxy-eval/annotations/annotator_qwen.json --env-file .env.eval
+
+# 2) 汇总多位评者
 python eval/human_eval/proxy_panel.py --annotations proxy-eval/annotations \
   --key proxy-eval/key.json --out proxy-eval/report.md --json proxy-eval/report.json
 ```
