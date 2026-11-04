@@ -19,8 +19,6 @@ def test_stagnant_rounds_and_stop():
     assert graph.next_stagnant_rounds("a", "a", 0) == 1
     assert graph.next_stagnant_rounds("a", "a", 1) == 2
     assert graph.next_stagnant_rounds("a", "b", 5) == 0
-    counts = {"total": 4, "passed": 4, "pending": 0}
-    assert graph.should_stop_on_stagnation(2, counts, 8, 2, 2)
-    assert not graph.should_stop_on_stagnation(2, counts, 8, 1, 2)
-    assert not graph.should_stop_on_stagnation(1, counts, 8, 2, 2)
-    assert not graph.should_stop_on_stagnation(2, {"total": 8, "passed": 4, "pending": 0}, 8, 2, 2)
+    assert graph.should_stop_on_stagnation(2, {"total": 4, "passed": 4, "pending": 0}, 8)
+    assert not graph.should_stop_on_stagnation(1, {"total": 4, "passed": 4, "pending": 0}, 8)
+    assert not graph.should_stop_on_stagnation(2, {"total": 8, "passed": 4, "pending": 0}, 8)
