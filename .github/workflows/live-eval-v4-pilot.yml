@@ -4,6 +4,15 @@ name: live-eval-v4-pilot
 # 目的：验证 pass^k/CI 与运行时成本，为 v4 标签与全量 40×3 做准备。
 on:
   workflow_dispatch:
+    inputs:
+      keys:
+        description: "要跑的场景 key（逗号分隔）"
+        required: false
+        default: "V4_01,V4_02,V4_03,V4_17,V4_18,V4_19,V4_29,V4_30,V4_31"
+      trials:
+        description: "每个场景 trial 次数"
+        required: false
+        default: "3"
 
 concurrency:
   group: live-eval-v4-pilot
@@ -17,7 +26,7 @@ jobs:
     env:
       APP_BASE: http://127.0.0.1:8080
       MATCH_TIMEOUT_SECONDS: "600"
-      PILOT_KEYS: "V4_01,V4_02,V4_03,V4_17,V4_18,V4_19,V4_29,V4_30,V4_31"
+      PILOT_KEYS: ${{ github.event.inputs.keys || 'V4_01,V4_02,V4_03,V4_17,V4_18,V4_19,V4_29,V4_30,V4_31' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -84,7 +93,7 @@ jobs:
           EVAL_SUITE=v4
           DB_PROFILE=eval
           EVAL_LABEL=${RUN_LABEL}
-          EVAL_TRIALS=3
+          EVAL_TRIALS=${{ github.event.inputs.trials || '3' }}
           EVAL_POLL_SECONDS=3
           EVAL_MAX_WAIT_SECONDS=650
           EOF
@@ -100,7 +109,7 @@ jobs:
         env:
           RUN_LABEL: v4-pilot-${{ github.run_id }}
         run: |
-          python eval/run_matrix.py --suite v4 --only "$PILOT_KEYS" --trials 3 \
+          python eval/run_matrix.py --suite v4 --only "$PILOT_KEYS" --trials "${{ github.event.inputs.trials || '3' }}" \
             --label "$RUN_LABEL" --stamp v4-pilot
 
       - name: Analyze pilot

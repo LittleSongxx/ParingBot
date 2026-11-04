@@ -93,6 +93,22 @@ def pool_counts(pool: list) -> dict:
             "pending": len(pool) - passed - len(rejected), "codes": codes}
 
 
+
+
+def needs_shortfall_topup(counts: dict, deliver_count: int, relax_used: int,
+                          relax_limit: int) -> bool:
+    """通过人数不足、但候选池人数够时，主管收尾前强制补一轮筛选。
+
+    只在“候选池总数 >= 交付要求、没有待审、还有放宽额度”时触发：
+    这说明不是池子没人，而是审核否决/筛选停早了，补筛一轮可能补上；
+    池子本身不够时补筛没有意义，不触发。
+    """
+    return (counts.get("passed", 0) < deliver_count
+            and counts.get("total", 0) >= deliver_count
+            and counts.get("pending", 0) == 0
+            and relax_used < relax_limit)
+
+
 def _missing_dimensions(pool: list) -> list:
     """审核官判「画像不够」时点名的维度，去重后按出现顺序列出来。
 
@@ -403,6 +419,16 @@ async def supervisor_node(state: MatchState) -> dict:
             error_message=exc.message, started=precise_now())
         raise
     counts = pool_counts(await MatchCandidate.filter(task_id=task.id))
+    # 通过人数不足但池子人数够：主管收尾前强制补一轮筛选，而不是接受短交付。
+    history = await _relax_history(task.id)
+    relax_limit = await tool_box.relax_limit()
+    if (decision["next_agent"] == AGENT_FINISH
+            and needs_shortfall_topup(counts, task.deliver_count, len(history), relax_limit)):
+        decision = {
+            "next_agent": AGENT_SCREENER,
+            "instruction": "通过审核人数未达交付上限，请再放宽一个加分项补筛；没有可放宽项就说明原因。",
+            "rationale": "代码门禁：通过人数不足且候选池人数够，强制补筛一轮",
+        }
     await agents.write_step(
         context, round_no, 0, agents.STEP_SCHEDULE,
         step_name=f"第 {round_no} 轮调度",
