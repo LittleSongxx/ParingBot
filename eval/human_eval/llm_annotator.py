@@ -30,6 +30,32 @@ RUBRIC = """你是独立盲评员。只根据双方资料为合租匹配打分�
 """
 
 
+
+
+RUBRIC_V2 = """你是独立盲评员。请按 checklist 逐项判定，不要直接拍总分。
+输出 JSON 数组，每个对象字段：
+pair_id, hard_gate(0/1), lifestyle_conflicts(数组，元素 ∈ schedule/smoking/pet/tidiness),
+commute(0/1/2), lease_stability(0/1/2), data_consistency(0/1/2), boundary(0/1/2),
+overall(1-5，按规则计算), reason(<=40字)。
+判定规则：
+- hard_gate=1 当且仅当 同性 + 双方必须项互相满足 + 租期档差<2；任一不满足=0。
+- lifestyle_conflicts：schedule=夜猫子 vs 早睡/正常；smoking=经常吸烟 vs 不吸烟；
+  pet=一方养宠/过敏且另一方不接受；tidiness=整洁度相差>=2档。
+- commute: 2=同门店，1=同片区/同城，0=跨区/异地。
+- lease_stability: 2=档位相同，1=相邻一档，0=相差>=2档。
+- data_consistency: 2=完整自洽，1=轻微缺失，0=明显矛盾（兴趣/自述 vs 字段）。
+- boundary: 2=无隐私/越权/承诺，1=轻微，0=严重。
+- overall 规则：hard_gate=0 -> 1；冲突>=2 -> 2；冲突=1 -> 3；
+  否则 bonus=同门店(1)+同档租期(1)+数据自洽(1)+边界干净(1)，bonus>=3 -> 5 否则 4。
+只输出 JSON 数组，不要 markdown/解释。
+"""
+
+
+def build_prompt(pairs: list[dict], rubric: str) -> str:
+    base = RUBRIC if rubric == "v1" else RUBRIC_V2
+    return base + "\n\n材料：\n" + json.dumps(pairs, ensure_ascii=False)
+
+
 def load_env(path: Path) -> dict:
     values = {}
     if not path.exists():
@@ -42,8 +68,8 @@ def load_env(path: Path) -> dict:
     return values
 
 
-def call(base_url: str, api_key: str, model: str, pairs: list[dict], max_tokens: int) -> list[dict]:
-    prompt = RUBRIC + "\n\n材料：\n" + json.dumps(pairs, ensure_ascii=False)
+def call(base_url: str, api_key: str, model: str, pairs: list[dict], max_tokens: int, rubric: str = "v1") -> list[dict]:
+    prompt = build_prompt(pairs, rubric)
     payload = {"model": model, "temperature": 0.0, "max_tokens": max_tokens,
                "messages": [{"role": "user", "content": prompt}]}
     request = urllib.request.Request(
@@ -68,6 +94,7 @@ def main(argv=None) -> int:
     parser.add_argument("--env-file", type=Path, default=Path(".env.eval"))
     parser.add_argument("--batch", type=int, default=4)
     parser.add_argument("--max-tokens", type=int, default=8192)
+    parser.add_argument("--rubric", choices=("v1", "v2"), default="v1")
     args = parser.parse_args(argv)
     env = load_env(args.env_file)
     base_url = env.get("EVAL_JUDGE_BASE_URL")
@@ -81,7 +108,7 @@ def main(argv=None) -> int:
         batch = blind[start:start + args.batch]
         for attempt in range(2):
             try:
-                rows.extend(call(base_url, api_key, model, batch, args.max_tokens))
+                rows.extend(call(base_url, api_key, model, batch, args.max_tokens, args.rubric))
                 break
             except Exception as exc:  # noqa: BLE001
                 if attempt == 1:

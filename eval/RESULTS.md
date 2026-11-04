@@ -75,3 +75,13 @@
 - `pass^k` 已加入 `report.py`：同一场景 k 次全部成功才算通过；当前每场景 1 trial，先记为 N/A，
   扩到 3 trials 后自动输出 pass^2/pass^3。
 - heuristic agreement / NDCG 仍只做监控；质量结论需要人工/judge 校准。
+
+## 8. Rubric v2 代理校准（P0，2026-11-04）
+
+- 5 位评者（4 个 DeepSeek 子 Agent + Qwen3.7-plus）×16 对，rubric v2（可判定项 + 规则汇总）：
+  - overall Cohen κ **0.832**（v1 0.417）；加权 κ **0.931**（0.630）；Spearman **0.936**；
+  - hard_gate κ **0.938**；lifestyle Jaccard **1.000**；但 commute 一致率 0.662、data 一致率 0.750；
+  - 交付组 overall 4.167 vs 随机对照 1.000；
+- **重要限定**：overall κ 提升部分是“确定性汇总”造成的结构性一致，item-level 仍有分歧；
+  data 矛盾上限测试后 κ=0.828/0.927；v2.1 需补 store_id、明确同门店/同片区定义，再跑 5 评者；
+- 这是评分量表一致性，不是“匹配质量提升”；代理评审仍不能替代人工（见 `eval/human_eval/PROXY.md`）。
