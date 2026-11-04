@@ -103,5 +103,25 @@ class JudgePromptTest(unittest.TestCase):
         self.assertIn("winner", pair)
 
 
+    def test_report_has_ci_and_pass_power(self):
+        import tempfile
+        out_json = Path(tempfile.mkstemp(suffix=".json")[1])
+        self.addCleanup(lambda: out_json.unlink(missing_ok=True))
+        args = [
+            "--bundle", str(FIXTURES / "synthetic_bundle.json"),
+            "--matrix", str(FIXTURES / "matrix"),
+            "--labels", str(REPO / "eval" / "frozen" / "v3" / "labels.json"),
+            "--scenarios", str(REPO / "eval" / "frozen" / "v3" / "scenarios.json"),
+            "--manifest", str(REPO / "eval" / "frozen" / "v3" / "MANIFEST.json"),
+            "--mode", "baseline", "--json", str(out_json),
+        ]
+        self.assertEqual(report.main(args), 0)
+        payload = json.loads(out_json.read_text(encoding="utf-8"))
+        delivery = payload["delivery"]
+        self.assertIn("ci95", delivery)
+        self.assertIn("pass_power", delivery)
+        self.assertEqual(delivery["trials_min"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

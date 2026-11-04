@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import statistics
 from datetime import datetime
 from pathlib import Path
 
@@ -105,6 +106,20 @@ def build(args) -> tuple[dict, str]:
     avg_delivered = delivered / len(rows) if rows else 0.0
     avg_requested = requested / len(rows) if rows else 0.0
     delivery_rate = delivered / requested if requested else 0.0
+    ratios = [row["delivered"] / row["requested"] for row in rows if row["requested"]]
+    delivery_ci = metrics.bootstrap_ci(ratios)
+    delivery_sd = round(statistics.stdev(ratios), 4) if len(ratios) > 1 else 0.0
+    delivery_mde = metrics.mde(delivery_sd, len(ratios)) if ratios else None
+    grouped: dict = {}
+    for row in rows:
+        grouped.setdefault(row["key"], []).append(row)
+    trials_min = min((len(values) for values in grouped.values()), default=0)
+    pass_power = {}
+    for k in (2, 3, 5):
+        if trials_min >= k:
+            passed = sum(1 for values in grouped.values()
+                         if len(values) >= k and all(row["delivered"] >= row["requested"] for row in values[:k]))
+            pass_power[f"pass^{k}"] = round(passed / len(grouped), 4) if grouped else 0.0
 
     checks = [quality_checks.check_run(item) for item in bundle.get("runs", [])]
     quality_errors = [error for check in checks for error in check["errors"]]
@@ -195,6 +210,11 @@ def build(args) -> tuple[dict, str]:
             "avg_delivered": round(avg_delivered, 4),
             "avg_requested": round(avg_requested, 4),
             "delivery_rate": round(delivery_rate, 4),
+            "ci95": {"lo": delivery_ci["lo"], "hi": delivery_ci["hi"], "n": delivery_ci["n"]},
+            "sd": delivery_sd,
+            "mde_abs": delivery_mde,
+            "trials_min": trials_min,
+            "pass_power": pass_power,
             "failures": failures,
             "per_scenario": _per_scenario(rows),
         },
@@ -258,6 +278,10 @@ def render(result: dict) -> str:
         "",
         f"- 运行 {delivery['runs']} 次；平均交付 **{delivery['avg_delivered']}** / {delivery['avg_requested']}；"
         f"交付率 {delivery['delivery_rate']:.2%}；失败 {delivery['failures']}",
+        f"- 95% bootstrap CI（交付率）：[{delivery['ci95']['lo']:.3f}, {delivery['ci95']['hi']:.3f}]；"
+        f"SD={delivery['sd']}；MDE(α=.05,power=.8)={delivery['mde_abs']}",
+        f"- pass^k：{delivery['pass_power'] or 'N/A（每场景需要 ≥2 trials）'}",
+        "",
         "",
         "## 质量与安全",
         "",
