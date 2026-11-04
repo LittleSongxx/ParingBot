@@ -227,3 +227,17 @@
   - 墙钟均值 270s，没有延迟收益；
 - 结论：该优化**被否定并回退**；V4_18 的池子在前几轮看似停滞，但后续轮次还能补到人，提前收尾会牺牲交付；
   延迟问题应通过供给分层/减少无效轮次解决，而不是提前收尾。
+
+## 20. target 达成率指标（capacity-normalized delivery，2026-11-04）
+
+- 问题：v4 中/低容量场景 raw delivery 只有 48.6%/66.7%，但这是因为 target 本身受容量限制；
+  只看“交付数/requested 8”会把供给问题误读成 Agent 质量问题。
+- 新增 `analyze_pilot.target_attainment`：`mean(min(delivered,target)/target)`，按可达到目标归一化。
+- 清理后 v4 pilot（9 场景×3）：
+  - raw delivery **71.3%**；
+  - **target 达成率 98.61%**；
+  - 分容量层：高 **98.61%**、中 **97.22%**、低 **100%**；
+  - 中容量 raw 交付率 48.6%，但 target 达成率 97.22%——说明中容量 Agent 已基本打满可达上限；
+- 补筛定向 V4_03/V4_18：target 达成率 **100%**。
+- 结论：capacity-normalized 后交付表现**高**；raw delivery 低主要是供给上限，不是 Agent 不稳定。
+  该指标与 raw delivery、pass^3 一起报告，避免单一口径误导。

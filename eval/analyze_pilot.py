@@ -75,6 +75,8 @@ def analyze(matrix: dict, scenarios: dict) -> dict:
             "shortfall_causes": causes,
             "capacity_limited": target < expected,
             "delivery_rate": round(statistics.mean([value / expected for value in delivered]), 4),
+            "target_attainment": round(statistics.mean(
+                [min(value / target, 1.0) for value in delivered]), 4) if target else 0.0,
             "pass_full": all(full),
             "pass_cap": all(cap),
             "pass_any": all(any_ok),
@@ -89,12 +91,14 @@ def analyze(matrix: dict, scenarios: dict) -> dict:
             tier_stats[tier] = {
                 "n": len(subset),
                 "delivery_rate": round(statistics.mean([row["delivery_rate"] for row in subset]), 4),
+                "target_attainment": round(statistics.mean([row["target_attainment"] for row in subset]), 4),
                 "pass_cap": round(sum(1 for row in subset if row["pass_cap"]) / len(subset), 4),
             }
     return {
         "scenarios": len(rows),
         "trials": sorted({len(row["delivered"]) for row in rows}),
         "delivery_rate": round(statistics.mean(rates), 4) if rates else 0.0,
+        "target_attainment": round(statistics.mean([row["target_attainment"] for row in rows]), 4) if rows else 0.0,
         "delivery_ci95": bootstrap_ci(rates),
         "pass_full": round(sum(1 for row in rows if row["pass_full"]) / len(rows), 4) if rows else 0.0,
         "pass_cap": round(sum(1 for row in rows if row["pass_cap"]) / len(rows), 4) if rows else 0.0,
@@ -116,14 +120,16 @@ def render(result: dict) -> str:
     lines = ["# v4 pilot 分析（真实运行）", "",
              f"- 场景 {result['scenarios']} 个；trials={result['trials']}；失败 {result['failures']}",
              f"- 平均交付率 **{result['delivery_rate']:.2%}**，95% CI "
-             f"[{result['delivery_ci95']['lo']:.3f}, {result['delivery_ci95']['hi']:.3f}]",
+             f"[{result['delivery_ci95']['lo']:.3f}, {result['delivery_ci95']['hi']:.3f}]；"
+             f"target 达成率 **{result['target_attainment']:.2%}**",
              f"- pass^k（全部达到 requested 8）**{result['pass_full']:.3f}**；"
              f"pass^k（达到 min(8, 容量)）**{result['pass_cap']:.3f}**；"
              f"pass^k（>0）**{result['pass_any']:.3f}**",
              f"- 同场景三 trial 交付完全一致：**{result['consistency']:.3f}**", "",
-             "| 层 | n | 交付率 | pass^k(cap) |", "|---|---|---|---|"]
+             "| 层 | n | 交付率 | target 达成率 | pass^k(cap) |", "|---|---|---|---|---|"]
     for tier, item in result["tier_stats"].items():
-        lines.append(f"| {tier} | {item['n']} | {item['delivery_rate']:.2%} | {item['pass_cap']:.3f} |")
+        lines.append(f"| {tier} | {item['n']} | {item['delivery_rate']:.2%} | "
+                     f"{item['target_attainment']:.2%} | {item['pass_cap']:.3f} |")
     lines += ["", "| 场景 | tier | delivered | target | pass_cap | 短交付原因 |",
               "|---|---|---|---|---|---|"]
     for row in result["rows"]:
