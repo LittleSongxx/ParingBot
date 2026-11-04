@@ -103,3 +103,15 @@
 - 文件：`eval/frozen/v4/scenarios.json`（sha256 见 `MANIFEST.json`）、`DESIGN.md`、`DATASHEET.md`、`COVERAGE.md`；
 - **标签 pending**：不使用 heuristic gold，需人工/judge 分级 0–3；标签完成前 v4 不接门禁；
 - 下一步：12 场景×3 trials 方法验证 → 40×3 全量 → 100 对标签/校准。
+
+## 11. Rubric v2.2 校准（40 对，2026-11-04）
+
+- 样本扩到 **40 对**（30 系统交付 + 10 随机池对照），盲评材料含 store_id；数据规则明确“养宠类兴趣 vs
+  has_pet / pet_accept / 不养声明”，并给出 pet-tag 白名单；
+- 5 位评者（4 DeepSeek 子 Agent + Qwen3.7-plus）：
+  - overall κ **0.933**、加权 κ **0.933**、Spearman **0.936**；
+  - hard_gate κ 0.927；commute 完全一致率 **1.000**；data 一致率 **0.902**；
+  - 交付组 overall 3.700 vs 随机对照 1.000；
+- 规则校验：`eval/human_eval/data_consistency.py` 与 5 位评者中位数一致 **37/40（92.5%）**；
+- 仍然是代理评审（E2.5），不是人工真值；overall κ 仍含“确定性汇总”的结构性成分。
+- 下一步：用该 rubric + v4 做 12 场景×3 trials 的 pass^k/CI 方法验证；人工标签仍需 ≥100 对。
