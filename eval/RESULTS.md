@@ -241,3 +241,15 @@
 - 补筛定向 V4_03/V4_18：target 达成率 **100%**。
 - 结论：capacity-normalized 后交付表现**高**；raw delivery 低主要是供给上限，不是 Agent 不稳定。
   该指标与 raw delivery、pass^3 一起报告，避免单一口径误导。
+
+## 21. 成对质量评审（pairwise，2026-11-04）
+
+- 新增 `eval/pairwise_quality.py`：同一申请人下，比较“系统交付候选 vs 随机池候选”，
+  并做 A/B 位置交换，报告 delivered 胜率与 position consistency；
+- 12 对结果：
+  - **delivered 胜率 100%**（12/12）；
+  - **position consistency 0.917**（11/12，交换后仍选同一身份）；
+  - usable=true（一致性 ≥0.8）；
+- 解释：随机池对照含性别/门店等硬冲突，因此 100% 胜率只能证明**交付组明显优于随机对照**，
+  不能证明“匹配质量高”；它补的是 pairwise 证据，不是人工真值；
+- 修正了一个度量 bug：最初 position consistency 计算把归一化标签用反，误报 0；修正后为 0.917。
