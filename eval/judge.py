@@ -20,7 +20,7 @@ from lib.env import load_env  # noqa: E402
 DEFAULT_ENV = ROOT.parent / ".env.eval"
 POINT_PROMPT = """你是独立合租匹配评审。只根据双方资料判断候选是否适合该申请方，不要参考已有审核结论。
 评分 1-5：1=明显不适合，3=一般，5=非常合适。资料不足时 score=null 并说明缺什么。
-只输出 JSON：{"score": 1-5 或 null, "reason": "一句话", "missing": "缺什么/无"}。
+只输出 JSON：{{"score": 1-5 或 null, "reason": "一句话", "missing": "缺什么/无"}}。
 
 【申请方】
 {applicant}
@@ -29,7 +29,7 @@ POINT_PROMPT = """你是独立合租匹配评审。只根据双方资料判断�
 {candidate}
 """
 PAIR_PROMPT = """你是独立合租匹配评审。下面有两个候选（A/B），请判断对申请方而言谁更适合合租。
-只输出 JSON：{"winner": "A" 或 "B" 或 "tie", "reason": "一句话"}。
+只输出 JSON：{{"winner": "A" 或 "B" 或 "tie", "reason": "一句话"}}。
 
 【申请方】
 {applicant}

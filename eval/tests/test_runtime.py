@@ -94,5 +94,14 @@ class ReportGateTest(unittest.TestCase):
         self.assertEqual(report.main(args), 1)
 
 
+class JudgePromptTest(unittest.TestCase):
+    def test_judge_prompts_format(self):
+        import judge
+        point = judge.POINT_PROMPT.format(applicant="a", candidate="b")
+        pair = judge.PAIR_PROMPT.format(applicant="a", candidate_a="b", candidate_b="c")
+        self.assertIn("score", point)
+        self.assertIn("winner", pair)
+
+
 if __name__ == "__main__":
     unittest.main()
