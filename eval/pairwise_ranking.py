@@ -30,7 +30,7 @@ A/B 的位置不代表优劣，不要因为 A 在前就选 A；接近时选 tie�
 """
 
 
-def pairs_from_bundle(bundle: dict, limit: int) -> list[dict]:
+def pairs_from_bundle(bundle: dict, limit: int, mode: str = "top-bottom") -> list[dict]:
     pairs = []
     for run in bundle.get("runs", []):
         delivered = [c for c in run.get("candidates", []) if c.get("delivered")]
@@ -38,13 +38,17 @@ def pairs_from_bundle(bundle: dict, limit: int) -> list[dict]:
             continue
         ordered = sorted(delivered, key=lambda c: (c.get("delivered_rank") is None,
                                                    c.get("delivered_rank") or 9999))
-        top, bottom = ordered[0], ordered[-1]
-        if top.get("id") == bottom.get("id"):
-            continue
-        pairs.append({"pair_id": f"R{len(pairs)+1:02d}", "applicant": run.get("applicant") or {},
-                      "top": top, "bottom": bottom})
-        if len(pairs) >= limit:
-            break
+        if mode == "adjacent":
+            pairs_raw = [(ordered[i], ordered[i + 1]) for i in range(len(ordered) - 1)]
+        else:
+            pairs_raw = [(ordered[0], ordered[-1])]
+        for top, bottom in pairs_raw:
+            if top.get("id") == bottom.get("id"):
+                continue
+            pairs.append({"pair_id": f"R{len(pairs)+1:02d}", "applicant": run.get("applicant") or {},
+                          "top": top, "bottom": bottom})
+            if len(pairs) >= limit:
+                return pairs
     return pairs
 
 
@@ -64,6 +68,7 @@ def main(argv=None) -> int:
     parser.add_argument("--bundle", required=True, type=Path)
     parser.add_argument("--env-file", type=Path, default=Path(".env.eval"))
     parser.add_argument("--limit", type=int, default=8)
+    parser.add_argument("--mode", choices=("top-bottom", "adjacent"), default="top-bottom")
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--json", type=Path, default=None)
     args = parser.parse_args(argv)
@@ -71,7 +76,7 @@ def main(argv=None) -> int:
     if not all(env.get(k) for k in ("EVAL_JUDGE_BASE_URL", "EVAL_JUDGE_API_KEY", "EVAL_JUDGE_MODEL")):
         raise SystemExit("缺少 EVAL_JUDGE_* 配置")
     bundle = json.loads(args.bundle.read_text(encoding="utf-8"))
-    pairs = pairs_from_bundle(bundle, args.limit)
+    pairs = pairs_from_bundle(bundle, args.limit, args.mode)
     forward_payload = []
     for pair in pairs:
         forward_payload.append({"pair_id": pair["pair_id"], "applicant": pair["applicant"],
@@ -97,11 +102,11 @@ def main(argv=None) -> int:
         rows.append({"pair_id": pid, "forward": f, "backward": b_as_forward,
                      "top_win": f == "A", "bottom_win": f == "B"})
     summary = summarize(rows)
-    result = {"summary": summary, "rows": rows, "note": "交付名单内成对代理评审，不是人工真值。"}
+    result = {"summary": summary, "rows": rows, "mode": args.mode, "note": "交付名单内成对代理评审，不是人工真值。"}
     if args.json:
         args.json.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
     lines = ["# 交付名单内部成对评审（代理）", "",
-             f"- 样本：{summary['n']} 对（每 run 的 rank 最高 vs 最低）；"
+             f"- 样本：{summary['n']} 对（{args.mode}）；"
              f"**top 胜率 {summary['top_win_rate']:.2%}**；"
              f"position consistency **{summary['position_consistency']:.2f}**；usable **{summary['usable']}**",
              "", "| pair | forward | backward(归一) | top win |", "|---|---|---|---|"]
