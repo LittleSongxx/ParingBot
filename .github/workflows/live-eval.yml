@@ -236,7 +236,9 @@ jobs:
 
       - name: Dump compose logs on failure
         if: failure()
-        run: docker compose logs --tail=300
+        run: |
+          docker compose logs --tail=3000
+          docker compose logs backend --tail=3000 | grep -E "Traceback|Error|ERROR|异常|exception" -A 20 || true
 
       - name: Upload artifacts
         if: always()

@@ -21,6 +21,7 @@
 
 import asyncio
 import json
+import logging
 from uuid import uuid4
 
 from tortoise.transactions import in_transaction
@@ -35,6 +36,8 @@ from models import (AgentDefinition, AgentRun, AgentStep, AiModelConfig, Functio
 from service import (agent_service, auditor_service, config_service, member_service,
                      preference_service, screener_service)
 from settings import MATCH_TIMEOUT_SECONDS, QUALITY_GATE
+
+logger = logging.getLogger(__name__)
 
 # 运行类型，一次匹配编排对应一条运行记录
 RUN_TYPE = "匹配编排"
@@ -495,7 +498,9 @@ async def execute_task(task_id: int, run_id: int) -> None:
         return
     except Exception:  # noqa: BLE001
         # 兜住没预料到的异常。写进运行记录的是一句能照做的话：
-        # 底层异常原文是英文，直接放进结论列用户看不懂，也指不出下一步
+        # 底层异常原文是英文，直接放进结论列用户看不懂，也指不出下一步。
+        # 但异常栈必须进服务端日志，否则评测 artifact 只能看到“未预期的错误”，无法归因。
+        logger.exception("匹配任务 %s 运行出现未预期异常", task_id)
         reason = ("调度过程中出现未预期的错误。请稍后重试；"
                   "如果一直失败，请把这次操作告诉管理员")
         await _close(run, task, started, False, reason, await _count_rounds(run.id))
