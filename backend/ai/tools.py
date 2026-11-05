@@ -568,20 +568,23 @@ async def search_members(context: ToolContext, gender: str | None = None,
     # 门店只有标「必须」时才是硬条件；标「加分」时不能把检索直接缩到同店/同片区，
     # 否则模型按门店检索时会把其他门店的合格候选挡在外面（V4_29 发现不足的根因）。
     store_required = getattr(preference, "store_required", "加分") if preference is not None else "加分"
-    if store_scope in ("同门店", "同片区") and (preference is None or store_required == "必须"):
-        if not store_id:
-            store_id = applicant.store_id if applicant is not None else None
-        if not store_id:
-            raise CustomException(
-                f"门店范围选了「{store_scope}」，但申请方档案里没有可用的门店编码，"
-                f"请先让申请方在档案里选择意向门店")
-        if store_scope == "同门店":
-            query = query.filter(store_id=int(store_id))
-        else:
-            area = member_service.area_name(int(store_id))
-            same = [code for code, name in member_service.STORE_LIST
-                    if member_service.area_name(code) == area]
-            query = query.filter(store_id__in=same)
+    if store_scope in ("同门店", "同片区"):
+        # 只有标「必须」时才把门店当硬条件；标「加分」时直接忽略这个筛选参数，
+        # 也不报错（模型可能按提示词习惯性传了门店，但加分项不该把候选缩窄）。
+        if preference is None or store_required == "必须":
+            if not store_id:
+                store_id = applicant.store_id if applicant is not None else None
+            if not store_id:
+                raise CustomException(
+                    f"门店范围选了「{store_scope}」，但申请方档案里没有可用的门店编码，"
+                    f"请先让申请方在档案里选择意向门店")
+            if store_scope == "同门店":
+                query = query.filter(store_id=int(store_id))
+            else:
+                area = member_service.area_name(int(store_id))
+                same = [code for code, name in member_service.STORE_LIST
+                        if member_service.area_name(code) == area]
+                query = query.filter(store_id__in=same)
     elif store_scope and store_scope != "不限":
         raise CustomException("门店范围只能填「同门店」「同片区」或「不限」")
     wanted_tags = split_values(interest_tags)
