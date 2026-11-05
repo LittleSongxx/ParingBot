@@ -11,34 +11,34 @@
 | 多 Agent 匹配流程可运行、可复盘 | CI backend pytest、E2E、真实运行归档 | 高 |
 | 硬规则（同性/双向必须项/租期档位/交付前复核）由代码强制并有单测 | `backend/service/auditor_service.py`、`backend/tests/` | 高（机制） |
 | 评测工具链自身可用（冻结/供给池指纹/target 归一/负向断言/门禁） | `eval/tests/` 135 tests、`check_freeze.py`、CI | 高 |
-| v3 冻结集上，verify 交付 **7.125/8（57/64）**，达到结构上限 **57/57 target（100%）** | run 41663358923 artifact + 本地回放 | 中高（n=8，single trial） |
+| v3 冻结集上，baseline 交付 **7.125/8（57/64）**，达到结构上限 **57/57 target（100%）** | run 41985813976 artifact + 本地回放 | 中高（n=8，single trial） |
 
 **不能声称**：匹配准确率/Precision/NDCG 质量、泛化、内容质量达标、安全无风险、
 温度 0 可复现、成本可控；任何旧 pairwise/κ/内容质量结论。
 **质量真值仍缺**：没有 E3 人工盲评；v4 labels 仍 pending。
 
-## 2. v3 当前基线（BASELINE v2）
+## 2. v3 当前基线（BASELINE v2，2026-11-05 重跑）
 
 - 文件：`eval/frozen/v3/BASELINE.json`（schema_version=2）；
-- 来源：归档 run `41655402168`（code_commit `bebf56c`，bundle generated_at 2026-11-03 22:58），
-  原 run 的 report 步骤曾失败（旧 `quality_checks` 字符串偏好 bug），本基线由修复后代码从同一 artifact 复算；
-- labels/scenarios sha 与当前冻结文件一致；protocol `v3-2026-11-04`；
-- 交付：55/64 = **85.94% raw**；`target` 合计 57（V3_04 最多 5、V3_06 最多 4），
-  **target 达成率 55/57 = 96.49%**；failures=0、runs=8；
+- 来源：live-eval run `41985813976`（code_commit `b6f3d74`，2026-11-05 15:32 +08），
+  经 `report.py --mode baseline` 生成、人工提交；labels/scenarios sha 与当前冻结文件一致，protocol `v3-2026-11-04`；
+- 交付：57/64 = **89.06% raw**；`target` 合计 57（V3_04 最多 5、V3_06 最多 4），
+  **target 达成率 57/57 = 100%**；failures=0、runs=8；
 - regression：`max_failures_delta=0`、`target_margin=2/57≈0.0351`；任一场景由“有交付”退化为 0 直接失败。
+- 归档历史基线（run 41655402168 / 6.88、target 96.49%）只作追溯，不再作为当前 baseline。
 
-> v3 结构上限 = 57/64；verify 的 57/64 已打满上限。**7.13/8 不是质量分，也不支持“比 6.88 提升”**：
-> 差异只来自 V3_08 的 6→8 两个交付位，在 n=8、MDE≈1.6–2 的噪声内。
+> v3 结构上限 = 57/64；当前 baseline 已经打满上限（100% target）。
+> 这意味着：**v3 交付指标不再有提升空间，也不适合用来证明质量提升**；
+> 后续主回归只能依赖硬规则/安全/失败数/负向断言/成本，质量变化必须等 E3 人工或校准 judge。
+> 任何“7.13 → 更高”的叙事都不成立（最大值就是 7.125/8）。
 
 ## 3. verify 回放（2026-11-05 新门禁）
 
-- run `41663358923`（code `7637a5e`）：交付 57/64 = 89.06% raw，**target 100%**；failures 0；
-- token 1,661,505；延迟 P50/P95 85.3/249.4s（artifact；stats 队友复算一致）；
-- 新门禁回放：通过（baseline v2 校验、负向断言、bundle 指纹、freeze、safe/quality 全绿）；
-- run `41659345552` 交付 7.0/8（56/64 = 87.5%，target 98.2%），因 token 1,640,673 > 1,500,000 被旧预算门禁判失败；
-  这是 fail-closed 的预期行为，不再作为“质量回退”。
-- **HEAD 目前没有 live-eval artifact**：最后一次 live-eval 跑在 24a364c（tidy tie-break，已被回退）；
-  本轮代码合并后需重新跑 baseline/verify。
+- 归档 run `41663358923`（code `7637a5e`）：交付 57/64 = 89.06% raw，**target 100%**；failures 0；
+  用新 BASELINE v2 回放：通过（baseline hash/protocol、负向断言、bundle 指纹、freeze、safe/quality 全绿）；
+- run `41659345552` 交付 56/64（87.5% raw，target 98.2%），因 token 1,640,673 > 1,500,000 被预算门禁判失败；
+  这是 fail-closed 的预期行为，不再作为“质量回退”；
+- run `41985813976`（新 baseline）与后续 verify run 的 artifact 链接写在本节更新时；verify 必须与 baseline 同 code 栈/同协议。
 
 ## 4. v4 评测集（设计冻结，尚未接门禁）
 

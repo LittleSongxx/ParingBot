@@ -1,12 +1,12 @@
 {
  "schema_version": 2,
  "protocol_version": "v3-2026-11-04",
- "created_at": "2026-11-05 15:00:26",
+ "created_at": "2026-11-05 07:32:57",
  "source": {
-  "run_id": "41655402168",
-  "code_commit": "bebf56c436393c117d7f143f63dd21b45a269b7a",
-  "bundle_generated_at": "2026-11-03 22:58:22",
-  "matrix_source": "/tmp/smartlect-audit/runs/41655402168/live-eval-41655402168/eval/reports/scenario-matrix-live-41655402168",
+  "run_id": "41985813976",
+  "code_commit": "b6f3d745ac66ce3dfcac878e71ecaade5d158651",
+  "bundle_generated_at": "2026-11-05 15:32:57",
+  "matrix_source": "eval/reports/scenario-matrix-live-41985813976",
   "matrix_label": null
  },
  "labels_sha256": "86700b4b3dab78ab5eb767aa9f27fa6193789e0ba841a44a30388f19b7c99c50",
@@ -44,9 +44,9 @@
  "run_timeout_seconds": "600",
  "db_profile": "eval",
  "delivery": {
-  "avg": 6.875,
-  "rate": 0.8594,
-  "target_attainment": 0.9649
+  "avg": 7.125,
+  "rate": 0.8906,
+  "target_attainment": 1.0
  },
  "requested_avg": 8.0,
  "target_total": 57,
@@ -134,10 +134,10 @@
   "V3_08": {
    "requested": 8,
    "delivered": [
-    6
+    8
    ],
    "target": 8,
-   "target_attainment": 0.75,
+   "target_attainment": 1.0,
    "run_status": [
     "已完成"
    ]
