@@ -279,3 +279,15 @@
 - 解释：难负例（同性别/同片区/带软冲突）下交付组仍全胜，且 Qwen/DeepSeek 两族一致；
   但仍为 LLM 代理评审、对照包含明显软冲突，不能当作人工真值；
 - 兼容性修复：DeepSeek reasoning 输出可能只放在 `reasoning_content`，judge 解析已兼容。
+
+## 24. 交付名单内部排序评审（2026-11-04）
+
+- 新增 `eval/pairwise_ranking.py`：对每个 run 取 `delivered_rank` 最高 vs 最低的两位交付候选，
+  同一申请人做 A/B 成对评审（位置交换）；
+- 8 对结果：
+  - **top 胜率 100%**（8/8）；
+  - position consistency **1.000**；
+  - usable=true；
+- 解释：系统交付排序的“第一名 vs 最后一名”与独立 judge 偏好一致，说明排序至少在两端有区分度；
+  但这是代理评审、n=8，且只比较首尾，不代表中间排序完全正确；
+- 下一步：比较相邻 rank（1v2、2v3…）检验排序细粒度。
