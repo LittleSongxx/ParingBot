@@ -192,6 +192,30 @@ docker compose build web
 - **安全边界**：密码为 PBKDF2 哈希、上传鉴权+魔数校验、登录失败限流、改密吊销旧 JWT、分页限幅、nginx 安全响应头、用户名列表仅管理员可见；但这是**单人本机演示栈**，仍缺审计日志、备份策略与公网加固，不要直接暴露到公网。
 - **运行期**：匹配任务跑在 FastAPI BackgroundTasks 里，单进程、无队列、无重试；服务重启时会把悬挂运行标记为失败（前端会提示重新发起）。单次运行默认 600 秒超时。
 
+## 质量评测（2026-11 审计后）
+
+> 本项目不是生产系统，但评测不是“跑个 8/8”。下面只列**可追溯、带边界**的当前结果；完整口径见 [eval/RESULTS.md](eval/RESULTS.md)。
+
+- **冻结集**：v3 = 8 正向 + 2 负向 readiness 场景，候选池固定为 900 名种子成员，禁止补供给；
+  MANIFEST 记录 `base_sql_sha256` + 候选池 `pool_digest`，`eval/self_check.py` 每次 CI 校验。
+- **交付/target**：当前 BASELINE v2 来自真实 run，v3 交付 **57/64（89.06%）**；
+  结构上限 57（V3_04 最多 5、V3_06 最多 4），**target 达成率 100%**。
+  交付指标已饱和，因此不用它证明“质量提升”。
+- **稳定性**：4 次 v3 run 共 32 个 scenario-run，失败率 **3.12%**（Wilson 95% CI 0.5–15.7%）；
+  失败会被门禁按 `failures > baseline + 0` 拦截，不会静默放过。
+- **内容质量（Qwen 异族代理，E2.5 探索）**：n=20，overall **4.80/5**、faithful 4.80；
+  8/20 规则 warning（候选画像与 `has_pet` 字段矛盾）；
+  仪器校验：注入已知坏样本后 faithful 5.0→2.0，说明评分器有区分度；但仍不是人工真值。
+- **成对匹配 judge（E2 探索）**：去泄漏材料下 20 对有效，delivered 胜率 **75%**（Wilson 95% CI 53.1–88.8%），
+  位置一致性 0.85；n 小、只能作相对信号。
+- **v4 pilot（新协议，labels pending）**：9 场景×3 trials 交付 85.65%、target 99.38%；
+  但 **V4_29 同一冻结场景 6 次 trial 交付 [6,5,6,1,2,6]**，已被评分卡标为 unstable，
+  因此 pass^k 不作为稳定质量结论。
+- **能声称 / 不能声称**：可声称流程完成率、失败率、target 归一交付、硬规则/安全/负向断言；
+  **不能**声称匹配质量、内容质量达标、泛化或优化有效（缺 E3 人工盲评）。
+- 工具：`eval/quality_scorecard.py` 汇总多 run 的失败率/target CI/不稳定场景；
+  `eval/self_check.py` 做“test the test”（门禁探针/场景硬编码/材料泄漏/基线放松），CI 14/14 通过。
+
 ## 这个仓库里没有什么
 
 - **没有真实房源/租约/合同/支付**：只有租客档案、偏好、匹配与审核；不是完整的公寓租赁业务系统。
@@ -208,7 +232,7 @@ docker compose build web
 - 种子库生成说明：[scripts/prepare_seed.py](scripts/prepare_seed.py)
 - 评测体系与冻结集：[eval/README.md](eval/README.md)
 - 评测运行手册（环境/基线/judge/人工评估）：[eval/RUNBOOK.md](eval/RUNBOOK.md)
-- 当前评测状态（无质量结论，历史数字已作废）：[eval/RESULTS.md](eval/RESULTS.md)
+- 当前评测状态（2026-11 探索性结果与边界，历史数字已作废）：[eval/RESULTS.md](eval/RESULTS.md)
 - 前端 Playwright 冒烟：[e2e/README.md](e2e/README.md)
 - 发布前质量检查单：[docs/release-checklist.md](docs/release-checklist.md)
 - 真实模型评测工作流：`.github/workflows/live-eval.yml`（v3 冻结集；手动触发，需 DEEPSEEK_API_KEY secret）

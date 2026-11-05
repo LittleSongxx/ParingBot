@@ -35,6 +35,15 @@ on:
         description: "本次 token 预算上限（0=不限制）"
         required: false
         default: "2500000"
+      keys:
+        description: "调试用：只跑这些 v3 场景（逗号分隔，如 V3_07）；设置后跳过 report 门禁"
+        required: false
+        default: ""
+      debug_only:
+        description: "调试模式：只跑 keys 场景并跳过 report 门禁（artifact/日志照常上传）"
+        type: boolean
+        required: false
+        default: false
   schedule:
     - cron: '0 18 * * 0'   # 每周一 02:00 Asia/Shanghai
 
@@ -134,9 +143,15 @@ jobs:
         env:
           TRIALS: ${{ github.event.inputs.trials || '1' }}
           RUN_LABEL: live-${{ github.run_id }}
+          KEYS: ${{ github.event.inputs.keys || '' }}
         run: |
-          python eval/run_matrix.py --suite v3 --trials "$TRIALS" \
-            --label "$RUN_LABEL" --stamp "$RUN_LABEL"
+          if [ -n "$KEYS" ]; then
+            python eval/run_matrix.py --suite v3 --only "$KEYS" --trials "$TRIALS" \
+              --label "$RUN_LABEL" --stamp "$RUN_LABEL"
+          else
+            python eval/run_matrix.py --suite v3 --trials "$TRIALS" \
+              --label "$RUN_LABEL" --stamp "$RUN_LABEL"
+          fi
 
       - name: Warm candidate portraits (content quality inputs)
         continue-on-error: true
@@ -205,6 +220,7 @@ jobs:
           fi
 
       - name: Report + gates
+        if: ${{ github.event.inputs.debug_only != 'true' }}
         env:
           MODE: ${{ github.event.inputs.mode || 'verify' }}
           PUBLISH: ${{ github.event.inputs.publish || 'false' }}
