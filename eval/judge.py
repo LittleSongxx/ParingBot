@@ -3,11 +3,17 @@
 """独立 judge：跨模型族评估交付候选（pointwise / pairwise）。
 
 独立性约束：judge 模型不得与生产模型相同；相同必须显式 --allow-same-model（仅探索）。
+
+审计修正（2026-11-05，A3）：
+* 输出 JSON 增加 bundle_meta（bundle 的环境/模型指纹，便于追溯“哪次评测、哪个 judge”）；
+* pairwise 增加 position_consistency 与 Wilson 95% CI（小样本下胜率必须带区间）；
+* pointwise 聚合口径保持不变（只补 bundle_meta，不改原有字段）。
 """
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 import urllib.request
@@ -16,6 +22,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 from lib.env import load_env  # noqa: E402
+
+# Wilson CI：优先用 Lead 在 eval/lib/metrics.py 的统一实现，缺失时本地兜底。
+try:  # pragma: no cover - 正常路径
+    from lib.metrics import wilson_ci as _metrics_wilson_ci
+except ImportError:  # pragma: no cover
+    _metrics_wilson_ci = None
 
 DEFAULT_ENV = ROOT.parent / ".env.eval"
 POINT_PROMPT = """你是独立合租匹配评审。只根据双方资料判断候选是否适合该申请方，不要参考已有审核结论。
@@ -40,6 +52,35 @@ PAIR_PROMPT = """你是独立合租匹配评审。下面有两个候选（A/B）
 【候选 B】
 {candidate_b}
 """
+
+
+def _local_wilson_ci(successes: float, n: int, z: float = 1.96) -> dict:
+    total = int(n)
+    count = float(successes)
+    if total <= 0:
+        return {"n": 0, "successes": 0.0, "rate": 0.0, "lo": 0.0, "hi": 0.0}
+    rate = max(0.0, min(1.0, count / total))
+    denominator = 1 + z * z / total
+    centre = (rate + z * z / (2 * total)) / denominator
+    margin = z * math.sqrt(rate * (1 - rate) / total + z * z / (4 * total * total)) / denominator
+    return {"n": total, "successes": round(count, 4), "rate": round(rate, 4),
+            "lo": round(max(0.0, centre - margin), 4),
+            "hi": round(min(1.0, centre + margin), 4)}
+
+
+def wilson_ci(successes: float, n: int) -> dict:
+    """Wilson 95% CI：优先 lib.metrics.wilson_ci，缺失/异常时本地兜底。"""
+    if _metrics_wilson_ci is not None:
+        try:
+            result = _metrics_wilson_ci(successes, n)
+            return {"n": int(result.get("n", n) or 0),
+                    "successes": round(float(result.get("successes", successes) or 0.0), 4),
+                    "rate": round(float(result.get("rate", 0.0) or 0.0), 4),
+                    "lo": round(float(result.get("lo", 0.0) or 0.0), 4),
+                    "hi": round(float(result.get("hi", 0.0) or 0.0), 4)}
+        except Exception:  # noqa: BLE001
+            pass
+    return _local_wilson_ci(successes, n)
 
 
 def text(item: dict) -> str:
@@ -91,6 +132,7 @@ def pairwise(rows: list[dict], model: str, base_url: str, api_key: str) -> dict:
         raise SystemExit("pairwise 需要 run 内存在未交付候选；当前 bundle 没有，改用 pointwise")
     wins = 0
     comparisons = 0
+    consistent_count = 0
     rows_out = []
     for index, (app, delivered_candidate, rejected_candidate) in enumerate(pairs):
         verdicts = []
@@ -110,6 +152,8 @@ def pairwise(rows: list[dict], model: str, base_url: str, api_key: str) -> dict:
                 consistent = True
             elif verdicts[0] == "B" and verdicts[1] == "A":
                 consistent = True
+            if consistent:
+                consistent_count += 1
             if consistent and verdicts[0] != "tie":
                 wins += 1
             comparisons += 1
@@ -118,7 +162,10 @@ def pairwise(rows: list[dict], model: str, base_url: str, api_key: str) -> dict:
                          "consistent_after_swap": consistent})
     return {"mode": "pairwise", "model": model, "pairs": rows_out,
             "aggregate": {"pairs": len(pairs), "valid": comparisons, "delivered_wins": wins,
-                          "delivered_win_rate": round(wins / comparisons, 3) if comparisons else None}}
+                          "delivered_win_rate": round(wins / comparisons, 3) if comparisons else None,
+                          "position_consistency": round(consistent_count / comparisons, 3) if comparisons else None,
+                          "ci95": {"delivered_win_rate": wilson_ci(wins, comparisons),
+                                   "position_consistency": wilson_ci(consistent_count, comparisons)}}}
 
 
 def main(argv=None) -> int:
@@ -195,6 +242,10 @@ def main(argv=None) -> int:
                 aggregate["human_n"] = n
         result = {"mode": "pointwise", "provider": provider, "model": model, "rows": scored,
                   "aggregate": aggregate}
+    # bundle 环境指纹：哪个 bundle/commit/模型配置，避免 judge 结果脱离上下文被引用。
+    result["bundle_meta"] = bundle.get("meta") or {}
+    result["judge_model"] = model
+    result["judge_provider"] = provider
     if args.json:
         args.json.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
     lines = ["# 独立 judge 报告", "", f"- 模式：{args.mode}；模型：{model}（{provider}）",
