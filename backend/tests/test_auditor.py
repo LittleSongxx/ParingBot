@@ -407,7 +407,8 @@ async def test_candidates_with_a_conclusion_are_not_audited_again(db, monkeypatc
     await _put(task, todo)
     run = await _open_run(task)
     fake = _use_fake_model(monkeypatch, _audit_script([
-        (todo.id, auditor_service.AUDIT_REJECT, "MISMATCH_HARD")]))
+        # 用软冲突分类：本用例只验证“已结论不再审”，不应被硬规则复核改判
+        (todo.id, auditor_service.AUDIT_REJECT, "PREFERENCE_CONFLICT")]))
 
     result = await auditor_service.build_audit(member.id, task.id, run.id)
 
