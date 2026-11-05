@@ -202,6 +202,7 @@ docker compose build web
   结构上限 57（V3_04 最多 5、V3_06 最多 4），**target 达成率 100%**。
   交付指标已饱和，因此不用它证明“质量提升”。
 - **稳定性**：4 次 v3 run 共 32 个 scenario-run，失败率 **3.12%**（Wilson 95% CI 0.5–15.7%）；
+  同场景跨 run 交付一致率 87.5%；**候选发现覆盖率 100%**（discovered/target）；
   失败会被门禁按 `failures > baseline + 0` 拦截，不会静默放过。
 - **内容质量（Qwen 异族代理，E2.5 探索）**：n=20，overall **4.80/5**、faithful 4.80；
   8/20 规则 warning（候选画像与 `has_pet` 字段矛盾）；
@@ -209,8 +210,9 @@ docker compose build web
 - **成对匹配 judge（E2 探索）**：去泄漏材料下 20 对有效，delivered 胜率 **75%**（Wilson 95% CI 53.1–88.8%），
   位置一致性 0.85；n 小、只能作相对信号。
 - **v4 pilot（新协议，labels pending）**：9 场景×3 trials 交付 85.65%、target 99.38%；
-  但 **V4_29 同一冻结场景 6 次 trial 交付 [6,5,6,1,2,6]**，已被评分卡标为 unstable，
-  因此 pass^k 不作为稳定质量结论。
+  但 **V4_29 同一冻结场景 9 次 trial 交付 [6,5,6,1,2,6,6,6,6]**（mean 4.89、range 5、coverage 均值 90.7% / min 33.3%），
+  已被评分卡标为 unstable，因此 pass^k / target 不作为稳定质量结论。
+  其余 v4 场景候选发现覆盖率 98.97%，只有 V4_29 低于 99%。
 - **能声称 / 不能声称**：可声称流程完成率、失败率、target 归一交付、硬规则/安全/负向断言；
   **不能**声称匹配质量、内容质量达标、泛化或优化有效（缺 E3 人工盲评）。
 - 工具：`eval/quality_scorecard.py` 汇总多 run 的失败率/target CI/不稳定场景；

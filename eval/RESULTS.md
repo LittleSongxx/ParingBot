@@ -98,15 +98,19 @@
 新增 `eval/quality_scorecard.py`：对多次 run 的 matrix 汇总失败率 Wilson CI、target 达成率 CI、
 同场景跨 run 一致性、不稳定场景、内容/judge 代理信号，并输出“能/不能声称”清单。
 
+新增口径 **候选发现覆盖率** = `min(discovered / target, 1)`：目标人数中有多少被 Agent 真正找出来；
+它补上了“交付不足到底是没人还是没找到”的归因。
+
 v3（4 个 live-eval run：41985813976 / 41988136753 / 41991751431 / 41997348370，共 32 个 scenario-run）：
 - 失败 **1/32 = 3.12%**（Wilson 95% CI 0.5–15.7%）；target 达成率 **99.61%**（98.8–100%）；
 - 同场景跨 run 完全一致率 **87.5%**（唯一波动 V3_07：[8,8,7,8]）；
-- 无 unstable 场景；`delivery_headroom=false`（target 已饱和，交付不能证明提升）。
+- **候选发现覆盖率 100%**；无 low_coverage/unstable 场景；`delivery_headroom=false`（target 已饱和）。
 
-v4（full pilot 41991262897 + 定向复跑 42002328618，共 30 个 scenario-run）：
-- 失败 **1/30 = 3.33%**；target 达成率 **96.91%**；同场景跨 run 一致率 **88.9%**；
-- **unstable 场景 V4_29**：6 次 trial 交付 `[6,5,6,1,2,6]`（range=5, mean=4.33），
-  其中 1 次失败；因此 v4 的 pass^k / target 达成率不能当作稳定质量结论。
+v4（full pilot 41991262897 + 定向复跑 42002328618 / 42025074084，共 33 个 scenario-run）：
+- 失败 **1/33 = 3.03%**；target 达成率 **97.94%**；同场景跨 run 一致率 **88.9%**；
+- **候选发现覆盖率 98.97%**；低覆盖场景只有 **V4_29**（覆盖均值 90.7% / min 33.3%）；
+- **unstable 场景 V4_29**：9 次 trial 交付 `[6,5,6,1,2,6,6,6,6]`（mean 4.89, range 5, coverage min 33.3%），
+  其中 1 次失败；因此 v4 的 pass^k / target 达成率不能当作稳定质量结论；
 - 两个评分卡的 `quality_claim_allowed` 均恒为 false（无 E3 人工盲评）；代理信号只作探索。
 
 ## 5.7 自查：避免重蹈覆辙（eval/self_check.py，14/14 通过）

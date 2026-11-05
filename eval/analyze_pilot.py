@@ -133,8 +133,10 @@ def analyze(matrix: dict, scenarios: dict, *, scenarios_sha256: str | None = Non
         target = resolve_target(expect, scenario.get("ex_ante_capacity") or {})
         runs = record.get("runs") or []
         delivered = [int(run.get("delivered") or 0) for run in runs]
+        discovered = [int((run.get("counts") or {}).get("total") or 0) for run in runs]
         if not delivered:
             continue
+        coverage = [min(value / target, 1.0) for value in discovered] if target else []
         k = len(delivered)
         full = [value == requested for value in delivered]
         cap = [value >= target for value in delivered]
@@ -159,6 +161,9 @@ def analyze(matrix: dict, scenarios: dict, *, scenarios_sha256: str | None = Non
             "key": key,
             "tier": (scenario.get("ex_ante_capacity") or {}).get("tier"),
             "delivered": delivered,
+            "discovered": discovered,
+            "coverage_mean": round(statistics.mean(coverage), 4) if coverage else 0.0,
+            "coverage_range": round(max(coverage) - min(coverage), 4) if coverage else 0.0,
             "expected": requested,
             "target": target,
             "target_rule": target_rule(expect),
@@ -185,6 +190,7 @@ def analyze(matrix: dict, scenarios: dict, *, scenarios_sha256: str | None = Non
                 "n": len(subset),
                 "delivery_rate": round(statistics.mean([row["delivery_rate"] for row in subset]), 4),
                 "target_attainment": round(statistics.mean([row["target_attainment"] for row in subset]), 4),
+                "discovery_coverage": round(statistics.mean([row["coverage_mean"] for row in subset]), 4),
                 "pass_cap": round(sum(1 for row in subset if row["pass_cap"]) / len(subset), 4),
             }
     return {
@@ -194,6 +200,8 @@ def analyze(matrix: dict, scenarios: dict, *, scenarios_sha256: str | None = Non
         "scenarios_sha256": scenarios_sha256,
         "delivery_rate": round(statistics.mean(rates), 4) if rates else 0.0,
         "delivery_ci95": metrics.bootstrap_ci(rates),
+        "discovery_coverage": round(statistics.mean([row["coverage_mean"] for row in rows]), 4) if rows else 0.0,
+        "low_coverage_scenarios": sorted(row["key"] for row in rows if row["coverage_mean"] < 0.99),
         "target_attainment": round(statistics.mean(attainments), 4) if attainments else 0.0,
         "target_attainment_ci95": metrics.bootstrap_ci(attainments),
         "pass_full": round(sum(1 for row in rows if row["pass_full"]) / len(rows), 4) if rows else 0.0,
@@ -231,16 +239,21 @@ def render(result: dict) -> str:
              f"pass^k（>0）**{result['pass_any']:.3f}**",
              f"- pass_power（requested）：{result.get('pass_power_full') or {}}；"
              f"pass_power（target）：{result.get('pass_power_cap') or {}}",
-             f"- 同场景全部 trial 交付完全一致：**{result['consistency']:.3f}**", "",
-             "| 层 | n | 交付率 | target 达成率 | pass^k(cap) |", "|---|---|---|---|---|"]
+             f"- 同场景全部 trial 交付完全一致：**{result['consistency']:.3f}**；"
+             f"候选发现覆盖率 **{result.get('discovery_coverage', 0):.1%}**"
+             f"（不足场景：{result.get('low_coverage_scenarios') or '无'}）", "",
+             "| 层 | n | 交付率 | target 达成率 | 发现覆盖率 | pass^k(cap) |",
+             "|---|---|---|---|---|---|"]
     for tier, item in result["tier_stats"].items():
         lines.append(f"| {tier} | {item['n']} | {item['delivery_rate']:.2%} | "
-                     f"{item['target_attainment']:.2%} | {item['pass_cap']:.3f} |")
-    lines += ["", "| 场景 | tier | delivered | target | pass_cap | 短交付原因 |",
-              "|---|---|---|---|---|---|"]
+                     f"{item['target_attainment']:.2%} | {item.get('discovery_coverage', 0):.2%} | "
+                     f"{item['pass_cap']:.3f} |")
+    lines += ["", "| 场景 | tier | delivered | target | 发现覆盖 | pass_cap | 短交付原因 |",
+              "|---|---|---|---|---|---|---|"]
     for row in result["rows"]:
         lines.append(f"| {row['key']} | {row['tier']} | {row['delivered']} | {row['target']} | "
-                     f"{row['pass_cap']} | {','.join(row.get('shortfall_causes') or []) or '-'} |")
+                     f"{row.get('coverage_mean', 0):.0%} | {row['pass_cap']} | "
+                     f"{','.join(row.get('shortfall_causes') or []) or '-'} |")
     shortfall = result["shortfall"]
     lines += ["", f"- 短交付场景：{shortfall['scenarios_target_short']} 个；原因 {shortfall['causes']}；"
               f"容量上限低于 requested：{shortfall['capacity_limited']} 个"]
