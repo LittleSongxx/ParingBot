@@ -1,5 +1,5 @@
 """交付排序分 / 质量门禁的纯单元测试（不连数据库、不调模型）。"""
-from datetime import date
+from datetime import datetime
 from types import SimpleNamespace
 
 from service import match_service
@@ -8,7 +8,7 @@ from service import match_service
 def _member(**overrides):
     base = {
         "store_id": 1, "schedule_type": "正常作息", "lease_term": "1-2年",
-        "rent_budget": 3000, "birth_date": date(1994, 3, 12), "tidiness": "整洁",
+        "rent_budget": 3000, "birth_date": datetime(1994, 3, 12), "tidiness": "整洁",
         "smoking": "不吸烟", "has_pet": "无", "interest_tags": "看电影,跑步",
     }
     base.update(overrides)
