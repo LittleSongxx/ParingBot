@@ -72,9 +72,16 @@ async def run_bundle(user, run):
     applicant = await profile_bundle(task.member_id)
     if applicant is not None:
         applicant["username"] = user.username
-    delivered, _note = await match_service.deliverable(task.id)
-    delivered_ids = {row.id for row in delivered}
-    delivered_rank = {row.id: rank for rank, row in enumerate(delivered, 1)}
+    # deliverable() 是“按规则有资格交付”的全集；页面实际展示要再叠加
+    # task.deliver_count 上限。bundle 的 delivered 必须与页面口径一致，
+    # 否则会把“通过但被截断”的候选误标为已交付（V3_05 曾出现 delivered=10 > 8）。
+    breakdown = await match_service.delivery_breakdown(task.id)
+    passed = breakdown["passed"]
+    delivered_rows = breakdown["delivered"]
+    passed_ids = {row.id for row in passed}
+    delivered_ids = {row.id for row in delivered_rows}
+    truncated_ids = {row.id for row in breakdown["truncated"]}
+    delivered_rank = {row.id: rank for rank, row in enumerate(delivered_rows, 1)}
     rows = await MatchCandidate.filter(task_id=task.id).order_by("id")
     applicant_profile = await MemberProfile.get(id=task.member_id)
     applicant_preference = await RoommatePreference.get_or_none(member_id=task.member_id)
@@ -93,6 +100,8 @@ async def run_bundle(user, run):
             "found_round": row.found_round, "relax_note": row.relax_note,
             "audit_status": row.audit_status, "reject_code": row.reject_code,
             "reject_reason": row.reject_reason, "audit_round": row.audit_round,
+            "passed": row.id in passed_ids,
+            "truncated": row.id in truncated_ids,
             "delivered": row.id in delivered_ids,
             "delivered_rank": delivered_rank.get(row.id),
         })
@@ -108,8 +117,9 @@ async def run_bundle(user, run):
         "task": {"id": task.id, "task_no": task.task_no, "status": task.status,
                  "deliver_count": task.deliver_count, "total_round": task.total_round},
         "applicant": applicant,
-        "deliverable_passed_count": len(delivered),
-        "delivered_to_user": min(len(delivered), task.deliver_count),
+        "deliverable_passed_count": len(passed),
+        "delivered_to_user": len(delivered_rows),
+        "truncated_count": len(truncated_ids),
         "candidates": candidates,
         "rounds": await match_service.round_rows(run.id),
         "funnel": await trace_service.funnel(task.id),

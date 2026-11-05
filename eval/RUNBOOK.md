@@ -46,6 +46,10 @@ python eval/run_matrix.py --suite v3 --trials 1 --label v3-smoke
 ## 4. 导出 bundle 与报告
 
 ```bash
+# 先给交付名单里的候选补画像（content_quality 需要；没有公开动态的候选会跳过）
+docker compose exec -T -e EVAL_BUNDLE_TRIALS=1 -e EVAL_WARM_PORTRAITS=40 \
+  backend python - < eval/warm_candidate_portraits.py
+
 # EVAL_BUNDLE_TRIALS 必须与 --trials 一致，保证 quality/safety/judge/token 覆盖全部 trial
 docker compose exec -T -e EVAL_BUNDLE_TRIALS=1 backend python - < eval/build_bundle.py > quality-bundle.json
 
@@ -70,7 +74,7 @@ target 配对回退超阈值、安全 error 都会失败。`BASELINE.json` 必�
 python eval/judge.py --bundle quality-bundle.json --mode pairwise \
   --sample-not-delivered 8 --out judge-report.md --json judge-report.json
 
-python eval/content_quality.py --bundle quality-bundle.json --limit 20 \
+python eval/content_quality.py --bundle quality-bundle.json --limit 20 --min-items 12 \
   --env-file .env.eval --out content-report.md --json content-report.json
 
 python eval/report.py --bundle quality-bundle.json --matrix eval/reports \

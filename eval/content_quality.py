@@ -162,6 +162,18 @@ def call_judge(env: dict, items: list[dict], max_tokens: int = 4096) -> list[dic
     return json.loads(match.group(0))
 
 
+def ceiling_effect(values, threshold: float = 4.75, spread: float = 0.25) -> bool:
+    """检测“全满分/零方差”天花板：这种结果不能当作质量水平证据。
+
+    LLM judge 在合成/规整文本上很容易给 5 分；如果样本内极差 < spread 且均值 >= threshold，
+    指标只说明“评分器没有区分度”，需要在报告里显式标注，而不是当成高质量结论。
+    """
+    data = [float(value) for value in (values or [])]
+    if not data:
+        return False
+    return (max(data) - min(data) < spread) and (sum(data) / len(data) >= threshold)
+
+
 def rule_warnings(items: list[dict]) -> list[dict]:
     warnings = []
     for item in items:
@@ -205,8 +217,10 @@ def main(argv=None) -> int:
               for dim in dims}
     summary = {dim: round(statistics.mean(vals), 3) if vals else None for dim, vals in values.items()}
     ci95 = {dim: mean_ci(vals) for dim, vals in values.items() if vals}
+    ceiling = ceiling_effect(values.get("overall") or [])
+    credible = (not ceiling) and len(items) >= max(1, args.min_items)
     result = {"items": len(items), "n": len(items), "scored": len(rows), "means": summary,
-              "ci95": ci95,
+              "ci95": ci95, "ceiling_effect": ceiling, "credible": credible,
               "sample_ids": [item["item_id"] for item in items],
               "roles": {item["item_id"]: item["role"] for item in items},
               "bundle_meta": bundle.get("meta") or {},
@@ -223,10 +237,14 @@ def main(argv=None) -> int:
         ci_text = f"（95% CI {ci['lo']}–{ci['hi']}）" if ci else ""
         lines.append(f"- {dim}: {value}{ci_text}")
     lines += [f"- 规则 warning：{len(result['rule_warnings'])} 条"]
+    if ceiling:
+        lines.append("- ⚠️ **天花板效应**：overall 全为满分/零方差，评分器没有区分度；"
+                     "该结果不能作为内容质量水平证据（只说明当前样本未触发扣分项）。")
     if args.out:
         args.out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(json.dumps({"n": len(items), "means": summary,
-                      "warnings": len(result["rule_warnings"])}, ensure_ascii=False))
+                      "warnings": len(result["rule_warnings"]),
+                      "ceiling_effect": ceiling, "credible": credible}, ensure_ascii=False))
     return 0
 
 

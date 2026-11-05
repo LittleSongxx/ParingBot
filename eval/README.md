@@ -15,7 +15,8 @@ eval/
 ├── lib/                        # env / api / seed / rules / metrics / render / freeze
 │   └── freeze.py               # base SQL/pool digest、SQL 供给扫描（MANIFEST/check_freeze 共用）
 ├── run_matrix.py               # 真实 API + 真实模型跑场景矩阵（含负向断言记录）
-├── build_bundle.py             # 在 backend 容器内导出 quality-bundle（支持 EVAL_BUNDLE_TRIALS）
+├── build_bundle.py             # bundle 导出（delivered 按交付上限截断，支持多 trial）
+├── warm_candidate_portraits.py # 给交付候选补画像（content_quality 输入）
 ├── quality_checks.py           # 硬规则 / 数据一致性 / 字段存在率（非质量）
 ├── safety_checks.py            # PII / 承诺 / 注入 扫描
 ├── judge.py                    # 独立 judge（跨模型族、pointwise/pairwise、位置一致性）
@@ -73,7 +74,9 @@ python eval/configure_models.py --env-file .env.eval
 # 2) 跑冻结 v3（1 trial 先跑；质量类指标需 EVAL_BUNDLE_TRIALS 同步 = trials）
 EVAL_TRIALS=1 python eval/run_matrix.py --suite v3 --trials 1 --label v3-smoke
 
-# 3) 导出 bundle（容器内；EVAL_BUNDLE_TRIALS 与 trials 对齐）
+# 3) 补候选画像 + 导出 bundle（容器内；EVAL_BUNDLE_TRIALS 与 trials 对齐）
+docker compose exec -T -e EVAL_BUNDLE_TRIALS=1 -e EVAL_WARM_PORTRAITS=40 \
+  backend python - < eval/warm_candidate_portraits.py
 docker compose exec -T -e EVAL_BUNDLE_TRIALS=1 backend python - < eval/build_bundle.py > quality-bundle.json
 
 # 4) 报告 + 门禁

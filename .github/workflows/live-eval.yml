@@ -138,6 +138,16 @@ jobs:
           python eval/run_matrix.py --suite v3 --trials "$TRIALS" \
             --label "$RUN_LABEL" --stamp "$RUN_LABEL"
 
+      - name: Warm candidate portraits (content quality inputs)
+        continue-on-error: true
+        env:
+          EVAL_BUNDLE_TRIALS: ${{ github.event.inputs.trials || '1' }}
+        run: |
+          # 只给“实际交付名单”里缺画像的候选补画像（没有公开动态的会跳过）；
+          # 失败不阻断矩阵/门禁，内容质量步会按 --min-items 自行 fail-closed。
+          docker compose exec -T -e EVAL_BUNDLE_TRIALS="$EVAL_BUNDLE_TRIALS" \
+            -e EVAL_WARM_PORTRAITS=40 backend python - < eval/warm_candidate_portraits.py
+
       - name: Build quality bundle
         env:
           GIT_COMMIT: ${{ github.sha }}
@@ -189,7 +199,7 @@ jobs:
               "${{ secrets.EVAL_JUDGE_PROVIDER }}" "${{ secrets.EVAL_JUDGE_BASE_URL }}" \
               "$EVAL_JUDGE_API_KEY" "${{ secrets.EVAL_JUDGE_MODEL }}" >> .env.eval
             python eval/content_quality.py --bundle quality-bundle.json --limit 20 \
-              --env-file .env.eval --out content-report.md --json content-report.json \
+              --min-items 12 --env-file .env.eval --out content-report.md --json content-report.json \
               || [ "$PUBLISH" != "true" ]
           fi
 

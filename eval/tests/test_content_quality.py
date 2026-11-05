@@ -74,6 +74,12 @@ class ContentSamplingTest(unittest.TestCase):
             ])
             self.assertEqual(code, 1)
 
+    def test_ceiling_effect_detects_all_fives(self):
+        self.assertTrue(content_quality.ceiling_effect([5, 5, 5, 5]))
+        self.assertTrue(content_quality.ceiling_effect([5, 5, 5, 4.8]))
+        self.assertFalse(content_quality.ceiling_effect([5, 4, 5, 4]))
+        self.assertFalse(content_quality.ceiling_effect([]))
+
     def test_bootstrap_mean_ci_is_reproducible_and_brackets_mean(self):
         values = [3.0, 4.0, 5.0, 4.0, 4.5]
         ci = content_quality.mean_ci(values)
