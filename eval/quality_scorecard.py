@@ -86,6 +86,7 @@ def collect_runs(matrix_paths: list[Path]) -> list[dict]:
                     "delivered": delivered,
                     "target_attainment": round(min(delivered / target, 1.0), 4) if target else 0.0,
                     "status": run.get("run_status"),
+                    "error_message": run.get("error_message"),
                     "wall_seconds": run.get("wall_seconds"),
                     "source": str(matrix_path),
                 })
@@ -115,6 +116,11 @@ def summarize_runs(rows: list[dict]) -> dict:
             "has_failure": failures > 0,
         }
     failures = sum(1 for row in rows if row["status"] not in COMPLETED)
+    failure_details = [
+        {"scenario": row["scenario"], "status": row.get("status"),
+         "error_message": (row.get("error_message") or "")[:300]}
+        for row in rows if row["status"] not in COMPLETED
+    ]
     target_means = [item["target_attainment_mean"] for item in per_scenario.values()]
     delivery_means = [statistics.mean(item["delivered"]) for item in per_scenario.values()]
     target_ci = metrics.bootstrap_ci(target_means) if target_means else None
@@ -133,6 +139,7 @@ def summarize_runs(rows: list[dict]) -> dict:
         "same_scenario_consistency": round(expected_consistency / len(per_scenario), 4) if per_scenario else 0.0,
         "unstable_scenarios": sorted(key for key, item in per_scenario.items() if item["unstable"]),
         "failed_scenarios": sorted(key for key, item in per_scenario.items() if item["has_failure"]),
+        "failure_details": failure_details,
         "per_scenario": per_scenario,
         "delivery_headroom": not (target_means and statistics.mean(target_means) >= 0.99),
     }
@@ -228,6 +235,11 @@ def render(result: dict) -> str:
     for key, item in summary["per_scenario"].items():
         lines.append(f"| {key} | {item['runs']} | {item['delivered']} | {item['delivered_mean']} | "
                      f"{item['target']} | {item['failures']} | {item['unstable']} |")
+    if summary.get("failure_details"):
+        lines.append("")
+        lines.append("失败明细：")
+        for item in summary["failure_details"]:
+            lines.append(f"- {item['scenario']}: {item['status']}；{item['error_message'] or '（无 error_message）'}")
     lines += ["", "## 2. 质量代理信号（E2.5/E2，探索）"]
     content = result.get("content")
     if content:

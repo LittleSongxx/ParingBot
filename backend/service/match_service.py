@@ -501,7 +501,7 @@ async def execute_task(task_id: int, run_id: int) -> None:
         # 底层异常原文是英文，直接放进结论列用户看不懂，也指不出下一步。
         # 但异常栈必须进服务端日志，否则评测 artifact 只能看到“未预期的错误”，无法归因。
         logger.exception("匹配任务 %s 运行出现未预期异常", task_id)
-        reason = ("调度过程中出现未预期的错误。请稍后重试；"
+        reason = (f"调度过程中出现未预期的错误（{type(exc).__name__}）。请稍后重试；"
                   "如果一直失败，请把这次操作告诉管理员")
         await _close(run, task, started, False, reason, await _count_rounds(run.id))
         return
