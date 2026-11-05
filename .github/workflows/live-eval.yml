@@ -48,6 +48,10 @@ on:
         description: "筛选 A/B：current=保持现状，hard=只让必须项进 SQL 硬筛（加分项忽略）"
         required: false
         default: "current"
+      early_stop_mode:
+        description: "低容量早停 A/B：off=保持现状，on=候选池连续两轮零增长且无待审时收尾"
+        required: false
+        default: "off"
   schedule:
     - cron: '0 18 * * 0'   # 每周一 02:00 Asia/Shanghai
 
@@ -79,6 +83,7 @@ jobs:
           MATCH_TIMEOUT_SECONDS=600
           QUALITY_GATE=${{ github.event.inputs.quality_gate || 'off' }}
           SCREENER_FILTER_MODE=${{ github.event.inputs.soft_filter_mode || 'current' }}
+          SCREENER_EARLY_STOP=${{ github.event.inputs.early_stop_mode || 'off' }}
           MAX_UPLOAD_MB=5
           TZ=Asia/Shanghai
           LOGIN_MAX_FAILS=20

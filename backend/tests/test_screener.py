@@ -20,6 +20,7 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from ai import agents
+from ai import graph
 from ai import tools as tool_box
 from common.exception_handler import CustomException
 from common.times import now
@@ -842,6 +843,14 @@ async def test_model_claim_that_is_not_recorded_is_flagged(db, monkeypatch):
     assert result.rounds[0].note is None
     assert "但这一轮的放宽没有写进候选池" in result.rounds[0].mismatch
     assert "放宽没有写进候选池" in result.conclusion
+
+
+def test_pool_stagnant_low_capacity_early_stop():
+    """连续两轮同一总数、无待审、且低于交付要求才算供给停滞。"""
+    assert graph.pool_stagnant([6, 6], 6, 8, 0)
+    assert not graph.pool_stagnant([6, 7], 6, 8, 0)
+    assert not graph.pool_stagnant([6, 6], 6, 8, 1)
+    assert not graph.pool_stagnant([8, 8], 8, 8, 0)
 
 
 # ---------------------------------------------------------------- 纯函数

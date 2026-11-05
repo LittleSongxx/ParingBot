@@ -23,6 +23,8 @@
 等于把模型的决策悄悄换成代码的决策。
 """
 
+import json
+import os
 from typing import TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -107,6 +109,39 @@ def needs_shortfall_topup(counts: dict, deliver_count: int, relax_used: int,
             and counts.get("total", 0) >= deliver_count
             and counts.get("pending", 0) == 0
             and relax_used < relax_limit)
+
+
+def pool_stagnant(totals: list[int], current_total: int, deliver_count: int,
+                  pending: int) -> bool:
+    """低容量早停判断：连续两轮候选池总数没变、没有待审、且总数仍低于交付要求。
+
+    这时再派筛选官一轮也不会有新增候选，属于供给不足，应该收尾而不是空转。
+    """
+    return (pending == 0
+            and current_total < deliver_count
+            and len(totals) >= 2
+            and all(total == current_total for total in totals[-2:]))
+
+
+async def _recent_pool_totals(run_id: int, limit: int = 2) -> list[int]:
+    """从最近的调度步骤里取候选池总数，用于判断连续零增长。"""
+    steps = await AgentStep.filter(
+        run_id=run_id, step_type=agents.STEP_SCHEDULE).order_by("-id").limit(limit)
+    totals: list[int] = []
+    for step in steps:
+        try:
+            params = json.loads(step.request_params or "{}")
+            total = int(((params.get("candidate_counts") or {}).get("total")))
+        except (TypeError, ValueError):
+            continue
+        totals.append(total)
+    return totals
+
+
+def _early_stop_enabled() -> bool:
+    """A/B 开关：默认关闭，显式开启后才做低容量早停。"""
+    value = (os.environ.get("SCREENER_EARLY_STOP") or "off").strip().lower()
+    return value in ("on", "true", "1", "yes")
 
 
 def _missing_dimensions(pool: list) -> list:
@@ -429,6 +464,17 @@ async def supervisor_node(state: MatchState) -> dict:
             "instruction": "通过审核人数未达交付上限，请再放宽一个加分项补筛；没有可放宽项就说明原因。",
             "rationale": "代码门禁：通过人数不足且候选池人数够，强制补筛一轮",
         }
+    # A/B：低容量场景主管可能反复派筛选官；候选池连续两轮零增长且无待审时，
+    # 再派也不会有新增，直接按供给不足收尾（默认关闭，显式开启才生效）。
+    if (decision["next_agent"] == AGENT_SCREENER and _early_stop_enabled()
+            and counts["total"] < task.deliver_count):
+        totals = await _recent_pool_totals(state["run_id"])
+        if pool_stagnant(totals, counts["total"], task.deliver_count, counts["pending"]):
+            decision = {
+                "next_agent": AGENT_FINISH,
+                "instruction": "",
+                "rationale": "代码门禁：候选池连续两轮零增长且无待审，按供给不足收尾",
+            }
     await agents.write_step(
         context, round_no, 0, agents.STEP_SCHEDULE,
         step_name=f"第 {round_no} 轮调度",
