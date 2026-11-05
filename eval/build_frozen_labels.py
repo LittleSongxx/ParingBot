@@ -29,7 +29,7 @@ REPO = EVAL_DIR.parent
 if str(EVAL_DIR) not in sys.path:
     sys.path.insert(0, str(EVAL_DIR))
 
-from lib import rules, seed as seedmod  # noqa: E402
+from lib import freeze, rules, seed as seedmod  # noqa: E402
 
 METHOD = "heuristic-offline-v1"
 LABEL_NOTE = (
@@ -184,18 +184,23 @@ def build_manifest(scenarios_bytes: bytes, labels_bytes: bytes, scenario_file: s
     """MANIFEST：冻结文件的 sha256、协议版本、种子与候选池统计。"""
     root = Path(repo_root)
     seed_data = seedmod.load_seed(root)
+    pool_stats = _pool_stats(seed_data, root)
+    pool_stats["base_sql_sha256"] = freeze.base_sql_sha256(root)
+    pool_stats["pool_digest"] = freeze.pool_digest(seed_data)
+    eval_sql_dir = root / "deploy" / "mysql" / "sql" / "eval"
+    supply_additions = len(freeze.find_supply_writes(eval_sql_dir)) if eval_sql_dir.is_dir() else 0
     return {
         "version": scenarios_data.get("version", "v3"),
         "protocol_version": scenarios_data.get("protocol_version"),
         "seed": scenarios_data.get("seed"),
         "as_of": scenarios_data.get("as_of"),
-        "supply_additions": 0,
+        "supply_additions": supply_additions,
         "scenario_count": scenarios_data.get("scenario_count"),
         "positive_count": scenarios_data.get("positive_count"),
         "negative_count": scenarios_data.get("negative_count"),
         "scenarios": {"file": scenario_file, "sha256": _sha256(scenarios_bytes)},
         "labels": {"file": labels_file, "sha256": _sha256(labels_bytes)},
-        "pool": _pool_stats(seed_data, root),
+        "pool": pool_stats,
         "label_rule": {"method": METHOD, "top_k": TOP_K, "weights": dict(WEIGHTS)},
         "created_at": created_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
@@ -258,6 +263,13 @@ def verify(scenarios_dir: Path | str | None = None, repo_root: Path | str = REPO
                       f"（种子 SQL 或规则口径漂移）")
     if result["labels_text"].encode("utf-8") != labels_bytes:
         errors.append("labels.json 内容与重算结果不一致（文件被手改或构建非确定性）")
+    declared_pool = manifest.get("pool") or {}
+    recomputed_pool = result["manifest"].get("pool") or {}
+    for field in ("base_sql_sha256", "pool_digest"):
+        if not declared_pool.get(field):
+            errors.append(f"MANIFEST.pool 缺少 {field}")
+        elif declared_pool.get(field) != recomputed_pool.get(field):
+            errors.append(f"MANIFEST.pool.{field} 与重算结果不一致（base SQL/供给池漂移）")
     if errors:
         for item in errors:
             print(f"[FAIL] {item}")

@@ -1,23 +1,176 @@
 {
   "stamp": "test",
   "scenarios": [
-    {"key": "V3_01", "account": "TEST_SCENARIO_V3_01", "title": "t", "status": "已运行", "readiness": {"can_run": true},
-     "runs": [{"trial": 1, "run_status": "已完成", "delivered": 8, "wall_seconds": 40.0, "counts": {"deliver_count": 8}}]},
-    {"key": "V3_02", "account": "TEST_SCENARIO_V3_02", "title": "t", "status": "已运行",
-     "runs": [{"trial": 1, "run_status": "已完成", "delivered": 8, "wall_seconds": 42.0, "counts": {"deliver_count": 8}}]},
-    {"key": "V3_03", "account": "TEST_SCENARIO_V3_03", "title": "t", "status": "已运行",
-     "runs": [{"trial": 1, "run_status": "已完成", "delivered": 7, "wall_seconds": 44.0, "counts": {"deliver_count": 8}}]},
-    {"key": "V3_04", "account": "TEST_SCENARIO_V3_04", "title": "t", "status": "已运行",
-     "runs": [{"trial": 1, "run_status": "已完成", "delivered": 6, "wall_seconds": 50.0, "counts": {"deliver_count": 8}}]},
-    {"key": "V3_05", "account": "TEST_SCENARIO_V3_05", "title": "t", "status": "已运行",
-     "runs": [{"trial": 1, "run_status": "已完成", "delivered": 5, "wall_seconds": 55.0, "counts": {"deliver_count": 8}}]},
-    {"key": "V3_06", "account": "TEST_SCENARIO_V3_06", "title": "t", "status": "已运行",
-     "runs": [{"trial": 1, "run_status": "已完成", "delivered": 4, "wall_seconds": 60.0, "counts": {"deliver_count": 8}}]},
-    {"key": "V3_07", "account": "TEST_SCENARIO_V3_07", "title": "t", "status": "已运行",
-     "runs": [{"trial": 1, "run_status": "已完成", "delivered": 2, "wall_seconds": 70.0, "counts": {"deliver_count": 8}}]},
-    {"key": "V3_08", "account": "TEST_SCENARIO_V3_08", "title": "t", "status": "已运行",
-     "runs": [{"trial": 1, "run_status": "已完成", "delivered": 1, "wall_seconds": 80.0, "counts": {"deliver_count": 8}}]},
-    {"key": "V3_09", "account": "TEST_SCENARIO_V3_09", "title": "t", "status": "未运行（readiness 阻断）", "runs": []},
-    {"key": "V3_10", "account": "TEST_SCENARIO_V3_10", "title": "t", "status": "未运行（readiness 阻断）", "runs": []}
+    {
+      "key": "V3_01",
+      "account": "TEST_SCENARIO_V3_01",
+      "title": "t",
+      "status": "已运行",
+      "readiness": {
+        "can_run": true
+      },
+      "runs": [
+        {
+          "trial": 1,
+          "run_status": "已完成",
+          "delivered": 8,
+          "wall_seconds": 40.0,
+          "counts": {
+            "deliver_count": 8
+          }
+        }
+      ]
+    },
+    {
+      "key": "V3_02",
+      "account": "TEST_SCENARIO_V3_02",
+      "title": "t",
+      "status": "已运行",
+      "runs": [
+        {
+          "trial": 1,
+          "run_status": "已完成",
+          "delivered": 8,
+          "wall_seconds": 42.0,
+          "counts": {
+            "deliver_count": 8
+          }
+        }
+      ]
+    },
+    {
+      "key": "V3_03",
+      "account": "TEST_SCENARIO_V3_03",
+      "title": "t",
+      "status": "已运行",
+      "runs": [
+        {
+          "trial": 1,
+          "run_status": "已完成",
+          "delivered": 7,
+          "wall_seconds": 44.0,
+          "counts": {
+            "deliver_count": 8
+          }
+        }
+      ]
+    },
+    {
+      "key": "V3_04",
+      "account": "TEST_SCENARIO_V3_04",
+      "title": "t",
+      "status": "已运行",
+      "runs": [
+        {
+          "trial": 1,
+          "run_status": "已完成",
+          "delivered": 6,
+          "wall_seconds": 50.0,
+          "counts": {
+            "deliver_count": 8
+          }
+        }
+      ]
+    },
+    {
+      "key": "V3_05",
+      "account": "TEST_SCENARIO_V3_05",
+      "title": "t",
+      "status": "已运行",
+      "runs": [
+        {
+          "trial": 1,
+          "run_status": "已完成",
+          "delivered": 5,
+          "wall_seconds": 55.0,
+          "counts": {
+            "deliver_count": 8
+          }
+        }
+      ]
+    },
+    {
+      "key": "V3_06",
+      "account": "TEST_SCENARIO_V3_06",
+      "title": "t",
+      "status": "已运行",
+      "runs": [
+        {
+          "trial": 1,
+          "run_status": "已完成",
+          "delivered": 4,
+          "wall_seconds": 60.0,
+          "counts": {
+            "deliver_count": 8
+          }
+        }
+      ]
+    },
+    {
+      "key": "V3_07",
+      "account": "TEST_SCENARIO_V3_07",
+      "title": "t",
+      "status": "已运行",
+      "runs": [
+        {
+          "trial": 1,
+          "run_status": "已完成",
+          "delivered": 2,
+          "wall_seconds": 70.0,
+          "counts": {
+            "deliver_count": 8
+          }
+        }
+      ]
+    },
+    {
+      "key": "V3_08",
+      "account": "TEST_SCENARIO_V3_08",
+      "title": "t",
+      "status": "已运行",
+      "runs": [
+        {
+          "trial": 1,
+          "run_status": "已完成",
+          "delivered": 1,
+          "wall_seconds": 80.0,
+          "counts": {
+            "deliver_count": 8
+          }
+        }
+      ]
+    },
+    {
+      "key": "V3_09",
+      "account": "TEST_SCENARIO_V3_09",
+      "title": "t",
+      "status": "未运行（readiness 阻断）",
+      "runs": [],
+      "readiness": {
+        "can_run": false,
+        "blocker": {
+          "key": "moment",
+          "message": "缺少租客动态"
+        }
+      },
+      "expectation_ok": true,
+      "negative_observed": {
+        "kind": "readiness",
+        "blocker": "moment"
+      }
+    },
+    {
+      "key": "V3_10",
+      "account": "TEST_SCENARIO_V3_10",
+      "title": "t",
+      "status": "未运行（负向：档案不完整，API 层拒绝）",
+      "runs": [],
+      "readiness": null,
+      "expectation_ok": true,
+      "negative_observed": {
+        "kind": "save_rejected",
+        "blocker": "intro"
+      }
+    }
   ]
 }
