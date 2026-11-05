@@ -38,7 +38,9 @@
   用新 BASELINE v2 回放：通过（baseline hash/protocol、负向断言、bundle 指纹、freeze、safe/quality 全绿）；
 - run `41659345552` 交付 56/64（87.5% raw，target 98.2%），因 token 1,640,673 > 1,500,000 被预算门禁判失败；
   这是 fail-closed 的预期行为，不再作为“质量回退”；
-- run `41985813976`（新 baseline）与后续 verify run 的 artifact 链接写在本节更新时；verify 必须与 baseline 同 code 栈/同协议。
+- run `41988136753`（新 BASELINE v2 之后的 verify，code `1587240`）：交付 57/64、**target 100%**、failures 0、
+  token 1,499,592、P50/P95 126.4/249.7s；**新门禁通过**（baseline hash/protocol、负向断言、bundle 指纹、
+  freeze、safe/quality 全绿）。这是当前唯一“baseline → verify”端到端实跑证据。
 
 ## 4. v4 评测集（设计冻结，尚未接门禁）
 
