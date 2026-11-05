@@ -326,29 +326,13 @@ def _suitability_score(applicant: MemberProfile, candidate: MemberProfile,
     def interests(value):
         return {item.strip() for item in str(value or "").replace("，", ",").split(",") if item.strip()}
     score += min(2, len(interests(applicant.interest_tags) & interests(candidate.interest_tags)))
-    # 质量感知惩罚：只影响排序，不改变“是否可交付”；用于把明显的生活习惯冲突排后面。
-    # 依据是 40 对代理盲评：吸烟/整洁冲突是被评者一致扣分的低质匹配（P09/P12/P01/P07 等）。
-    if applicant.smoking == "不吸烟":
-        if candidate.smoking == "经常":
-            score -= 4
-        elif candidate.smoking == "偶尔":
-            score -= 1
-    if preference is not None and candidate.tidiness and preference.tidiness_min:
-        try:
-            if (member_service.TIDINESS_LEVELS.index(candidate.tidiness)
-                    < member_service.TIDINESS_LEVELS.index(preference.tidiness_min)):
-                score -= 2
-        except ValueError:
-            pass
-    if preference is not None and candidate.has_pet == "有" and preference.pet_accept == "不接受":
-        score -= 4
     return score
 
 
 
 
 def _severe_quality_conflict(applicant, candidate, preference) -> bool:
-    """质量门禁用：明显生活习惯冲突（与排序惩罚同口径，但用于剔除）。
+    """质量门禁用：明显生活习惯冲突（只在门禁开启时用于剔除；不参与排序）。
 
     只挡最确定的三类：不吸烟 vs 经常吸烟、宠物不接受 vs 有宠、整洁度低于
     申请方最低要求 2 档及以上。默认关闭，由 env QUALITY_GATE 控制。
@@ -422,6 +406,7 @@ async def deliverable(task_id: int) -> tuple[list, str | None]:
     if applicant is not None:
         candidate_ids = [row.candidate_member_id for row in passed]
         members = {item.id: item for item in await MemberProfile.filter(id__in=candidate_ids)}
+        # 实验特性：默认关闭（env QUALITY_GATE=off），未验证，不参与排序，仅供显式 A/B 对比。
         if QUALITY_GATE:
             blocked = [row for row in passed
                        if members.get(row.candidate_member_id) is not None
