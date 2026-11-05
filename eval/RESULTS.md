@@ -38,9 +38,12 @@
   用新 BASELINE v2 回放：通过（baseline hash/protocol、负向断言、bundle 指纹、freeze、safe/quality 全绿）；
 - run `41659345552` 交付 56/64（87.5% raw，target 98.2%），因 token 1,640,673 > 1,500,000 被预算门禁判失败；
   这是 fail-closed 的预期行为，不再作为“质量回退”；
-- run `41988136753`（新 BASELINE v2 之后的 verify，code `1587240`）：交付 57/64、**target 100%**、failures 0、
-  token 1,499,592、P50/P95 126.4/249.7s；**新门禁通过**（baseline hash/protocol、负向断言、bundle 指纹、
-  freeze、safe/quality 全绿）。这是当前唯一“baseline → verify”端到端实跑证据。
+- run `41997348370`（最新干净 verify，code `a0ef5c9`）：交付 57/64、**target 100%**、failures 0、
+  token 1,222,026、P50/P95 103.6/169.2s；**新门禁通过**（baseline hash/protocol、负向断言、bundle 指纹、
+  freeze、safe/quality 全绿）。
+- run `41991751431`：同一代码栈上 V3_07 单次运行失败（438.97s、10 轮、交付 7），门禁按 `failures 1 > 0` 正确拦下；
+  复跑 `41997348370` 通过。说明该失败是**间歇性**，首跑还没留下异常栈；已给 `execute_task` 加 `logger.exception`
+  并让 CI 始终归档 backend 日志，后续失败可归因。
 
 ## 4. v4 评测集（设计冻结，尚未接门禁）
 
@@ -50,9 +53,28 @@
 - MANIFEST 记录 base SQL 指纹 + pool digest；`supply_additions=0`；labels **pending**（human/judge 0–3）；
 - 本轮修复：slot 计数/昵称（不再“第 208 次”）、文本级宠物矛盾（清洗 tags 后重建 self_intro/moments）、
   负向跨层跨性别、脚本生成 MANIFEST/COVERAGE、`--check` 只读 fail-closed；
+- **新协议 pilot（run `41991262897`，9 场景×3 trials）**：交付率 85.65%（95% CI 71.3–96.8%）、
+  target 达成率 99.38%、pass³(target)=0.889、failures=1、墙钟 76 分钟（V4_29 单次 483s + 低容量场景约 300s）；
+  `V4_29` 在 full pilot 交付 [6,5,6]（run1 失败），但定向复跑 `42002328618` 同一场景交付 **[1,2,6]**、无失败——
+  **同一冻结场景跨 run 波动极大**，说明 pilot 的 pass^k 不能当作稳定质量结论；低容量场景的候选发现/通过率不稳定，
+  需产品侧排查（不在本轮评测修复范围）。
 - **旧 v4 pilot 结果作废**（旧 sha `f52ad089…`、旧 target 口径）：72.2%→71.3%、pass^3 1.0→0.778、
   target 达成率 98.61% 等数字只保留在历史段落，不得引用。
 - 全量 40×3 尚未跑；v4 labels 完成前只能做流程/成本/稳定性试点，不接门禁。
+
+## 5.5 2026-11-05 首轮探索性质量结果（E2.5/E2，不是人工真值）
+- 对象：run `41997348370` 的 quality bundle（8 申请方 / 57 交付候选 / 对照组来自截断或否决候选）。
+- 内容质量（Qwen 异族代理，n=20：8 申请方 + 12 交付候选）：
+  - faithful **4.65**（95% CI 4.15–5.0）、coherent 4.85、readable 4.90、respectful 5.00、overall **4.75**（4.45–5.0）；
+  - 规则 warning **8/20**：候选画像提到养宠但 `has_pet=无`（种子候选数据自相矛盾），说明“内容质量”与
+    “数据一致性”必须分开报告；天花板检测未触发（非全满分，有区分度）；
+  - 这只是代理评审（E2.5），不能当作内容质量达标的证据；warning 指向的是候选数据质量问题。
+- 成对 judge（Qwen 异族，对照组=截断/否决候选；E2）：
+  - 21 对，20 对有效；delivered 胜率 **75%**（95% CI 53.1–88.8%），位置一致性 **0.85**（95% CI 64.0–94.8%）；
+  - 这是判官材料去泄漏后的第一份新 pairwise 结果；n 小、对照来自同 pool 的 near-miss，只能作为
+    “交付组相对优于对照”的弱-中等探索信号，不能声称匹配质量。
+- 结论：本轮能给出的是“流程/容量 + 内容质量代理 + 相对 judge”的**探索性**结果；
+  E3 人工盲评仍是唯一可对外质量真值。
 
 ## 5. 2026-11-05 审计修复摘要（代码层）
 
