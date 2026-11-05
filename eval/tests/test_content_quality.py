@@ -74,6 +74,19 @@ class ContentSamplingTest(unittest.TestCase):
             ])
             self.assertEqual(code, 1)
 
+    def test_corrupt_items_create_known_bad_anchor(self):
+        items = [{"item_id": "A1", "role": "applicant",
+                  "profile": {"has_pet": "有", "smoking": "经常"},
+                  "portrait": {"summary": "作息规律"}}]
+        anchors = content_quality.corrupt_items(items, 1)
+        self.assertEqual(len(anchors), 1)
+        self.assertEqual(anchors[0]["item_id"], "A1-corrupt")
+        self.assertEqual(anchors[0]["profile"]["has_pet"], "无")
+        self.assertEqual(anchors[0]["profile"]["smoking"], "不吸烟")
+        self.assertIn("养了两只猫", anchors[0]["portrait"]["summary"])
+        # 原始 item 不被修改
+        self.assertEqual(items[0]["profile"]["has_pet"], "有")
+
     def test_ceiling_effect_detects_all_fives(self):
         self.assertTrue(content_quality.ceiling_effect([5, 5, 5, 5]))
         self.assertTrue(content_quality.ceiling_effect([5, 5, 5, 4.8]))

@@ -199,7 +199,8 @@ jobs:
               "${{ secrets.EVAL_JUDGE_PROVIDER }}" "${{ secrets.EVAL_JUDGE_BASE_URL }}" \
               "$EVAL_JUDGE_API_KEY" "${{ secrets.EVAL_JUDGE_MODEL }}" >> .env.eval
             python eval/content_quality.py --bundle quality-bundle.json --limit 20 \
-              --min-items 12 --env-file .env.eval --out content-report.md --json content-report.json \
+              --min-items 12 --instrument-check --env-file .env.eval \
+              --out content-report.md --json content-report.json \
               || [ "$PUBLISH" != "true" ]
           fi
 

@@ -65,9 +65,11 @@
 ## 5.5 2026-11-05 首轮探索性质量结果（E2.5/E2，不是人工真值）
 - 对象：run `41997348370` 的 quality bundle（8 申请方 / 57 交付候选 / 对照组来自截断或否决候选）。
 - 内容质量（Qwen 异族代理，n=20：8 申请方 + 12 交付候选）：
-  - faithful **4.65**（95% CI 4.15–5.0）、coherent 4.85、readable 4.90、respectful 5.00、overall **4.75**（4.45–5.0）；
+  - faithful **4.80**（95% CI 4.15–5.0）、coherent 4.90、readable 4.85、respectful 5.00、overall **4.80**（4.45–5.0）；
   - 规则 warning **8/20**：候选画像提到养宠但 `has_pet=无`（种子候选数据自相矛盾），说明“内容质量”与
     “数据一致性”必须分开报告；天花板检测未触发（非全满分，有区分度）；
+  - **仪器校验通过**：4 条“已知坏”对照（profile 改坏 + 画像写养猫/每天抽烟）faithful 均值 **2.0** vs
+    clean **5.0**（delta 3.0, passed=true）——说明 judge 确实能识别矛盾，4.8 分不是无差别给高分；
   - 这只是代理评审（E2.5），不能当作内容质量达标的证据；warning 指向的是候选数据质量问题。
 - 成对 judge（Qwen 异族，对照组=截断/否决候选；E2）：
   - 21 对，20 对有效；delivered 胜率 **75%**（95% CI 53.1–88.8%），位置一致性 **0.85**（95% CI 64.0–94.8%）；
@@ -87,6 +89,22 @@
 | 数据 | v4 重冻（见 §4）；v3 scenarios/labels 字节未变；free-text 宠物矛盾识别加入 data_consistency |
 | 产品 | 回退 65d011a 的“代理评分排序惩罚”（保留 QUALITY_GATE 默认 off 的实验开关）；短交付补筛保留但仅作为未全量验证机制 |
 | 文档 | 本文件、README/RUNBOOK/quality-policy/release-checklist、v4 DESIGN/DATASHEET/COVERAGE 全部同步 |
+
+## 5.6 自动质量评分卡（多 artifact 汇总，2026-11-05）
+
+新增 `eval/quality_scorecard.py`：对多次 run 的 matrix 汇总失败率 Wilson CI、target 达成率 CI、
+同场景跨 run 一致性、不稳定场景、内容/judge 代理信号，并输出“能/不能声称”清单。
+
+v3（4 个 live-eval run：41985813976 / 41988136753 / 41991751431 / 41997348370，共 32 个 scenario-run）：
+- 失败 **1/32 = 3.12%**（Wilson 95% CI 0.5–15.7%）；target 达成率 **99.61%**（98.8–100%）；
+- 同场景跨 run 完全一致率 **87.5%**（唯一波动 V3_07：[8,8,7,8]）；
+- 无 unstable 场景；`delivery_headroom=false`（target 已饱和，交付不能证明提升）。
+
+v4（full pilot 41991262897 + 定向复跑 42002328618，共 30 个 scenario-run）：
+- 失败 **1/30 = 3.33%**；target 达成率 **96.91%**；同场景跨 run 一致率 **88.9%**；
+- **unstable 场景 V4_29**：6 次 trial 交付 `[6,5,6,1,2,6]`（range=5, mean=4.33），
+  其中 1 次失败；因此 v4 的 pass^k / target 达成率不能当作稳定质量结论。
+- 两个评分卡的 `quality_claim_allowed` 均恒为 false（无 E3 人工盲评）；代理信号只作探索。
 
 ## 6. 已知未解决问题
 

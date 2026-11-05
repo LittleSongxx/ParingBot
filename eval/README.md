@@ -28,6 +28,7 @@ eval/
 ├── build_v4_scenarios.py       # v4 场景/MANIFEST/COVERAGE 生成与 --check
 ├── check_v4_freeze.py          # v4 冻结守护（场景/协议/target/文本自洽/labels 状态）
 ├── build_v4_labels.py          # v4 标签工具（人工 CSV / judge JSON / --check）
+├── quality_scorecard.py        # 多次 artifact 汇总：失败率 CI / target / 不稳定场景 / 代理质量信号
 ├── configure_models.py         # 写四用途模型配置
 ├── phase0/                     # 资料教练/解读官 schema 评测（功能未实现，非质量证据）
 ├── human_eval/                 # 人工盲评协议、rubric、抽样与 kappa 脚本

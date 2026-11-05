@@ -111,7 +111,20 @@ python eval/build_v4_labels.py --check
 在拿到人工结果前，对外只能声称“工程可运行/交付达容量上限”，不能声称“匹配质量”。
 同族 LLM 面板只用于发现问题，必须按同族/跨族拆分报告。
 
-## 8. 故障排查
+## 8. 质量评分卡（多 run 汇总）
+
+```bash
+# 多个 live-eval/v4-pilot artifact 目录 + 本地 judge/content JSON
+python eval/quality_scorecard.py \
+  --run /path/to/live-eval-RUN1 --run /path/to/live-eval-RUN2 \
+  --content content-report.json --judge judge-report.json \
+  --out quality-card.md --json quality-card.json
+```
+
+输出：失败率 Wilson CI、target 达成率 + CI、同场景跨 run 一致性、unstable 场景、
+内容/judge 代理信号，以及“能/不能声称”清单。没有 E3 人工盲评时 `quality_claim_allowed` 恒为 false。
+
+## 9. 故障排查
 
 | 现象 | 处理 |
 |---|---|

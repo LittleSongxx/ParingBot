@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import random
 import re
@@ -95,6 +96,30 @@ def sample_items(bundle: dict, limit: int) -> list[dict]:
     items = collect_items(bundle)
     random.Random(SAMPLE_SEED).shuffle(items)
     return items[:max(0, int(limit))]
+
+
+def corrupt_items(items: list[dict], limit: int = 4) -> list[dict]:
+    """构造“已知坏”对照：把 profile 字段改坏、同时在 portrait 里写相反事实。
+
+    只用于验证 judge 是否有区分度（仪器校验），不进入产品内容质量统计：
+    如果 judge 对“档案写无宠/不吸烟、画像却写养猫/每天抽烟”的矛盾文本仍给高分，
+    那当前的 4.75/5 就只是评分器宽松，不能当内容质量证据。
+    """
+    anchors = []
+    for item in (items or [])[:max(0, int(limit))]:
+        clone = copy.deepcopy(item)
+        profile = dict(clone.get("profile") or {})
+        portrait = dict(clone.get("portrait") or {})
+        profile["has_pet"] = "无"
+        profile["smoking"] = "不吸烟"
+        summary = str(portrait.get("summary") or "")
+        portrait["summary"] = (summary + " 补充：我养了两只猫，而且每天都抽烟。").strip()
+        clone["item_id"] = f"{item.get('item_id')}-corrupt"
+        clone["role"] = "corrupt"
+        clone["profile"] = profile
+        clone["portrait"] = portrait
+        anchors.append(clone)
+    return anchors
 
 
 def _local_bootstrap_mean_ci(values: list[float], iterations: int = DEFAULT_ITERATIONS,
@@ -195,6 +220,9 @@ def main(argv=None) -> int:
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--min-items", type=int, default=1,
                         help="实际可抽样本数低于该值直接失败（exit 1），默认 1")
+    parser.add_argument("--instrument-check", action="store_true",
+                        help="额外评 4 条“已知坏”对照，验证 judge 是否有区分度")
+    parser.add_argument("--instrument-size", type=int, default=4)
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--json", type=Path, default=None)
     args = parser.parse_args(argv)
@@ -215,12 +243,34 @@ def main(argv=None) -> int:
     values = {dim: [float(by_id[item["item_id"]][dim]) for item in items
                     if item["item_id"] in by_id and dim in by_id[item["item_id"]]]
               for dim in dims}
+    anchors = []
+    instrument = None
+    if args.instrument_check:
+        anchors = corrupt_items(items, args.instrument_size)
+        anchor_rows = []
+        for start in range(0, len(anchors), 4):
+            anchor_rows.extend(call_judge(env, anchors[start:start + 4]))
+        anchor_by_id = {row.get("item_id"): row for row in anchor_rows}
+        clean_faithful = [float(by_id[item["item_id"]]["faithful"]) for item in items
+                          if item["item_id"] in by_id and "faithful" in by_id[item["item_id"]]]
+        corrupt_faithful = [float(anchor_by_id[item["item_id"]]["faithful"]) for item in anchors
+                            if item["item_id"] in anchor_by_id and "faithful" in anchor_by_id[item["item_id"]]]
+        if clean_faithful and corrupt_faithful:
+            clean_mean = round(statistics.mean(clean_faithful[:len(corrupt_faithful)]), 3)
+            corrupt_mean = round(statistics.mean(corrupt_faithful), 3)
+            instrument = {"clean_faithful_mean": clean_mean, "corrupt_faithful_mean": corrupt_mean,
+                          "delta": round(clean_mean - corrupt_mean, 3),
+                          "passed": corrupt_mean <= clean_mean - 0.5,
+                          "anchors": len(corrupt_faithful)}
+        else:
+            instrument = {"passed": False, "error": "no usable anchor scoring"}
     summary = {dim: round(statistics.mean(vals), 3) if vals else None for dim, vals in values.items()}
     ci95 = {dim: mean_ci(vals) for dim, vals in values.items() if vals}
     ceiling = ceiling_effect(values.get("overall") or [])
     credible = (not ceiling) and len(items) >= max(1, args.min_items)
     result = {"items": len(items), "n": len(items), "scored": len(rows), "means": summary,
               "ci95": ci95, "ceiling_effect": ceiling, "credible": credible,
+              "instrument_check": instrument,
               "sample_ids": [item["item_id"] for item in items],
               "roles": {item["item_id"]: item["role"] for item in items},
               "bundle_meta": bundle.get("meta") or {},
@@ -237,6 +287,10 @@ def main(argv=None) -> int:
         ci_text = f"（95% CI {ci['lo']}–{ci['hi']}）" if ci else ""
         lines.append(f"- {dim}: {value}{ci_text}")
     lines += [f"- 规则 warning：{len(result['rule_warnings'])} 条"]
+    if instrument:
+        lines.append(f"- 仪器校验：clean faithful {instrument.get('clean_faithful_mean')} vs "
+                     f"corrupt {instrument.get('corrupt_faithful_mean')}，delta {instrument.get('delta')}，"
+                     f"passed={instrument.get('passed')}")
     if ceiling:
         lines.append("- ⚠️ **天花板效应**：overall 全为满分/零方差，评分器没有区分度；"
                      "该结果不能作为内容质量水平证据（只说明当前样本未触发扣分项）。")
@@ -244,7 +298,8 @@ def main(argv=None) -> int:
         args.out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(json.dumps({"n": len(items), "means": summary,
                       "warnings": len(result["rule_warnings"]),
-                      "ceiling_effect": ceiling, "credible": credible}, ensure_ascii=False))
+                      "ceiling_effect": ceiling, "credible": credible,
+                      "instrument_check": instrument}, ensure_ascii=False))
     return 0
 
 
