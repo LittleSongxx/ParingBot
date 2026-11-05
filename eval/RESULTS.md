@@ -143,6 +143,25 @@ v4（full pilot 41991262897 + 定向复跑 42002328618 / 42025074084，共 33 �
 - 没有在看到结果后改指标口径：本轮只新增测量（scorecard/instrument/stability），未调整门禁数值；
 - CI 的 freeze-guard 会在每次 push/PR 重跑 self-check；live-eval / v4-pilot 会归档 `quality-card.md/json`。
 
+## 5.8 产品侧根因：审核官“假硬否决”（2026-11-05 修复）
+
+V4_29 的波动不全是模型质量，bundle 逐候选对比暴露了产品 bug：
+
+- 同一候选 491（门店 11、夜猫子、预算 3600）在 t1 run64 被判 `MISMATCH_HARD`，
+  理由是“不满足申请方硬约束的大桥店门店要求”；但 V4_29 的偏好里 `store_required=加分`，
+  且同一候选在 run65/t2 里被判通过并交付。属于**模型把加分项误当必须项**的假否决。
+- 代码侧原来只复核对“通过”（`recheck_rows` 只处理 passed），不复核“否决”，
+  所以假否决会留在库里，造成 delivered 1/2 vs 6 的波动。
+
+修复（`backend/service/auditor_service.py::audit_batch`）：
+1. 模型判 `MISMATCH_HARD` 后，用 `recheck_rows` 对这批否决做双向代码复核；
+2. 代码没有发现任何必须项违规的，改回 `通过` 并清空 reject_code/reason，批次结论留痕；
+3. 代码确实发现必须项违规的，保留否决；
+4. 新增两个 backend 测试：假硬否决改回通过、真硬否决保留。
+
+未解决：V4_29 的**候选发现不足**（t1 run64 只发现 2 人）是另一个独立问题，
+本次未改；修复后仍需重复 run 验证 delivered 分布是否收敛。
+
 ## 6. 已知未解决问题
 
 - 无 E3 人工盲评（双人、κ≥0.6）；所有质量结论仍不可对外；

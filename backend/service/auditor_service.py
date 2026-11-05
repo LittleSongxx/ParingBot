@@ -578,6 +578,21 @@ async def audit_batch(member: MemberProfile, task: MatchTask, run_id: int, *,
         decided, passed, rejected, codes = _decided_counts(pool)
         notes.append(f"代码复核改判 {len(records)} 人："
                      + "；".join(item.describe() for item in records))
+    # 模型判「硬冲突」也要由代码验一遍：硬规则归代码，模型可能把加分项
+    # （例如门店）误当必须项，造成假否决；代码双向复核找不到必须项违规的，
+    # 改回通过并留痕，避免同一候选在不同轮次里忽通过忽否决。
+    hard_rejected = [row for row in rejected if row.reject_code == RECHECK_CODE]
+    if hard_rejected:
+        conflicts = await _recheck(member, hard_rejected)
+        conflict_ids = {item.row.id for item in conflicts}
+        unjustified = [row for row in hard_rejected if row.id not in conflict_ids]
+        if unjustified:
+            for row in unjustified:
+                await MatchCandidate.filter(id=row.id).update(
+                    audit_status=AUDIT_PASS, reject_code=None, reject_reason=None)
+            pool = await MatchCandidate.filter(task_id=task.id, candidate_member_id__in=ids)
+            decided, passed, rejected, codes = _decided_counts(pool)
+            notes.append(f"模型判硬冲突但代码复核未发现必须项违规，已改回通过 {len(unjustified)} 人")
     detail = "、".join(f"{reject_label(code) or code} {count} 人"
                        for code, count in codes.items()) or "没有否决"
     conclusion = (f"第 {batch_no} 批审了 {len(decided)} 人，通过 {len(passed)} 人，"

@@ -445,6 +445,50 @@ async def test_code_recheck_turns_a_passed_candidate_into_a_reject(db, monkeypat
     assert "模型报的和库里的对不上的地方" in result.conclusion
 
 
+async def test_false_hard_reject_is_undone_by_code(db, monkeypatch):
+    """模型把加分项误判成硬冲突时，代码双向复核没有必须项违规，应改回通过。
+
+    这是 V4_29 波动的一个产品根因：同一候选 491 在不同轮次被判 MISMATCH_HARD
+    或通过；硬规则归代码，模型误把「同门店（加分）」当必须项时不能真的否决。
+    """
+    member = await _make_applicant()
+    candidate = await _make_candidate()
+    # 去掉默认的「租期必须」这一真实硬约束，构造一个代码复核完全通过的候选
+    await _make_preference(candidate, lease_required="加分")
+    task = await _open_task(member)
+    await _put(task, candidate)
+    run = await _open_run(task)
+    _use_fake_model(monkeypatch, _audit_script([
+        (candidate.id, auditor_service.AUDIT_REJECT, "MISMATCH_HARD")]))
+
+    result = await auditor_service.build_audit(member.id, task.id, run.id)
+
+    assert result.passed == 1 and result.rejected == 0
+    row = await MatchCandidate.get(task_id=task.id, candidate_member_id=candidate.id)
+    assert row.audit_status == auditor_service.AUDIT_PASS
+    assert row.reject_code is None and row.reject_reason is None
+    assert "改回通过 1 人" in result.batches[0].conclusion
+
+
+async def test_real_hard_reject_is_kept_after_code_recheck(db, monkeypatch):
+    """代码复核确实发现必须项违规时，模型的 MISMATCH_HARD 否决保留。"""
+    member = await _make_applicant()
+    candidate = await _make_candidate(lease_term="3个月以下")
+    await _make_preference(candidate, lease_required="必须", lease_min="6-12个月")
+    task = await _open_task(member)
+    await _put(task, candidate)
+    run = await _open_run(task)
+    _use_fake_model(monkeypatch, _audit_script([
+        (candidate.id, auditor_service.AUDIT_REJECT, "MISMATCH_HARD")]))
+
+    result = await auditor_service.build_audit(member.id, task.id, run.id)
+
+    assert result.passed == 0 and result.rejected == 1
+    row = await MatchCandidate.get(task_id=task.id, candidate_member_id=candidate.id)
+    assert row.audit_status == auditor_service.AUDIT_REJECT
+    assert row.reject_code == "MISMATCH_HARD"
+
+
 async def test_code_recheck_turns_an_opposite_gender_pass_into_a_reject(db, monkeypatch):
     """合租只找同性：历史数据里已经判通过的异性候选，代码复核时改判否决。"""
     member = await _make_applicant()  # 男
