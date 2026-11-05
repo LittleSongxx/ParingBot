@@ -46,6 +46,13 @@ class QualityRankingTest:
             applicant, _member(has_pet="有"), preference)
         assert pet < clean
 
+    def test_tidiness_closeness_tiebreak(self):
+        applicant, preference = _member(tidiness="整洁"), _preference(tidiness_min="一般")
+        same = match_service._suitability_score(applicant, _member(tidiness="整洁"), preference)
+        near = match_service._suitability_score(applicant, _member(tidiness="一般"), preference)
+        far = match_service._suitability_score(applicant, _member(tidiness="随意"), preference)
+        assert same > near > far
+
     def test_severity_gate(self):
         applicant, preference = _member(), _preference(pet_accept="不接受")
         assert match_service._severe_quality_conflict(

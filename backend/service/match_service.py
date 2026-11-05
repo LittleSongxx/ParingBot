@@ -322,6 +322,15 @@ def _suitability_score(applicant: MemberProfile, candidate: MemberProfile,
                 score += 1
         except ValueError:
             pass
+    # 整洁度 tie-break：优先“和申请方同档”，其次相邻档；差 ≥2 档降权。
+    # 依据：相邻 rank 评审里 6/7 个 mismatch 的 judge 都选了更接近申请方整洁档的候选。
+    if candidate.tidiness and applicant.tidiness:
+        try:
+            gap = abs(member_service.TIDINESS_LEVELS.index(candidate.tidiness)
+                      - member_service.TIDINESS_LEVELS.index(applicant.tidiness))
+            score += 2 if gap == 0 else (1 if gap == 1 else -1)
+        except ValueError:
+            pass
     # 兴趣重合是加分项；最多算 2 分，避免标签多的人被过度加权
     def interests(value):
         return {item.strip() for item in str(value or "").replace("，", ",").split(",") if item.strip()}
