@@ -435,6 +435,23 @@ async def test_soft_store_preference_does_not_hard_filter(db):
     assert same.id in ids and other.id in ids
 
 
+async def test_hard_filter_mode_ignores_soft_age(db, monkeypatch):
+    """A/B 开关：SCREENER_FILTER_MODE=hard 时加分年龄不硬筛；默认 current 仍硬筛。"""
+    member = await _make_applicant()  # 年龄 24-32 标加分
+    senior = await _make_candidate(birth_date=datetime(1970, 1, 1))  # 明显超出区间
+    task = await _open_task(member)
+    run = await _open_run(task)
+    params = {"age_min": 24, "age_max": 32}
+    current = await tool_box.invoke(
+        "search_members", params, await _context(member, task, run, 2))
+    assert senior.id not in {row["member_id"] for row in current["candidates"]}
+
+    monkeypatch.setenv("SCREENER_FILTER_MODE", "hard")
+    hard = await tool_box.invoke(
+        "search_members", params, await _context(member, task, run, 2))
+    assert senior.id in {row["member_id"] for row in hard["candidates"]}
+
+
 async def test_first_round_limits_bonus_filters(db):
     """首轮可选项不能一次全用：加分项超过 2 个直接拒绝，后续轮次不限制。"""
     member = await _make_applicant()

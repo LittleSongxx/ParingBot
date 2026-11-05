@@ -14,6 +14,10 @@ on:
         description: "每个场景 trial 次数"
         required: false
         default: "3"
+      soft_filter_mode:
+        description: "筛选 A/B：current=保持现状，hard=只让必须项进 SQL 硬筛（加分项忽略）"
+        required: false
+        default: "current"
 
 concurrency:
   group: live-eval-v4-pilot
@@ -42,6 +46,7 @@ jobs:
           APP_PORT=8080
           PUBLIC_BASE_URL=
           MATCH_TIMEOUT_SECONDS=600
+          SCREENER_FILTER_MODE=${{ github.event.inputs.soft_filter_mode || 'current' }}
           MAX_UPLOAD_MB=5
           TZ=Asia/Shanghai
           LOGIN_MAX_FAILS=20

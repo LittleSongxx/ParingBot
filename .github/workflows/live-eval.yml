@@ -44,6 +44,10 @@ on:
         type: boolean
         required: false
         default: false
+      soft_filter_mode:
+        description: "筛选 A/B：current=保持现状，hard=只让必须项进 SQL 硬筛（加分项忽略）"
+        required: false
+        default: "current"
   schedule:
     - cron: '0 18 * * 0'   # 每周一 02:00 Asia/Shanghai
 
@@ -74,6 +78,7 @@ jobs:
           PUBLIC_BASE_URL=
           MATCH_TIMEOUT_SECONDS=600
           QUALITY_GATE=${{ github.event.inputs.quality_gate || 'off' }}
+          SCREENER_FILTER_MODE=${{ github.event.inputs.soft_filter_mode || 'current' }}
           MAX_UPLOAD_MB=5
           TZ=Asia/Shanghai
           LOGIN_MAX_FAILS=20

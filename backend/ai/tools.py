@@ -13,6 +13,7 @@
 """
 
 import json
+import os
 import re
 from dataclasses import dataclass, replace
 from datetime import date
@@ -501,9 +502,13 @@ async def search_members(context: ToolContext, gender: str | None = None,
     preference = None
     if applicant is not None:
         preference = await RoommatePreference.get_or_none(member_id=applicant.id)
+    # A/B 实验开关：默认 current 保持现有行为；hard 只让“必须项”进 SQL 硬筛，
+    # 加分项忽略（不缩小候选）。验证前不改变默认行为。
+    filter_mode = (os.environ.get("SCREENER_FILTER_MODE") or "current").strip().lower()
+    hard_only = filter_mode in ("hard", "hard_only", "must_only")
     # 首轮检索的「加分项预算」：可选项一次全用等于把加分项变成硬条件。
     # 只限制第一轮，后续放宽轮次仍允许按规则逐项收窄；超过就直接拒绝并回原因。
-    if preference is not None and context.round_no == 1 and context.member_id:
+    if preference is not None and not hard_only and context.round_no == 1 and context.member_id:
         if preference is not None:
             bonus = []
             for label, value, required in (
@@ -528,10 +533,15 @@ async def search_members(context: ToolContext, gender: str | None = None,
         lease_terms = member_service.compatible_lease_terms(applicant.lease_term)
         if lease_terms:
             query = query.filter(lease_term__in=lease_terms)
-    if budget_min is not None:
+    use_budget = preference is None or not hard_only or preference.budget_required == "必须"
+    use_age = preference is None or not hard_only or preference.age_required == "必须"
+    use_tidiness = preference is None or not hard_only or preference.tidiness_required == "必须"
+    use_schedule = preference is None or not hard_only or preference.schedule_required == "必须"
+    use_lease = preference is None or not hard_only or preference.lease_required == "必须"
+    if budget_min is not None and use_budget:
         query = query.filter(rent_budget__gte=_check_int(
             budget_min, member_service.MIN_BUDGET, member_service.MAX_BUDGET, "预算下限"))
-    if budget_max is not None:
+    if budget_max is not None and use_budget:
         query = query.filter(rent_budget__lte=_check_int(
             budget_max, member_service.MIN_BUDGET, member_service.MAX_BUDGET, "预算上限"))
     if age_min is not None and age_max is not None and int(age_min) > int(age_max):
@@ -541,23 +551,23 @@ async def search_members(context: ToolContext, gender: str | None = None,
         if age_min is not None else None,
         _check_int(age_max, member_service.MIN_AGE, member_service.MAX_AGE, "年龄上限")
         if age_max is not None else None)
-    if low:
+    if low and use_age:
         query = query.filter(birth_date__gt=low)
-    if high:
+    if high and use_age:
         query = query.filter(birth_date__lte=high)
-    if tidiness_min:
+    if tidiness_min and use_tidiness:
         if tidiness_min not in member_service.TIDINESS_LEVELS:
             raise CustomException(
                 f"最低整洁度请从这几项里选：{'、'.join(member_service.TIDINESS_LEVELS)}")
         allowed = member_service.TIDINESS_LEVELS[member_service.TIDINESS_LEVELS.index(tidiness_min):]
         query = query.filter(tidiness__in=list(allowed))
-    if lease_min:
+    if lease_min and use_lease:
         if lease_min not in member_service.LEASE_TERMS:
             raise CustomException(
                 f"最短租期请从这几项里选：{'、'.join(member_service.LEASE_TERMS)}")
         allowed = member_service.LEASE_TERMS[member_service.LEASE_TERMS.index(lease_min):]
         query = query.filter(lease_term__in=list(allowed))
-    if schedule_accept:
+    if schedule_accept and use_schedule:
         accept = split_values(schedule_accept)
         unknown = [item for item in accept if item not in member_service.SCHEDULE_TYPES]
         if unknown:
