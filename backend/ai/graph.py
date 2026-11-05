@@ -460,13 +460,13 @@ async def supervisor_node(state: MatchState) -> dict:
     if (decision["next_agent"] == AGENT_FINISH
             and needs_shortfall_topup(counts, task.deliver_count, len(history), relax_limit)):
         decision = {
-            "next_agent": AGENT_SCREENER,
+            "next_agent": agents.AGENT_SCREENER,
             "instruction": "通过审核人数未达交付上限，请再放宽一个加分项补筛；没有可放宽项就说明原因。",
             "rationale": "代码门禁：通过人数不足且候选池人数够，强制补筛一轮",
         }
     # A/B：低容量场景主管可能反复派筛选官；候选池连续两轮零增长且无待审时，
     # 再派也不会有新增，直接按供给不足收尾（默认关闭，显式开启才生效）。
-    if (decision["next_agent"] == AGENT_SCREENER and _early_stop_enabled()
+    if (decision["next_agent"] == agents.AGENT_SCREENER and _early_stop_enabled()
             and counts["total"] < task.deliver_count):
         totals = await _recent_pool_totals(state["run_id"])
         if pool_stagnant(totals, counts["total"], task.deliver_count, counts["pending"]):
