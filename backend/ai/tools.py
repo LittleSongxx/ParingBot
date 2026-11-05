@@ -498,10 +498,12 @@ async def search_members(context: ToolContext, gender: str | None = None,
                     f"合租只找同性，申请方是{applicant.gender}，"
                     f"gender 请传「{applicant.gender}」或者不传")
             gender = applicant.gender
+    preference = None
+    if applicant is not None:
+        preference = await RoommatePreference.get_or_none(member_id=applicant.id)
     # 首轮检索的「加分项预算」：可选项一次全用等于把加分项变成硬条件。
     # 只限制第一轮，后续放宽轮次仍允许按规则逐项收窄；超过就直接拒绝并回原因。
-    if applicant is not None and context.round_no == 1 and context.member_id:
-        preference = await RoommatePreference.get_or_none(member_id=context.member_id)
+    if preference is not None and context.round_no == 1 and context.member_id:
         if preference is not None:
             bonus = []
             for label, value, required in (
@@ -563,9 +565,10 @@ async def search_members(context: ToolContext, gender: str | None = None,
                 f"作息取值里没有：{'、'.join(unknown)}，"
                 f"请从这几项里选：{'、'.join(member_service.SCHEDULE_TYPES)}")
         query = query.filter(schedule_type__in=accept)
-    if store_scope in ("同门店", "同片区"):
-        # 门店范围是相对申请方的：模型不需要猜门店编码，优先用申请方档案里的意向门店。
-        # 显式传了 store_id 时仍按传入值处理（保留了给工具调用方留的覆盖能力）。
+    # 门店只有标「必须」时才是硬条件；标「加分」时不能把检索直接缩到同店/同片区，
+    # 否则模型按门店检索时会把其他门店的合格候选挡在外面（V4_29 发现不足的根因）。
+    store_required = getattr(preference, "store_required", "加分") if preference is not None else "加分"
+    if store_scope in ("同门店", "同片区") and (preference is None or store_required == "必须"):
         if not store_id:
             store_id = applicant.store_id if applicant is not None else None
         if not store_id:
