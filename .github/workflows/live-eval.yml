@@ -235,6 +235,14 @@ jobs:
           python eval/safety_checks.py --bundle quality-bundle.json \
             --out safety-report.md --json safety-report.json
 
+      - name: Quality scorecard (always)
+        if: always()
+        run: |
+          EXTRA=()
+          [ -f content-report.json ] && EXTRA+=(--content content-report.json)
+          [ -f judge-report.json ] && EXTRA+=(--judge judge-report.json)
+          python eval/quality_scorecard.py --run . "${EXTRA[@]}"             --out quality-card.md --json quality-card.json || true
+
       - name: Dump backend logs (always)
         if: always()
         run: |
@@ -267,6 +275,8 @@ jobs:
             compose-logs.txt
             backend-logs.txt
             backend-failures.txt
+            quality-card.md
+            quality-card.json
             eval/reports
             eval/frozen/v3/scenarios.json
             eval/frozen/v3/labels.json

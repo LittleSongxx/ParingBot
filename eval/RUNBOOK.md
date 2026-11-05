@@ -28,6 +28,7 @@ python eval/configure_models.py --env-file .env.eval --dry-run
 
 ```bash
 python eval/check_freeze.py                 # MANIFEST + base SQL/pool digest + eval SQL 扫描
+python eval/self_check.py                   # 评测体系自检：门禁探针/场景硬编码/材料泄漏/基线放松
 python eval/build_frozen_labels.py --verify # 标签可由 base 种子 + 场景复算
 python eval/check_v4_freeze.py              # v4 场景/协议/target/文本自洽（labels pending）
 python eval/build_v4_scenarios.py --check   # v4 生成器可复现、不写文件

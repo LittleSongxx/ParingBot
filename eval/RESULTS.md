@@ -106,6 +106,29 @@ v4（full pilot 41991262897 + 定向复跑 42002328618，共 30 个 scenario-run
   其中 1 次失败；因此 v4 的 pass^k / target 达成率不能当作稳定质量结论。
 - 两个评分卡的 `quality_claim_allowed` 均恒为 false（无 E3 人工盲评）；代理信号只作探索。
 
+## 5.7 自查：避免重蹈覆辙（eval/self_check.py，14/14 通过）
+
+新增 `eval/self_check.py` 并接入 CI freeze-guard；它不调模型/DB，检查：
+
+| 检查 | 结果 |
+|---|---|
+| 冻结文件/manifest/base SQL 指纹/pool digest/eval SQL | PASS |
+| v4 场景 sha/40+8/target/文本自洽/pool 指纹；labels 仍 pending | PASS |
+| v3 labels 可由 base SQL + 场景确定性复算 | PASS |
+| 98 个产品/评测运行脚本无 `V3_xx/V4_xx` 场景硬编码 | PASS |
+| 门禁探针：干净通过 / 单场景归零失败 / 负向断言失败 / baseline hash 漂移 / publish 缺成本+judge / token 超预算 | 全部按设计 PASS/FAIL |
+| BASELINE schema v2、protocol 一致、`max_failures_delta=0` 未被放松 | PASS |
+| live-eval 无自动重算 oracle，冻结校验显式 `--verify` | PASS |
+| judge 材料白名单（禁字段/`*_role`） | PASS |
+| 内容 judge 仪器校验（已知坏锚点/原 item 不变/天花板检测） | PASS |
+
+**自查结论**：
+- 失败没有被“放宽门禁”掩盖：V3_07/V4_29 失败后仍是 failures=1，`max_failures_delta` 保持 0；
+- 没有按场景写规则/排序/prompt：运行代码无场景 ID 硬编码；
+- 没有把代理分当质量真值：`quality_claim_allowed` 恒为 false，内容/judge 只作探索；
+- 没有在看到结果后改指标口径：本轮只新增测量（scorecard/instrument/stability），未调整门禁数值；
+- CI 的 freeze-guard 会在每次 push/PR 重跑 self-check；live-eval / v4-pilot 会归档 `quality-card.md/json`。
+
 ## 6. 已知未解决问题
 
 - 无 E3 人工盲评（双人、κ≥0.6）；所有质量结论仍不可对外；

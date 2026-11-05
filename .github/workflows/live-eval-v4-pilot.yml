@@ -138,6 +138,11 @@ jobs:
             --scenarios eval/frozen/v4/scenarios.json \
             --out v4-pilot-report.md --json v4-pilot-report.json
 
+      - name: Quality scorecard (always)
+        if: always()
+        run: |
+          python eval/quality_scorecard.py --run .             --out quality-card.md --json quality-card.json || true
+
       - name: Dump backend logs (always)
         if: always()
         run: |
@@ -162,6 +167,8 @@ jobs:
             compose-logs.txt
             backend-logs.txt
             backend-failures.txt
+            quality-card.md
+            quality-card.json
             eval/frozen/v4/scenarios.json
             eval/frozen/v4/MANIFEST.json
           if-no-files-found: ignore
