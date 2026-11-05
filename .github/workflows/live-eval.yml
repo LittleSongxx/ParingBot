@@ -10,6 +10,11 @@ on:
         description: "baseline 或 verify"
         required: true
         default: "verify"
+      publish:
+        description: "发布门禁：true 时 judge/content 失败即整 job 失败，report 走 --publish"
+        type: boolean
+        required: false
+        default: false
       trials:
         description: "每个场景 trial 次数"
         required: true
@@ -113,6 +118,7 @@ jobs:
           DB_PROFILE=eval
           EVAL_LABEL=${RUN_LABEL}
           EVAL_TRIALS=${{ github.event.inputs.trials || '1' }}
+          EVAL_BUNDLE_TRIALS=${{ github.event.inputs.trials || '1' }}
           EVAL_POLL_SECONDS=3
           EVAL_MAX_WAIT_SECONDS=650
           EOF
@@ -120,7 +126,9 @@ jobs:
           python eval/configure_models.py --env-file .env.eval
 
       - name: Freeze check
-        run: python eval/check_freeze.py
+        run: |
+          python eval/check_freeze.py
+          python eval/build_frozen_labels.py --verify
 
       - name: Run v3 matrix
         env:
@@ -133,42 +141,63 @@ jobs:
       - name: Build quality bundle
         env:
           GIT_COMMIT: ${{ github.sha }}
+          EVAL_BUNDLE_TRIALS: ${{ github.event.inputs.trials || '1' }}
         run: |
           LABELS_HASH=$(sha256sum eval/frozen/v3/labels.json | cut -d' ' -f1)
           SCENARIOS_HASH=$(sha256sum eval/frozen/v3/scenarios.json | cut -d' ' -f1)
-          docker compose exec -T -e GIT_COMMIT="$GIT_COMMIT" -e EVAL_SUITE=v3 -e DB_PROFILE=eval -e LABELS_HASH="$LABELS_HASH" -e SCENARIOS_HASH="$SCENARIOS_HASH" -e MATCH_TIMEOUT_SECONDS=600 backend python - < eval/build_bundle.py > quality-bundle.json
+          # 每个申请人导出最近 N 次运行，bundle meta 记录 bundle_trials/run_ids/prompts_sha256
+          docker compose exec -T -e GIT_COMMIT="$GIT_COMMIT" -e EVAL_SUITE=v3 -e DB_PROFILE=eval \
+            -e EVAL_BUNDLE_TRIALS="$EVAL_BUNDLE_TRIALS" -e LABELS_HASH="$LABELS_HASH" \
+            -e SCENARIOS_HASH="$SCENARIOS_HASH" -e MATCH_TIMEOUT_SECONDS=600 \
+            backend python - < eval/build_bundle.py > quality-bundle.json
 
       - name: Optional independent judge
         env:
           EVAL_JUDGE_API_KEY: ${{ secrets.EVAL_JUDGE_API_KEY }}
+          PUBLISH: ${{ github.event.inputs.publish || 'false' }}
         run: |
+          # publish=true 时 judge 失败必须让 job 失败（fail-closed）；非 publish 保持可选
           if [ -z "$EVAL_JUDGE_API_KEY" ]; then
+            if [ "$PUBLISH" = "true" ]; then
+              echo "::error::publish=true 需要 EVAL_JUDGE_API_KEY secret，不能静默跳过独立 judge"
+              exit 1
+            fi
             echo "未配置 EVAL_JUDGE_API_KEY，跳过独立 judge（发布前必须补）"
           else
             printf '\nEVAL_JUDGE_PROVIDER=%s\nEVAL_JUDGE_BASE_URL=%s\nEVAL_JUDGE_API_KEY=%s\nEVAL_JUDGE_MODEL=%s\n' \
               "${{ secrets.EVAL_JUDGE_PROVIDER }}" "${{ secrets.EVAL_JUDGE_BASE_URL }}" \
               "$EVAL_JUDGE_API_KEY" "${{ secrets.EVAL_JUDGE_MODEL }}" >> .env.eval
             python eval/judge.py --bundle quality-bundle.json --mode pointwise \
-              --sample-not-delivered 8 --out judge-report.md --json judge-report.json || true
+              --sample-not-delivered 8 --out judge-report.md --json judge-report.json \
+              || [ "$PUBLISH" != "true" ]
           fi
 
       - name: Optional content quality
         env:
           EVAL_JUDGE_API_KEY: ${{ secrets.EVAL_JUDGE_API_KEY }}
+          PUBLISH: ${{ github.event.inputs.publish || 'false' }}
         run: |
+          # 与 judge 同样的 fail-closed 口径：publish=true 时失败即 job 失败
           if [ -z "$EVAL_JUDGE_API_KEY" ]; then
+            if [ "$PUBLISH" = "true" ]; then
+              echo "::error::publish=true 需要 EVAL_JUDGE_API_KEY secret，不能静默跳过内容质量评审"
+              exit 1
+            fi
             echo "未配置 EVAL_JUDGE_API_KEY，跳过内容质量代理评审"
           else
             printf '\nEVAL_JUDGE_PROVIDER=%s\nEVAL_JUDGE_BASE_URL=%s\nEVAL_JUDGE_API_KEY=%s\nEVAL_JUDGE_MODEL=%s\n' \
               "${{ secrets.EVAL_JUDGE_PROVIDER }}" "${{ secrets.EVAL_JUDGE_BASE_URL }}" \
               "$EVAL_JUDGE_API_KEY" "${{ secrets.EVAL_JUDGE_MODEL }}" >> .env.eval
             python eval/content_quality.py --bundle quality-bundle.json --limit 20 \
-              --env-file .env.eval --out content-report.md --json content-report.json || true
+              --env-file .env.eval --out content-report.md --json content-report.json \
+              || [ "$PUBLISH" != "true" ]
           fi
 
       - name: Report + gates
         env:
           MODE: ${{ github.event.inputs.mode || 'verify' }}
+          PUBLISH: ${{ github.event.inputs.publish || 'false' }}
+          RUN_LABEL: live-${{ github.run_id }}
           PRICE_IN: ${{ github.event.inputs.price_input_per_m }}
           PRICE_OUT: ${{ github.event.inputs.price_output_per_m }}
           MAX_TOKENS: ${{ github.event.inputs.max_tokens || '2500000' }}
@@ -177,7 +206,16 @@ jobs:
           if [ -n "$PRICE_IN" ] && [ -n "$PRICE_OUT" ]; then
             EXTRA+=(--price-input-per-m "$PRICE_IN" --price-output-per-m "$PRICE_OUT" --require-cost)
           fi
+          # publish=true 时 report 走 --publish：judge/content 报告缺失即失败
+          if [ "$PUBLISH" = "true" ]; then
+            EXTRA+=(--publish)
+          fi
+          # 独立 judge 报告存在时一并交给 report 校验（publish 模式必需，非 publish 仅记录）
+          if [ -f judge-report.json ]; then
+            EXTRA+=(--judge judge-report.json)
+          fi
           python eval/report.py --bundle quality-bundle.json --matrix eval/reports \
+            --matrix-stamp "$RUN_LABEL" --source-run "${{ github.run_id }}" \
             --labels eval/frozen/v3/labels.json \
             --scenarios eval/frozen/v3/scenarios.json \
             --manifest eval/frozen/v3/MANIFEST.json \
@@ -207,7 +245,10 @@ jobs:
             content-report.json
             v3-baseline.json
             eval/reports
-            eval/frozen/v3/*.json
+            eval/frozen/v3/scenarios.json
+            eval/frozen/v3/labels.json
+            eval/frozen/v3/BASELINE.json
+            eval/frozen/v3/MANIFEST.json
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 30
 
