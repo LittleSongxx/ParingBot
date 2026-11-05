@@ -81,13 +81,19 @@ def collect_runs(matrix_paths: list[Path]) -> list[dict]:
             eligible_unbounded = int(expect.get("ex_ante_unbounded") or 0)
             for run in scenario.get("runs") or []:
                 delivered = int(run.get("delivered") or 0)
-                discovered = int((run.get("counts") or {}).get("total") or 0)
+                counts = run.get("counts") or {}
+                discovered = int(counts.get("total") or 0)
+                passed = int(counts.get("passed") or 0)
+                rejected = int(counts.get("rejected") or 0)
                 rows.append({
                     "scenario": scenario.get("key"),
                     "requested": requested,
                     "target": target,
                     "delivered": delivered,
                     "discovered": discovered,
+                    "passed": passed,
+                    "rejected": rejected,
+                    "rounds": int(run.get("total_round") or 0),
                     "eligible_unbounded": eligible_unbounded,
                     "coverage": round(min(discovered / target, 1.0), 4) if target else 0.0,
                     "target_attainment": round(min(delivered / target, 1.0), 4) if target else 0.0,
@@ -108,6 +114,12 @@ def summarize_runs(rows: list[dict]) -> dict:
         delivered = [int(item.get("delivered", 0)) for item in values]
         attainment = [float(item.get("target_attainment", 0.0)) for item in values]
         coverage = [float(item.get("coverage", 0.0)) for item in values]
+        discovered = [int(item.get("discovered", 0)) for item in values]
+        passed = [int(item.get("passed", 0)) for item in values]
+        rejected = [int(item.get("rejected", 0)) for item in values]
+        rounds = [int(item.get("rounds", 0)) for item in values]
+        walls = [float(item.get("wall_seconds") or 0) for item in values]
+        statuses = [item.get("status") for item in values]
         failures = sum(1 for item in values if item["status"] not in COMPLETED)
         per_scenario[key] = {
             "runs": len(values),
@@ -122,6 +134,13 @@ def summarize_runs(rows: list[dict]) -> dict:
             "coverage_min": min(coverage),
             "coverage_max": max(coverage),
             "coverage_range": round(max(coverage) - min(coverage), 4),
+            "discovered": discovered,
+            "passed": passed,
+            "rejected": rejected,
+            "rounds": rounds,
+            "wall_seconds": walls,
+            "statuses": statuses,
+            "audit_rejection_rate": round(sum(rejected) / max(1, sum(discovered)), 4),
             "failures": failures,
             "unstable": (max(delivered) - min(delivered) >= 2
                          or (max(coverage) - min(coverage) >= 0.5)),
@@ -151,6 +170,9 @@ def summarize_runs(rows: list[dict]) -> dict:
         "target_ci95": target_ci,
         "same_scenario_consistency": round(expected_consistency / len(per_scenario), 4) if per_scenario else 0.0,
         "discovery_coverage": round(statistics.mean(coverage_means), 4) if coverage_means else 0.0,
+        "audit_rejection_rate": round(
+            sum(sum(item["rejected"]) for item in per_scenario.values())
+            / max(1, sum(sum(item["discovered"]) for item in per_scenario.values())), 4),
         "low_coverage_scenarios": sorted(key for key, item in per_scenario.items()
                                          if item["coverage_mean"] < 0.99),
         "unstable_scenarios": sorted(key for key, item in per_scenario.items() if item["unstable"]),
@@ -241,7 +263,8 @@ def render(result: dict) -> str:
         f"- target 达成率：**{summary['target_attainment']:.2%}**"
         f"（95% CI [{target_ci['lo']:.1%}, {target_ci['hi']:.1%}]）",
         f"- 同场景跨 run 完全一致率：**{summary['same_scenario_consistency']:.1%}**；"
-        f"候选发现覆盖率（discovered/target）：**{summary['discovery_coverage']:.1%}**",
+        f"候选发现覆盖率（discovered/target）：**{summary['discovery_coverage']:.1%}**；"
+        f"审核否决率（rejected/discovered）：**{summary['audit_rejection_rate']:.1%}**",
         f"- 覆盖率不足场景：{summary['low_coverage_scenarios'] or '无'}；"
         f"不稳定场景：{summary['unstable_scenarios'] or '无'}；有失败场景：{summary['failed_scenarios'] or '无'}",
         f"- 不稳定判定：同一场景跨 run 交付极差≥2 **或** 候选发现覆盖率极差≥0.5",
@@ -254,6 +277,19 @@ def render(result: dict) -> str:
     for key, item in summary["per_scenario"].items():
         lines.append(f"| {key} | {item['runs']} | {item['delivered']} | {item['delivered_mean']} | "
                      f"{item['target']} | {item['coverage_mean']:.0%} | {item['failures']} | {item['unstable']} |")
+    unstable = summary.get("unstable_scenarios") or []
+    if unstable:
+        lines += ["", "### 不稳定场景 trial 明细（发现不足 vs 审核否决）", "",
+                  "| 场景 | trial | discovered | passed | rejected | delivered | coverage | rounds | wall(s) | status |",
+                  "|---|---|---|---|---|---|---|---|---|---|"]
+        for key in unstable:
+            item = summary["per_scenario"][key]
+            for index, value in enumerate(item["delivered"]):
+                status = (item.get("statuses") or [])[index] if index < len(item.get("statuses") or []) else ""
+                lines.append(
+                    f"| {key} | {index + 1} | {item['discovered'][index]} | {item['passed'][index]} | "
+                    f"{item['rejected'][index]} | {value} | {item['delivered'][index] / item['target']:.0%} | "
+                    f"{item['rounds'][index]} | {item['wall_seconds'][index]:.1f} | {status} |")
     if summary.get("failure_details"):
         lines.append("")
         lines.append("失败明细：")
