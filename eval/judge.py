@@ -135,7 +135,9 @@ def pairwise(rows: list[dict], model: str, base_url: str, api_key: str,
         # 确定性等距抽样，覆盖不同场景/run，而不是只取前几个高容量场景。
         step = max(1, len(pairs) // limit_pairs)
         pairs = pairs[::step][:limit_pairs]
-    wins = 0
+    delivered_wins = 0
+    control_wins = 0
+    ties = 0
     comparisons = 0
     consistent_count = 0
     rows_out = []
@@ -150,27 +152,37 @@ def pairwise(rows: list[dict], model: str, base_url: str, api_key: str,
             except Exception as exc:  # noqa: BLE001
                 verdicts.append("error:" + str(exc))
         consistent = False
-        if len(verdicts) == 2 and verdicts[0] in ("A", "B", "tie") and verdicts[1] in ("A", "B", "tie"):
-            if verdicts[0] == "tie" and verdicts[1] == "tie":
-                consistent = True
-            elif verdicts[0] == "A" and verdicts[1] == "B":
-                consistent = True
-            elif verdicts[0] == "B" and verdicts[1] == "A":
-                consistent = True
+        delivered_win = control_win = tie = False
+        if len(verdicts) == 2 and all(v in ("A", "B", "tie") for v in verdicts):
+            # 未交换时 A=delivered；交换后 A=control、B=delivered。
+            if verdicts == ["A", "B"]:
+                consistent = delivered_win = True
+                delivered_wins += 1
+            elif verdicts == ["B", "A"]:
+                consistent = control_win = True
+                control_wins += 1
+            elif verdicts == ["tie", "tie"]:
+                consistent = tie = True
+                ties += 1
             if consistent:
                 consistent_count += 1
-            if consistent and verdicts[0] != "tie":
-                wins += 1
             comparisons += 1
         rows_out.append({"index": index, "delivered": delivered_candidate.get("nickname"),
                          "rejected": rejected_candidate.get("nickname"), "verdicts": verdicts,
-                         "consistent_after_swap": consistent})
+                         "consistent_after_swap": consistent,
+                         "delivered_win": delivered_win, "control_win": control_win, "tie": tie})
+    # tie 记 0.5 胜（与 pairwise_quality 同口径）；分母是有效 pair 数，不含 API error。
+    wins = delivered_wins + 0.5 * ties
     return {"mode": "pairwise", "model": model, "pairs": rows_out,
-            "aggregate": {"pairs": len(pairs), "valid": comparisons, "delivered_wins": wins,
+            "aggregate": {"pairs": len(pairs), "valid": comparisons,
+                          "delivered_wins": delivered_wins, "control_wins": control_wins,
+                          "ties": ties, "inconsistent": comparisons - consistent_count,
                           "delivered_win_rate": round(wins / comparisons, 3) if comparisons else None,
                           "position_consistency": round(consistent_count / comparisons, 3) if comparisons else None,
+                          "usable": (consistent_count / comparisons) >= 0.8 if comparisons else False,
                           "ci95": {"delivered_win_rate": wilson_ci(wins, comparisons),
-                                   "position_consistency": wilson_ci(consistent_count, comparisons)}}}
+                                   "position_consistency": wilson_ci(consistent_count, comparisons)}},
+            "note": "position_consistency<0.8 时 win_rate 不可用（位置偏差）"}
 
 
 def main(argv=None) -> int:

@@ -206,6 +206,9 @@ def load_judge(path: Path | None) -> dict | None:
         "delivered_win_rate": aggregate.get("delivered_win_rate",
                                              aggregate.get("top_win_rate")),
         "position_consistency": aggregate.get("position_consistency"),
+        "usable": (aggregate.get("usable") if "usable" in aggregate else
+                   (float(aggregate["position_consistency"]) >= 0.8
+                    if isinstance(aggregate.get("position_consistency"), (int, float)) else None)),
         "ci95": aggregate.get("ci95") or data.get("ci95"),
         "source": str(path),
     }
@@ -236,6 +239,8 @@ def build(markdown_paths: list[Path], report_paths: list[Path],
         "reason": "没有 E3 人工盲评（双人 rubric + kappa>=0.6）；代理结果只能作探索性信号",
         "delivery_headroom": summary["delivery_headroom"],
         "pass_k_stable": not summary["unstable_scenarios"] and not summary["failed_scenarios"],
+        "judge_usable": (all(bool(item.get("usable")) for item in judges)
+                         if judges else None),
     }
     return {
         "summary": summary,
@@ -314,7 +319,9 @@ def render(result: dict) -> str:
             f"**{win:.1%}**" if isinstance(win, (int, float)) else "- 成对 judge：无有效数据")
         if isinstance(win, (int, float)) and win_ci:
             lines.append(f"  （Wilson 95% CI {win_ci.get('lo'):.1%}–{win_ci.get('hi'):.1%}）；"
-                         f"位置一致性 {cons:.2f}；模型={judge.get('model')}")
+                         f"位置一致性 {cons:.2f}；usable={judge.get('usable')}；模型={judge.get('model')}")
+        if judge.get("usable") is False:
+            lines.append("- ⚠️ 成对 judge 位置一致性 < 0.8，delivered 胜率不可用（位置偏差），只能当探索性信号。")
     if not content and not judge:
         lines.append("- 本次 artifact 未包含内容/judge 报告（CI 未配置 EVAL_JUDGE_API_KEY 时按设计跳过）。")
     lines += ["", "## 3. 能声称 / 不能声称", ""]
