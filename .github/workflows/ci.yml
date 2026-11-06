@@ -56,6 +56,13 @@ jobs:
           python eval/build_frozen_labels.py --verify
           python eval/build_v4_scenarios.py --check
           python eval/phase0/run_eval.py --fixtures --bad eval/phase0/fixtures/bad
+      # quality-v1 口径源自检：quality_spec 是 6 指标定义/阈值/门禁的唯一来源，
+      # 必须可独立 import 且 ORDER 与 METRICS 一致（阈值是否被放松由 eval/tests/
+      # test_self_check_quality.py 的冻结基线检查负责）。
+      - name: Quality 口径源自检
+        run: |
+          python eval/quality_spec.py
+          python -c "import sys; sys.path.insert(0, 'eval'); import quality_spec; assert quality_spec.ORDER == list(quality_spec.METRICS); print('quality_spec ok', quality_spec.PROTOCOL_VERSION)"
 
   freeze-guard:
     name: freeze-guard

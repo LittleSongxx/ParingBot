@@ -222,7 +222,9 @@ docker compose build web
 - **能声称 / 不能声称**：可声称流程完成率、失败率、target 归一交付、硬规则/安全/负向断言；
   **不能**声称匹配质量、内容质量达标、泛化或优化有效（缺 E3 人工盲评）。
 - 工具：`eval/quality_scorecard.py` 汇总多 run 的失败率/target CI/不稳定场景；
-  `eval/self_check.py` 做“test the test”（门禁探针/场景硬编码/材料泄漏/基线放松），CI 14/14 通过。
+  `eval/self_check.py` 做“test the test”（门禁探针/场景硬编码/材料泄漏/基线放松），CI 18/18 通过。
+
+- **quality-v1 工具链（2026-11-06）**：6 项核心指标（匹配质量胜率/误拒率/交付召回/内容忠实度/pass^k/安全）已实现测量工具——三档对照双向 judge + Bradley-Terry、claim 级忠实度、硬规则 replay 误拒、人工校准包（100 对）、κ/PPI 校正与统一质量报告；quality_claim_allowed 仍为 false（人工盲评未做）。命令见 eval/RESULTS.md §9 / eval/RUNBOOK.md §10。
 
 ## 这个仓库里没有什么
 

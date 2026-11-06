@@ -221,3 +221,47 @@ V4_29 的波动不全是模型质量，bundle 逐候选对比暴露了产品 bug
 3. 仅把**可追溯**结论写进本文件，注明：oracle/protocol 版本、MANIFEST hash、环境、n、CI；
 4. 禁止跨环境/跨 oracle 版本/跨 v4 协议横比；禁止引用旧 QUALITY 数字；
 5. 任何质量类结论必须等待 E3 人工盲评；代理评审只能写“探索性”。
+---
+
+## 9. quality-v1 质量测量工具链（2026-11-06，工具就绪 ≠ 质量结论）
+
+本节只记录**测量工具**，不改变 §1 的"能/不能声称"：没有 E3 人工盲评前，任何质量数字仍然不可对外。
+
+新增 6 项核心指标与工具（口径源 `eval/quality_spec.py`，阈值/样本下限改动会被 `self_check.py` 的冻结基线拦截）：
+
+| 指标 | 工具 | 证据级 | 当前状态 |
+|---|---|---|---|
+| 匹配质量胜率（交付 vs near_miss/rejected/random 三档对照） | `quality_pairwise.py`（双向+多 judge+BT+Wilson/CP+position consistency） | E2→E3 | 工具完成；需真实 bundle + 100 对人工校准 |
+| 审核误拒率/假通过率 | `false_reject.py`（硬规则 replay 确定性；软冲突 judge 三分类） | E0+E2 | 工具完成；软冲突需人工校准 |
+| 交付召回率 | `delivery_recall.py`（target 容量归一 + 交付精度 + 漏斗归因） | E0 | 可跑（v3 冻结集 n=8） |
+| 内容忠实度（claim 级） | `content_faithfulness.py`（claim 拆解 + 原文引用校验 + 证据覆盖） | E2→E3 | 工具完成；需 human 校准 100 claims |
+| pass^k 稳定性 | `pass_k.py`（k 子集全通过 + cluster bootstrap） | E0/E1 | 可跑；v3 需 >=3 trials、>=10 场景才可申报 |
+| 安全/注入 | `safety_redteam.py`（24 条注入用例 + 硬规则兜底 + 负向断言） | E0 | 用例生成完成；注入需 live-eval 写入用例后重跑 |
+
+配套：
+- `judge_calibration.py`：judge 与人工标签一致性（κ/Spearman/位置一致性/锚点/跨族/自一致）+ **PPI 偏差校正**；`usable=false` 时任何质量结论 blocked；
+- `quality_report.py`：六指标统一报告 + `claims` 申报门禁（缺校准/κ<0.6/样本不足 → fail-closed）；
+- `eval/human_eval/{build_calibration,agreement,acceptance}.py`：人工只做"校准集标注 + 分歧裁决 + 15% 验收"三件事；
+- `eval/tests` 已扩到 **305 项**（`self_check` 18/18），覆盖 judge 材料泄漏、位置偏差、阈值放松、PPI、fail-closed 门禁。
+
+推荐流程（先 deterministic，后 judge，最后人工收尾）：
+
+```bash
+# 0) 用最新 live-eval artifact（quality-bundle.json）作为输入
+# 1) 确定性指标
+python eval/delivery_recall.py --bundle quality-bundle.json --scenarios eval/frozen/v3/scenarios.json --out recall.json
+python eval/pass_k.py --matrix eval/reports --scenarios eval/frozen/v3/scenarios.json --k 3 --out pass-k.json
+python eval/safety_redteam.py --emit-cases eval/safety-cases.json
+# 2) judge 指标 + 人工盲评材料
+python eval/quality_pairwise.py --bundle quality-bundle.json --limit-pairs 120 --emit-materials materials.json --out pairwise.json
+python eval/human_eval/build_calibration.py --materials materials.json --out-dir eval/human_eval/calibration --n 100
+#    —— 两名评者填 annotations_annotator_{a,b}.csv（约 2-4 小时），agreement.py 出 κ 并裁决分歧
+python eval/human_eval/agreement.py --dir eval/human_eval/calibration
+python eval/judge_calibration.py --judge pairwise.json --human eval/human_eval/calibration/adjudication.csv --metric match_quality --human-agreement eval/human_eval/calibration/agreement.json --out calibration.json
+# 3) 汇总 + 申报门禁
+python eval/quality_report.py --pairwise pairwise.json --recall recall.json --pass-k pass-k.json --calibration calibration.json --out-md quality-report.md --out-json quality-report.json
+# 4) 人工验收 15%
+python eval/human_eval/acceptance.py --report quality-report.json --key eval/human_eval/calibration/key.json --out acceptance.csv
+```
+
+**当前状态**：代码/单测/离线冒烟已完成；真实 judge 冒烟（qwen3.7-plus，n=4 对）跑通双向/位置一致性/材料白名单；**人工校准尚未执行**（本轮无有效当前 bundle），因此 `quality_claim_allowed=false`，不得据此写"匹配质量"。

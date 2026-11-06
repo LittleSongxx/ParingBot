@@ -111,3 +111,11 @@ python eval/report.py --bundle quality-bundle.json --matrix eval/reports \
 - 不允许对 v3 补候选、不允许 CI 自动重算 oracle；
 - 禁止判官材料携带 `delivered_rank/screen_score/delivered/audit_status/evidence/*_role`；
 - 任何质量数字必须附：oracle 版本 + 数据版本 + 环境 + n + artifact（见 `docs/quality-policy.md`）。
+
+## 质量指标（quality-v1，2026-11-06）
+
+- 口径源：`quality_spec.py`（6 指标、合格/优秀线、证据级、申报门禁）；改动会被 `self_check.py` 冻结基线拦截。
+- 工具：`quality_pairwise.py`（三档对照/双向/BT）、`false_reject.py`（硬规则 replay + 软冲突 judge）、`delivery_recall.py`（容量归一+精度+漏斗归因）、`content_faithfulness.py`（claim 级）、`pass_k.py`、`safety_redteam.py`。
+- 校准：`judge_calibration.py`（κ/位置一致性/锚点/跨族/PPI）+ `human_eval/{build_calibration,agreement,acceptance}.py`（人工只做校准/裁决/验收）。
+- 汇总：`quality_report.py --pairwise ... --calibration ... --out-md quality-report.md`；无人工校准时 `quality_claim_allowed=false`。
+- 单测：`eval/tests` 305 项；`python eval/self_check.py` 18/18。

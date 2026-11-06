@@ -143,3 +143,12 @@ python eval/quality_scorecard.py \
 - `.env.eval` 与 `eval/reports/` 均被 gitignore；
 - Key 会写入演示库 `ai_model_config`（后端调用用），不再需要时到管理端停用/清空，或重建数据卷；
 - 报告只写模型名/供应商/base_url，不写 Key。
+## 10. 质量指标 quality-v1（2026-11-06）
+
+质量测量工具与 6 项指标口径见 `eval/RESULTS.md` §9 与 `eval/quality_spec.py`（唯一口径源）。
+原则：
+1. 先跑确定性指标（`delivery_recall/pass_k/safety_redteam`），它们不调模型；
+2. judge 只测语义维度（`quality_pairwise/content_faithfulness/false_reject`），材料必须过系统元数据白名单；
+3. judge 必须用人工校准集证明仪器可信（`judge_calibration.py`：κ≥0.6、位置一致性≥0.85、锚点有效、PPI 校正），否则 `quality_report.py` 的 `claims.quality_claim_allowed` 恒为 false；
+4. 人工只做三件事：填校准集、裁决分歧、验收抽样 15%（`eval/human_eval/`）。
+最小命令链见 `eval/RESULTS.md` §9；任何阈值改动都会被 `eval/self_check.py` 的冻结基线拦截。
