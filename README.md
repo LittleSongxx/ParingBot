@@ -192,6 +192,38 @@ docker compose build web
 - **安全边界**：密码为 PBKDF2 哈希、上传鉴权+魔数校验、登录失败限流、改密吊销旧 JWT、分页限幅、nginx 安全响应头、用户名列表仅管理员可见；但这是**单人本机演示栈**，仍缺审计日志、备份策略与公网加固，不要直接暴露到公网。
 - **运行期**：匹配任务跑在 FastAPI BackgroundTasks 里，单进程、无队列、无重试；服务重启时会把悬挂运行标记为失败（前端会提示重新发起）。单次运行默认 600 秒超时。
 
+## 质量评测（2026-11 审计后）
+
+> 本项目不是生产系统，但评测不是“跑个 8/8”。下面只列**可追溯、带边界**的当前结果；完整口径见 [eval/RESULTS.md](eval/RESULTS.md)。
+
+- **冻结集**：v3 = 8 正向 + 2 负向 readiness 场景，候选池固定为 900 名种子成员，禁止补供给；
+  MANIFEST 记录 `base_sql_sha256` + 候选池 `pool_digest`，`eval/self_check.py` 每次 CI 校验。
+- **交付/target**：当前 BASELINE v2 来自真实 run，v3 交付 **57/64（89.06%）**；
+  结构上限 57（V3_04 最多 5、V3_06 最多 4），**target 达成率 100%**。
+  交付指标已饱和，因此不用它证明“质量提升”。
+- **稳定性**：4 次 v3 run 共 32 个 scenario-run，失败率 **3.12%**（Wilson 95% CI 0.5–15.7%）；
+  同场景跨 run 交付一致率 87.5%；**候选发现覆盖率 100%**（discovered/target）；
+  失败会被门禁按 `failures > baseline + 0` 拦截，不会静默放过。
+- **内容质量（Qwen 异族代理，E2.5 探索）**：n=20，overall **4.80/5**、faithful 4.80；
+  8/20 规则 warning 的根因是**种子数据自身矛盾**（候选 `has_pet=无`，兴趣标签/画像却写养猫/养狗）；
+  已加画像一致性兜底：档案写无宠时，画像不得写本人养宠；种子数据清洗仍属 backlog。
+  仪器校验：注入已知坏样本后 faithful 5.0→2.0，说明评分器有区分度；但仍不是人工真值。
+- **成对匹配 judge（E2 探索）**：**旧的 win_rate 统计有 bug**（把位置一致当成交付赢），
+  v4 修正后 24 对：交付赢 11、对照赢 6、不一致 7，交付胜率 **45.8%**（CI 27.9–64.9），
+  位置一致性 **70.8%** → `usable=false`；旧 70.8%/75% 等数字不得引用，需在人工/校准标签后重跑。
+- **v4 12 场景×3 trials（方法验证，labels pending）**：target 100%、failures 0、pass^k(target) 1.0、
+  候选发现覆盖率 100%；但 labels 未完成，不能接质量门禁。
+- **V4_29 稳定性（修复后）**：6 次 trial 交付 [6,6,6]×6、0 否决、0 失败，墙钟约 117s vs 248s；
+  此前 9 次 `[6,5,6,1,2,6,6,6,6]` 已由审核/发现两个产品根因解释。
+- **产品根因修复**：V4_29 波动定位到两个“加分项被当硬条件”问题——①审核官误判 `MISMATCH_HARD`，
+  现由代码双向复核否决，找不到必须项违规的改回通过；②`search_members` 对加分门店也做硬筛，
+  现只在门店标“必须”时硬筛。修复后 V4_29 验证 3/3 交付 6/6、发现 6/6、0 否决；
+  v3 回归 57/64、target 100%、failures 0。以上均为产品侧修复，非场景特调。
+- **能声称 / 不能声称**：可声称流程完成率、失败率、target 归一交付、硬规则/安全/负向断言；
+  **不能**声称匹配质量、内容质量达标、泛化或优化有效（缺 E3 人工盲评）。
+- 工具：`eval/quality_scorecard.py` 汇总多 run 的失败率/target CI/不稳定场景；
+  `eval/self_check.py` 做“test the test”（门禁探针/场景硬编码/材料泄漏/基线放松），CI 14/14 通过。
+
 ## 这个仓库里没有什么
 
 - **没有真实房源/租约/合同/支付**：只有租客档案、偏好、匹配与审核；不是完整的公寓租赁业务系统。
@@ -208,7 +240,7 @@ docker compose build web
 - 种子库生成说明：[scripts/prepare_seed.py](scripts/prepare_seed.py)
 - 评测体系与冻结集：[eval/README.md](eval/README.md)
 - 评测运行手册（环境/基线/judge/人工评估）：[eval/RUNBOOK.md](eval/RUNBOOK.md)
-- 当前评测状态（无质量结论，历史数字已作废）：[eval/RESULTS.md](eval/RESULTS.md)
+- 当前评测状态（2026-11 探索性结果与边界，历史数字已作废）：[eval/RESULTS.md](eval/RESULTS.md)
 - 前端 Playwright 冒烟：[e2e/README.md](e2e/README.md)
 - 发布前质量检查单：[docs/release-checklist.md](docs/release-checklist.md)
 - 真实模型评测工作流：`.github/workflows/live-eval.yml`（v3 冻结集；手动触发，需 DEEPSEEK_API_KEY secret）

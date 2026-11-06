@@ -1,18 +1,27 @@
 name: live-eval-v4-pilot
 
-# v4 试跑：9 个场景 ×3 trials（高/中/低各 3），只跑矩阵，不接门禁。
-# 目的：验证 pass^k/CI 与运行时成本，为 v4 标签与全量 40×3 做准备。
+# v4 试跑：默认 9 个场景 ×3 trials（高/中/低各 3），只跑矩阵，不接门禁。
+# keys=all 时跑全部 40 个正向场景；同时导出 quality-bundle-v4.json（EVAL_BUNDLE_TRIALS=3）
+# 供 pass^k/CI 复算。依赖 EVAL_JUDGE_API_KEY 的 labels/judge 步骤本 workflow 不跑。
 on:
   workflow_dispatch:
     inputs:
       keys:
-        description: "要跑的场景 key（逗号分隔）"
+        description: "要跑的场景 key（逗号分隔；all = 全部 40 个正向场景）"
         required: false
         default: "V4_01,V4_02,V4_03,V4_17,V4_18,V4_19,V4_29,V4_30,V4_31"
       trials:
         description: "每个场景 trial 次数"
         required: false
         default: "3"
+      soft_filter_mode:
+        description: "筛选 A/B：current=保持现状，hard=只让必须项进 SQL 硬筛（加分项忽略）"
+        required: false
+        default: "current"
+      early_stop_mode:
+        description: "低容量早停：on=候选池连续两轮零增长且无待审时收尾（已 A/B 验证），off=关闭"
+        required: false
+        default: "on"
 
 concurrency:
   group: live-eval-v4-pilot
@@ -41,6 +50,8 @@ jobs:
           APP_PORT=8080
           PUBLIC_BASE_URL=
           MATCH_TIMEOUT_SECONDS=600
+          SCREENER_FILTER_MODE=${{ github.event.inputs.soft_filter_mode || 'current' }}
+          SCREENER_EARLY_STOP=${{ github.event.inputs.early_stop_mode || 'off' }}
           MAX_UPLOAD_MB=5
           TZ=Asia/Shanghai
           LOGIN_MAX_FAILS=20
@@ -105,12 +116,30 @@ jobs:
           python eval/check_freeze.py
           python eval/check_v4_freeze.py
 
-      - name: Run v4 pilot matrix (9 scenarios x 3 trials)
+      - name: Run v4 pilot matrix
         env:
           RUN_LABEL: v4-pilot-${{ github.run_id }}
         run: |
-          python eval/run_matrix.py --suite v4 --only "$PILOT_KEYS" --trials "${{ github.event.inputs.trials || '3' }}" \
+          SELECTED_KEYS="$PILOT_KEYS"
+          if [ "$(printf '%s' "$PILOT_KEYS" | tr '[:upper:]' '[:lower:]')" = "all" ]; then
+            # all = 冻结集里的全部正向场景（负向场景不消耗模型调用，仍按需单独跑）
+            SELECTED_KEYS=$(python3 -c 'import json; data = json.load(open("eval/frozen/v4/scenarios.json")); print(",".join(item["key"] for item in data["scenarios"] if item.get("run")))')
+          fi
+          python eval/run_matrix.py --suite v4 --only "$SELECTED_KEYS" \
+            --trials "${{ github.event.inputs.trials || '3' }}" \
             --label "$RUN_LABEL" --stamp v4-pilot
+
+      - name: Build quality bundle (v4, 3 trials)
+        continue-on-error: true
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+        run: |
+          SCENARIOS_HASH=$(sha256sum eval/frozen/v4/scenarios.json | cut -d' ' -f1)
+          # EVAL_BUNDLE_TRIALS=3：每个申请人导出最近 3 次运行，meta 记录 run_ids/prompts_sha256
+          docker compose exec -T -e GIT_COMMIT="$GIT_COMMIT" -e EVAL_SUITE=v4 -e DB_PROFILE=eval \
+            -e EVAL_BUNDLE_TRIALS=3 -e SCENARIOS_HASH="$SCENARIOS_HASH" \
+            -e MATCH_TIMEOUT_SECONDS=600 \
+            backend python - < eval/build_bundle.py > quality-bundle-v4.json
 
       - name: Analyze pilot
         run: |
@@ -118,6 +147,18 @@ jobs:
             --matrix eval/reports/scenario-matrix-v4-pilot/matrix.json \
             --scenarios eval/frozen/v4/scenarios.json \
             --out v4-pilot-report.md --json v4-pilot-report.json
+
+      - name: Quality scorecard (always)
+        if: always()
+        run: |
+          python eval/quality_scorecard.py --run .             --out quality-card.md --json quality-card.json || true
+
+      - name: Dump backend logs (always)
+        if: always()
+        run: |
+          docker compose logs --tail=5000 > compose-logs.txt || true
+          docker compose logs backend --tail=5000 > backend-logs.txt || true
+          grep -E "Traceback|ERROR|异常|exception" -A 20 backend-logs.txt > backend-failures.txt || true
 
       - name: Dump compose logs on failure
         if: failure()
@@ -132,5 +173,13 @@ jobs:
             eval/reports
             v4-pilot-report.md
             v4-pilot-report.json
+            quality-bundle-v4.json
+            compose-logs.txt
+            backend-logs.txt
+            backend-failures.txt
+            quality-card.md
+            quality-card.json
+            eval/frozen/v4/scenarios.json
+            eval/frozen/v4/MANIFEST.json
           if-no-files-found: ignore
           retention-days: 14

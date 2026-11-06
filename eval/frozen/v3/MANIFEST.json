@@ -46,7 +46,9 @@
       "18": 42,
       "19": 42,
       "20": 41
-    }
+    },
+    "base_sql_sha256": "a5e1e2dbedb4ada6ceacfb7501c5ab3bd62db1877fb33910faec73d800a536e2",
+    "pool_digest": "d863578aae64f364dc0ccef3498d1523f422567540a5402023860d2ad002087a"
   },
   "label_rule": {
     "method": "heuristic-offline-v1",
@@ -63,5 +65,5 @@
       "interest_cap": 2
     }
   },
-  "created_at": "2026-11-03 17:30:27"
+  "created_at": "2026-11-05 14:57:33"
 }

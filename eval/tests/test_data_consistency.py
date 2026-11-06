@@ -43,6 +43,32 @@ class DataConsistencyTest(unittest.TestCase):
         result = data_consistency.assess({"applicant": person(), "candidate": person()})
         self.assertEqual(result["score"], 2)
 
+    def test_free_text_pet_contradiction_is_severe(self):
+        # A3 审计口径：“不养宠物 … 养猫、撸猫”是自由文本自相矛盾 → severe(0)
+        result = data_consistency.assess({
+            "applicant": person(),
+            "candidate": person(interest_tags=["看电影"],
+                                self_intro="不养宠物，但喜欢养猫、撸猫"),
+        })
+        self.assertEqual(result["score"], 0)
+        self.assertTrue(any("不养" in reason for reason in result["reasons"]))
+
+    def test_free_text_pet_mention_without_negation_is_minor(self):
+        # 只说“喜欢撸猫”、档案 has_pet=无、没有不养声明 → 轻微歧义(1)
+        result = data_consistency.assess({
+            "applicant": person(),
+            "candidate": person(interest_tags=["看电影"], self_intro="平时喜欢撸猫"),
+        })
+        self.assertEqual(result["score"], 1)
+
+    def test_negated_pet_mention_is_not_contradiction(self):
+        # “不养猫/不养狗/无宠物”是否定表述，不能误判成“文本提到养宠”
+        result = data_consistency.assess({
+            "applicant": person(),
+            "candidate": person(interest_tags=["看电影"], self_intro="我不养猫也不养狗，无宠物"),
+        })
+        self.assertEqual(result["score"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

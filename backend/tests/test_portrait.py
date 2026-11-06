@@ -488,6 +488,28 @@ async def test_clean_portrait_rules(db):
     assert any("标签太长" in item for item in dropped)
 
 
+async def test_clean_portrait_removes_pet_claims_when_profile_says_no_pet(db):
+    """档案写无宠时，画像不能把本人写成养猫/养狗（种子数据矛盾不能进画像）。"""
+    data = {
+        "summary": "我养了一只猫。喜欢做饭和运动。",
+        "personality_tags": ["爱做饭"],
+        "lifestyle_tags": ["养猫", "爱做饭"],
+        "cohabit_need_tags": [],
+        "evidence": {"爱做饭": "喜欢做饭", "养猫": "我养了一只猫"},
+    }
+    sources = "自我介绍：我养了一只猫。喜欢做饭和运动。"
+    values, evidence, dropped, counts = portrait_service.clean_portrait(
+        data, sources, has_pet="无")
+    assert values["summary"] == "喜欢做饭和运动。"
+    assert values["lifestyle_tags"] == "爱做饭"
+    assert any("档案写无宠" in item for item in dropped)
+    # 档案写有宠时保留
+    kept, _, _, _ = portrait_service.clean_portrait(
+        data, sources, has_pet="有")
+    assert kept["summary"].startswith("我养了一只猫")
+    assert "养猫" in kept["lifestyle_tags"]
+
+
 async def test_clean_portrait_keeps_nothing_when_evidence_is_empty(db):
     """模型一条依据都没给时，三类标签全被丢掉，调用方据此判失败。"""
     values, evidence, dropped, counts = portrait_service.clean_portrait(

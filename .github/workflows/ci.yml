@@ -53,6 +53,8 @@ jobs:
           python -m unittest discover -s eval/tests -v
           python -m compileall -q eval
           python eval/check_freeze.py
+          python eval/build_frozen_labels.py --verify
+          python eval/build_v4_scenarios.py --check
           python eval/phase0/run_eval.py --fixtures --bad eval/phase0/fixtures/bad
 
   freeze-guard:
@@ -67,6 +69,8 @@ jobs:
         run: python eval/check_freeze.py
       - name: validate v4 scenario freeze (labels pending)
         run: python eval/check_v4_freeze.py
+      - name: evaluation self-check (test the test)
+        run: python eval/self_check.py
 
   frontend:
     runs-on: ubuntu-latest
