@@ -49,9 +49,9 @@ on:
         required: false
         default: "current"
       early_stop_mode:
-        description: "低容量早停 A/B：off=保持现状，on=候选池连续两轮零增长且无待审时收尾"
+        description: "低容量早停：on=候选池连续两轮零增长且无待审时收尾（已 A/B 验证），off=关闭"
         required: false
-        default: "off"
+        default: "on"
   schedule:
     - cron: '0 18 * * 0'   # 每周一 02:00 Asia/Shanghai
 

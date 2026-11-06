@@ -140,7 +140,7 @@ async def _recent_pool_totals(run_id: int, limit: int = 2) -> list[int]:
 
 def _early_stop_enabled() -> bool:
     """A/B 开关：默认关闭，显式开启后才做低容量早停。"""
-    value = (os.environ.get("SCREENER_EARLY_STOP") or "off").strip().lower()
+    value = (os.environ.get("SCREENER_EARLY_STOP") or "on").strip().lower()
     return value in ("on", "true", "1", "yes")
 
 
