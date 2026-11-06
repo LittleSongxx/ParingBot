@@ -122,7 +122,8 @@ def delivered(bundle: dict) -> list[dict]:
     return rows
 
 
-def pairwise(rows: list[dict], model: str, base_url: str, api_key: str) -> dict:
+def pairwise(rows: list[dict], model: str, base_url: str, api_key: str,
+             *, limit_pairs: int = 0) -> dict:
     pairs = []
     for row in rows:
         others = [item for item in (row["run"].get("candidates") or []) if not item.get("delivered")]
@@ -130,6 +131,10 @@ def pairwise(rows: list[dict], model: str, base_url: str, api_key: str) -> dict:
             pairs.append((row["applicant"], row["candidate"], others[0]))
     if not pairs:
         raise SystemExit("pairwise 需要 run 内存在未交付候选；当前 bundle 没有，改用 pointwise")
+    if limit_pairs and len(pairs) > limit_pairs:
+        # 确定性等距抽样，覆盖不同场景/run，而不是只取前几个高容量场景。
+        step = max(1, len(pairs) // limit_pairs)
+        pairs = pairs[::step][:limit_pairs]
     wins = 0
     comparisons = 0
     consistent_count = 0
@@ -174,6 +179,8 @@ def main(argv=None) -> int:
     parser.add_argument("--mode", choices=("pointwise", "pairwise"), default="pointwise")
     parser.add_argument("--env-file", type=Path, default=DEFAULT_ENV)
     parser.add_argument("--sample-not-delivered", type=int, default=0)
+    parser.add_argument("--limit-pairs", type=int, default=0,
+                        help="pairwise 确定性抽样上限（0=全部；大 bundle 用 24/40 控制成本）")
     parser.add_argument("--human-labels", type=Path, default=None)
     parser.add_argument("--allow-same-model", action="store_true")
     parser.add_argument("--out", type=Path, default=None)
@@ -206,7 +213,7 @@ def main(argv=None) -> int:
     if not rows:
         raise SystemExit("bundle 中没有可评候选")
     if args.mode == "pairwise":
-        result = pairwise(rows, model, base_url, api_key)
+        result = pairwise(rows, model, base_url, api_key, limit_pairs=args.limit_pairs)
     else:
         scored = []
         for index, row in enumerate(rows):
