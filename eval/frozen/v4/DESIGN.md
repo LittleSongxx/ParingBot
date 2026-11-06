@@ -1,6 +1,6 @@
 # v4 评测集设计（2026-11-05 重冻）
 
-> 状态：**场景已重新冻结（protocol `v4-2026-11-05`），标签 pending（人工/judge 0-3）**；
+> 状态：**场景已重新冻结（protocol `v4-2026-11-06b`），标签 pending（人工/judge 0-3）**；
 > v4 尚未替换 v3 门禁，也**不能**用于任何质量结论。
 >
 > **2026-11-04 的旧 v4 pilot（9 场景 ×3 trials，run 41771579066 等）结果作废**：
@@ -91,7 +91,7 @@
 
 `eval/frozen/v4/MANIFEST.json` 由 `build_v4_scenarios.py --write` 生成，记录：
 
-- `version` / `protocol_version`（`v4-2026-11-05`）/ `seed` / `as_of`；
+- `version` / `protocol_version`（`v4-2026-11-06b`）/ `seed` / `as_of`；
 - `scenario_count=48` / `positive_count=40` / `negative_count=8` / `deliver_count=8`；
 - `scenarios {file, sha256}`：`scenarios.json` 的字节 sha256；
 - `labels {status: "pending", method: "human/judge 0-3"}`（标签生成后由标签工具改为 ready 并记录 sha256）；

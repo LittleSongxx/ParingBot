@@ -1,16 +1,16 @@
 {
  "schema_version": 2,
- "protocol_version": "v3-2026-11-04",
- "created_at": "2026-11-05 07:32:57",
+ "protocol_version": "v3-2026-11-06b",
+ "created_at": "2026-11-06 15:39:32",
  "source": {
-  "run_id": "41985813976",
-  "code_commit": "b6f3d745ac66ce3dfcac878e71ecaade5d158651",
-  "bundle_generated_at": "2026-11-05 15:32:57",
-  "matrix_source": "eval/reports/scenario-matrix-live-41985813976",
+  "run_id": "42242512314",
+  "code_commit": "a7681986c3e92a1658ad0b1c7d1791941e290223",
+  "bundle_generated_at": "2026-11-06 23:39:31",
+  "matrix_source": "eval/reports/scenario-matrix-live-42242512314",
   "matrix_label": null
  },
- "labels_sha256": "86700b4b3dab78ab5eb767aa9f27fa6193789e0ba841a44a30388f19b7c99c50",
- "scenarios_sha256": "9dd20c0e4388aa236f88bc546a8b4023da403fe18f37a52002f4a21b32b0968d",
+ "labels_sha256": "6f20d2bb67b0e83e79c4449b6577a4805ee1ade0095a4e4274968096cb30a563",
+ "scenarios_sha256": "d2c9f5d51237633737821ea3debb77620d73e525df6716b5d2ce224fb6ef1857",
  "model_configs": [
   {
    "purpose": "审核",

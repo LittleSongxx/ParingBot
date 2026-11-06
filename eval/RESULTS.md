@@ -2,7 +2,8 @@
 
 > 本文件只记录**当前有效**的结论。旧版 RESULTS（含 794 行历史数字、pairwise 100%、
 > κ=0.933、内容 4.875/5 等）已全部作废，原因见 §7。
-> 有效口径 = 冻结 v3 协议 `v3-2026-11-04` + BASELINE v2 + 2026-11-05 之后产生的 artifact。
+> 有效口径 = 冻结 v3 协议 `v3-2026-11-06b` + BASELINE v2 + 2026-11-06 重冻后产生的 artifact。
+> 2026-11-06 已清洗种子池 `has_pet=无` 的养宠矛盾并重冻 v3/v4（旧协议 artifact 只对应旧池，不能与新冻结集横比）。
 
 ## 1. 现在能声称什么
 
@@ -21,7 +22,7 @@
 
 - 文件：`eval/frozen/v3/BASELINE.json`（schema_version=2）；
 - 来源：live-eval run `41985813976`（code_commit `b6f3d74`，2026-11-05 15:32 +08），
-  经 `report.py --mode baseline` 生成、人工提交；labels/scenarios sha 与当前冻结文件一致，protocol `v3-2026-11-04`；
+  经 `report.py --mode baseline` 生成、人工提交；labels/scenarios sha 与当前冻结文件一致，protocol `v3-2026-11-06b`；
 - 交付：57/64 = **89.06% raw**；`target` 合计 57（V3_04 最多 5、V3_06 最多 4），
   **target 达成率 57/57 = 100%**；failures=0、runs=8；
 - regression：`max_failures_delta=0`、`target_margin=2/57≈0.0351`；任一场景由“有交付”退化为 0 直接失败。
@@ -50,7 +51,7 @@
 
 ## 4. v4 评测集（设计冻结，尚未接门禁）
 
-- protocol `v4-2026-11-05`；48 场景（40 正向 + 8 负向：4 缺动态、4 缺自我介绍）；
+- protocol `v4-2026-11-06b`；48 场景（40 正向 + 8 负向：4 缺动态、4 缺自我介绍）；
 - sha256 `31863a65c3da215995aaa97176b4c5268d1db0e1cd21bb8ea8e751002cf67967`；
 - 层配额 16/12/12；性别 20/20；门店 19/20；租期 5 档；`expect.target=min(8, eligible_unbounded)`；
 - MANIFEST 记录 base SQL 指纹 + pool digest；`supply_additions=0`；labels **pending**（human/judge 0–3）；
@@ -190,7 +191,7 @@ V4_29 的波动不全是模型质量，bundle 逐候选对比暴露了产品 bug
   rank 1→8 的 suitability 单调下降；24 对中 20 对交付 suitability 更高。
   说明产品排序内部有信号，judge 的 45.8% 不能反推“产品排序差”，只能说明 judge 目前不可用。
 - 内容 8/20 warning 的根因是**种子数据矛盾**（`has_pet=无` 但兴趣标签/画像写养宠）；
-  已加画像一致性兜底，种子数据清洗仍需单独排期。
+  已加画像一致性兜底；2026-11-06 已用 `scripts/clean_pet_contradictions.py` 清洗种子数据并重冻 v3/v4。
 - **结论**：质量指标暂不合格的原因首先是测量仪器不可信（judge 口径+位置偏差），
   其次是没有人工/校准标签；在修复指标前不做扩容或全量。
 

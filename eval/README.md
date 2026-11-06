@@ -11,7 +11,7 @@
 eval/
 ├── suites/demo.json            # S1–S20 演示 smoke（demo profile，非质量证据）
 ├── frozen/v3/                  # 冻结评测集：scenarios + labels + MANIFEST + BASELINE(v2)
-├── frozen/v4/                  # 设计冻结：40 正向 + 8 负向；labels pending；protocol v4-2026-11-05
+├── frozen/v4/                  # 设计冻结：40 正向 + 8 负向；labels pending；protocol v4-2026-11-06b
 ├── lib/                        # env / api / seed / rules / metrics / render / freeze
 │   └── freeze.py               # base SQL/pool digest、SQL 供给扫描（MANIFEST/check_freeze 共用）
 ├── run_matrix.py               # 真实 API + 真实模型跑场景矩阵（含负向断言记录）
@@ -48,7 +48,7 @@ eval/
 - **v3（V3-01..V3-10）**：冻结评测集，8 正向 + 2 readiness 负向；候选池固定为 base 种子
   （841 名 approved+enabled），从不补供给；按先天容量分层（高 3 / 中 3 / 低 2），容量在场景定义前确定。
   结构交付上限 = 57/64（V3_04 最多 5、V3_06 最多 4）；主口径是 `target=min(8, eligible_unbounded)`。
-- **v4（V4-01..V4-48）**：40 正向 + 8 负向，protocol `v4-2026-11-05`；供给池与 v3 相同、无供给追加；
+- **v4（V4-01..V4-48）**：40 正向 + 8 负向，protocol `v4-2026-11-06b`；供给池与 v3 相同、无供给追加；
   labels **pending**，完成前只用于流程/成本/稳定性试点，不接质量门禁。旧 v4 pilot（protocol v4-2026-11-04）已作废。
 
 ## 指标：能证明什么 / 不能证明什么
