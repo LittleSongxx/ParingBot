@@ -44,7 +44,7 @@ def _base_manifest() -> dict:
 def _baseline_payload(**overrides) -> dict:
     payload = {
         "schema_version": 2,
-        "protocol_version": "v3-2026-11-04",
+        "protocol_version": _base_manifest()["protocol_version"],
         "labels_sha256": _labels_hash(),
         "scenarios_sha256": _scenarios_hash(),
         "source": {"code_commit": "test-commit", "run_id": "test"},

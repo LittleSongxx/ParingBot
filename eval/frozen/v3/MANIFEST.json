@@ -1,6 +1,6 @@
 {
   "version": "v3",
-  "protocol_version": "v3-2026-11-04",
+  "protocol_version": "v3-2026-11-06b",
   "seed": 20261104,
   "as_of": "2026-11-04",
   "supply_additions": 0,
@@ -9,11 +9,11 @@
   "negative_count": 2,
   "scenarios": {
     "file": "eval/frozen/v3/scenarios.json",
-    "sha256": "9dd20c0e4388aa236f88bc546a8b4023da403fe18f37a52002f4a21b32b0968d"
+    "sha256": "d2c9f5d51237633737821ea3debb77620d73e525df6716b5d2ce224fb6ef1857"
   },
   "labels": {
     "file": "eval/frozen/v3/labels.json",
-    "sha256": "86700b4b3dab78ab5eb767aa9f27fa6193789e0ba841a44a30388f19b7c99c50"
+    "sha256": "6f20d2bb67b0e83e79c4449b6577a4805ee1ade0095a4e4274968096cb30a563"
   },
   "pool": {
     "source": "deploy/mysql/sql/base/01-paringbot.sql",
@@ -47,8 +47,8 @@
       "19": 42,
       "20": 41
     },
-    "base_sql_sha256": "a5e1e2dbedb4ada6ceacfb7501c5ab3bd62db1877fb33910faec73d800a536e2",
-    "pool_digest": "d863578aae64f364dc0ccef3498d1523f422567540a5402023860d2ad002087a"
+    "base_sql_sha256": "d52f64b378351f2b1a3be693256a075b47af853e238a46dbc8018c11c1ef84da",
+    "pool_digest": "00dfb192bd2dbc77aa7ad929e823aceb837757c6be38400532ec11f85126999c"
   },
   "label_rule": {
     "method": "heuristic-offline-v1",
@@ -65,5 +65,5 @@
       "interest_cap": 2
     }
   },
-  "created_at": "2026-11-05 14:57:33"
+  "created_at": "2026-11-06 23:20:38"
 }

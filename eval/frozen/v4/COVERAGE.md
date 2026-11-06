@@ -2,7 +2,7 @@
 
 - 生成命令：`python3 eval/build_v4_scenarios.py --write`
 - 场景总数：48（正向 40 / 负向 8）
-- 协议：`v4-2026-11-05`；seed=`20261104`；as_of=`2026-11-04`
+- 协议：`v4-2026-11-06b`；seed=`20261104`；as_of=`2026-11-04`
 - target 口径：`min(8, eligible_unbounded)`
 
 ## 容量层（正向）

@@ -38,7 +38,7 @@ from lib import rules, seed as seedmod  # noqa: E402
 
 VERSION = "v3"
 SUITE = "v3"
-PROTOCOL_VERSION = "v3-2026-11-04"
+PROTOCOL_VERSION = "v3-2026-11-06b"
 SEED = 20261104
 AS_OF = date(2026, 11, 4)
 DELIVER_COUNT = 8

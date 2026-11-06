@@ -1,6 +1,6 @@
 {
   "version": "v4",
-  "protocol_version": "v4-2026-11-05",
+  "protocol_version": "v4-2026-11-06b",
   "seed": 20261104,
   "as_of": "2026-11-04",
   "generator": "eval/build_v4_scenarios.py",
@@ -10,7 +10,7 @@
   "deliver_count": 8,
   "scenarios": {
     "file": "eval/frozen/v4/scenarios.json",
-    "sha256": "31863a65c3da215995aaa97176b4c5268d1db0e1cd21bb8ea8e751002cf67967"
+    "sha256": "1c1a185ca8e65c6dd23a154c8f070b88ab94b2a5d7ee0546e0cc07288a278499"
   },
   "labels": {
     "status": "pending",
@@ -20,9 +20,9 @@
     "source": "deploy/mysql/sql/base/01-paringbot.sql",
     "members": 900,
     "approved": 841,
-    "base_sql_sha256": "a5e1e2dbedb4ada6ceacfb7501c5ab3bd62db1877fb33910faec73d800a536e2",
-    "pool_digest": "d863578aae64f364dc0ccef3498d1523f422567540a5402023860d2ad002087a"
+    "base_sql_sha256": "d52f64b378351f2b1a3be693256a075b47af853e238a46dbc8018c11c1ef84da",
+    "pool_digest": "00dfb192bd2dbc77aa7ad929e823aceb837757c6be38400532ec11f85126999c"
   },
   "supply_additions": 0,
-  "created_at": "2026-11-05 15:09:13"
+  "created_at": "2026-11-06 23:20:41"
 }

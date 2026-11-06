@@ -52,7 +52,7 @@ if str(HUMAN_EVAL_DIR) not in sys.path:
 from data_consistency import assess_person  # noqa: E402
 
 VERSION = "v4"
-PROTOCOL_VERSION = "v4-2026-11-05"
+PROTOCOL_VERSION = "v4-2026-11-06b"
 SEED = 20261104
 AS_OF = date(2026, 11, 4)
 DELIVER_COUNT = 8

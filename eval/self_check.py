@@ -111,7 +111,7 @@ def _baseline_payload() -> dict:
         }
     return {
         "schema_version": 2,
-        "protocol_version": "v3-2026-11-04",
+        "protocol_version": json.loads(SCENARIOS.read_text(encoding="utf-8"))["protocol_version"],
         "labels_sha256": _sha(LABELS),
         "scenarios_sha256": _sha(SCENARIOS),
         "source": {"code_commit": "self-check", "run_id": "self-check"},

@@ -68,7 +68,7 @@ class V4ScenarioTest(unittest.TestCase):
     # ------------------------------------------------------------ 形状/冻结
     def test_counts_and_shape(self):
         data = self.data
-        self.assertEqual(data["protocol_version"], "v4-2026-11-05")
+        self.assertEqual(data["protocol_version"], "v4-2026-11-06b")
         self.assertEqual(data["seed"], 20261104)
         self.assertEqual(data["as_of"], "2026-11-04")
         self.assertEqual(data["scenario_count"], 48)
@@ -218,7 +218,7 @@ class V4ScenarioTest(unittest.TestCase):
     def test_manifest_fingerprints_reproducible(self):
         manifest = self.manifest
         self.assertEqual(manifest["version"], "v4")
-        self.assertEqual(manifest["protocol_version"], "v4-2026-11-05")
+        self.assertEqual(manifest["protocol_version"], "v4-2026-11-06b")
         self.assertEqual(manifest["seed"], 20261104)
         self.assertEqual(manifest["as_of"], "2026-11-04")
         self.assertEqual(manifest["scenario_count"], 48)
@@ -391,7 +391,7 @@ class V3FrozenCompatibilityTest(unittest.TestCase):
         self.assertEqual(rebuilt, frozen)
         self.assertEqual(
             hashlib.sha256(rebuilt.encode("utf-8")).hexdigest(),
-            "9dd20c0e4388aa236f88bc546a8b4023da403fe18f37a52002f4a21b32b0968d")
+            "d2c9f5d51237633737821ea3debb77620d73e525df6716b5d2ce224fb6ef1857")
 
     def test_v3_opt_in_parameters_do_not_leak(self):
         """新增参数只在显式传入时生效，不影响默认档案/文本。"""

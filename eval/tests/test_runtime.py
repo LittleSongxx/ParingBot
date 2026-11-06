@@ -112,7 +112,7 @@ class ReportGateTest(unittest.TestCase):
         }
         payload = {
             "schema_version": 2,
-            "protocol_version": "v3-2026-11-04",
+            "protocol_version": json.loads((REPO / "eval" / "frozen" / "v3" / "scenarios.json").read_text(encoding="utf-8"))["protocol_version"],
             "labels_sha256": labels_sha,
             "scenarios_sha256": scenarios_sha,
             "source": {"code_commit": "test-commit", "run_id": "test"},
