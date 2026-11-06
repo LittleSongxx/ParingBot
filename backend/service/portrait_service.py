@@ -47,7 +47,10 @@ TAG_FIELDS = (
 )
 # 一个版本里每类标签最多留几个，多出来的丢掉
 TAG_LIMIT = 6
-# 单个标签的最长字数。标签是一两个词的短句，超长的说明模型写成了整句话
+
+# 种子数据的兴趣标签与 has_pet 可能自相矛盾（历史数据），画像生成必须按档案的
+# has_pet 为准：档案写“无”时，不把本人写成养宠；动态/兴趣只能作为话题。
+PET_OWN_TERMS = ("养猫", "养狗", "养宠物", "养宠", "养仓鼠", "养鸟", "养鱼", "有猫", "有狗")# 单个标签的最长字数。标签是一两个词的短句，超长的说明模型写成了整句话
 TAG_MAX_LENGTH = 30
 # 单条依据的最长字数，防止模型把整段动态贴进依据里
 EVIDENCE_MAX_LENGTH = 200
@@ -154,7 +157,7 @@ def portrait_dict(portrait: MemberPortrait | None, with_evidence: bool = True) -
     return data
 
 
-def clean_portrait(data: dict, sources: str) -> tuple[dict, dict, list[str], dict]:
+def clean_portrait(data: dict, sources: str, has_pet: str | None = None) -> tuple[dict, dict, list[str], dict]:
     """逐条核验模型给的标签，返回（三类标签、标签依据、被丢掉的标签、每类留下的个数）。
 
     这是「模型负责提炼、代码负责核对」这一步的落点：
@@ -169,6 +172,14 @@ def clean_portrait(data: dict, sources: str) -> tuple[dict, dict, list[str], dic
     # 概括不需要像标签一样做“原文逐字命中”校验，但仍要从模型结果带到落库值里。
     # 之前这里只重建了三类标签，导致模型明明返回了 summary，保存时却永远取到空值。
     summary = str(data.get("summary") or "").strip()
+    if has_pet == "无" and summary:
+        # 只删“养宠事实”句，保留其它概括；避免把种子数据的矛盾写进画像。
+        kept_sentences = []
+        for sentence in re.split(r"(?<=[。！？；])", summary):
+            if sentence and any(term in sentence for term in PET_OWN_TERMS):
+                continue
+            kept_sentences.append(sentence)
+        summary = "".join(kept_sentences).strip()
     values: dict = {"summary": summary or None}
     kept: dict[str, str] = {}
     dropped: list[str] = []
@@ -185,6 +196,9 @@ def clean_portrait(data: dict, sources: str) -> tuple[dict, dict, list[str], dic
                 continue
             if len(tags) >= TAG_LIMIT:
                 dropped.append(f"{tag}（超过每类 {TAG_LIMIT} 个）")
+                continue
+            if has_pet == "无" and any(term in tag for term in PET_OWN_TERMS):
+                dropped.append(f"{tag}（档案写无宠，不能写养宠事实）")
                 continue
             source = str(evidence.get(tag) or "").strip()[:EVIDENCE_MAX_LENGTH]
             if not source or _plain(source) not in text:
@@ -242,6 +256,9 @@ def _instruction(hint: str | None) -> str:
     text = "现在给这位租客提取画像。请先调用工具把他的档案和动态原文读到手里，再按输出格式给出结论。"
     if hint:
         text += f"本次要重点补充的是「{hint}」维度，这一维度必须给出标签，每个标签都要有原文依据。"
+    text += ("\n【一致性要求】不要推断档案里没有的养宠事实：档案「是否养宠」写「无」时，"
+             "不得把本人写成养猫/养狗/养宠物；动态或兴趣标签里出现宠物，只能作为兴趣/话题，"
+             "不能写成养宠事实。")
     return text
 
 
@@ -343,7 +360,8 @@ async def build_portrait(member_id: int, run_id: int, *, round_no: int = 1,
         # 被闸拦下来：当前角色立即中断，把触发了哪道闸原样带回去
         return PortraitResult(portrait=None, conclusion=outcome.conclusion,
                               gate=outcome.gate, tool_calls=outcome.tool_calls)
-    cleaned, evidence, dropped, counts = clean_portrait(outcome.data or {}, sources)
+    cleaned, evidence, dropped, counts = clean_portrait(
+        outcome.data or {}, sources, has_pet=member.has_pet)
     if not any(counts.values()):
         return PortraitResult(
             portrait=None,

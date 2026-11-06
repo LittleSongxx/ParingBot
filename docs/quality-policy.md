@@ -93,12 +93,15 @@
    但软 `PREFERENCE_CONFLICT` 仍无代码复核，S36 类语义问题仍 open。
    同时 `search_members` 已改为“只有门店标必须时才按门店硬筛”，加分门店不再硬过滤。
 3. 并发/多用户：单进程 BackgroundTasks，无队列/重试，未做并发验证。
-4. 内容质量（summary/画像/解释）未进入人工 rubric 流程。
+4. 内容质量（summary/画像/解释）未进入人工 rubric 流程；种子数据里 `has_pet=无` 与
+   养宠兴趣标签/画像矛盾仍存在，画像生成已加一致性兜底，数据清洗待排期。
 5. 安全：真实 prompt injection/越权对抗测试缺失；隐私仅日志脱敏。
 6. 运行不可完全复现：已记录 prompt 哈希与模型配置，但未保存每次运行完整 Prompt 原文/seed。
 7. 种子档案自相矛盾：兴趣标签/自由文本与 has_pet/宠物偏好不一致（评估器已能识别文本矛盾；
    产品侧数据清洗仍需单独排期）。
 8. v4 标签仍 pending，v4 尚不能作为质量门禁；旧 v4 pilot 结果（协议 v4-2026-11-04）已作废。
+9. judge pairwise 旧口径把位置一致当交付胜率（2026-11-06 修复）；在人工/校准标签前
+   judge win_rate 不可用（position consistency <0.8 时强制标记 usable=false）。
 
 ## 9. 发布门禁（摘要）
 
