@@ -25,29 +25,58 @@ def _preference(**overrides):
 
 
 class TestQualityRanking:
-    def test_suitability_score_ignores_quality_penalties(self):
-        """质量感知惩罚已回退：吸烟/养宠不再扣分，整洁度只保留原有“达标 +1”。"""
-        applicant = _member()
-
-        preference = _preference()
+    def test_smoking_penalty(self):
+        """2026-11 根因：不吸烟申请方遇到经常/偶尔吸烟的候选必须降权。"""
+        applicant, preference = _member(), _preference()
         clean = match_service._suitability_score(applicant, _member(), preference)
-        for smoking in ("经常", "偶尔"):
-            assert match_service._suitability_score(
-                applicant, _member(smoking=smoking), preference) == clean
+        occasional = match_service._suitability_score(
+            applicant, _member(smoking="偶尔"), preference)
+        frequent = match_service._suitability_score(
+            applicant, _member(smoking="经常"), preference)
+        assert occasional == clean - 1
+        assert frequent == clean - 3
 
-        pet_preference = _preference(pet_accept="不接受")
-        clean = match_service._suitability_score(applicant, _member(), pet_preference)
-        assert match_service._suitability_score(
-            applicant, _member(has_pet="有"), pet_preference) == clean
+    def test_pet_penalty_only_when_pets_not_accepted(self):
+        applicant = _member()
+        strict = _preference(pet_accept="不接受")
+        clean = match_service._suitability_score(applicant, _member(), strict)
+        with_pet = match_service._suitability_score(
+            applicant, _member(has_pet="有"), strict)
+        assert with_pet == clean - 3
+        # 申请方接受宠物时不扣分
+        lenient = _preference(pet_accept="接受")
+        clean_lenient = match_service._suitability_score(applicant, _member(), lenient)
+        pet_lenient = match_service._suitability_score(
+            applicant, _member(has_pet="有"), lenient)
+        assert pet_lenient == clean_lenient
 
-        # 不达标候选本来就拿不到原有“达到最低档 +1”，只应落后 1 分；
-        # 65d011a 的 -2 档位惩罚回退后不应再多扣（回退前这里会是 3 分差）。
-        tidy_preference = _preference(tidiness_min="整洁")
-        meets = match_service._suitability_score(
-            applicant, _member(tidiness="整洁"), tidy_preference)
-        below = match_service._suitability_score(
-            applicant, _member(tidiness="随意"), tidy_preference)
-        assert meets - below == 1
+    def test_budget_closeness_adds_point(self):
+        """预算都在区间内时，越接近申请方预算越靠前，避免 21% 同分。"""
+        applicant, preference = _member(rent_budget=3000), _preference()
+        near = match_service._suitability_score(
+            applicant, _member(rent_budget=3100), preference)
+        far = match_service._suitability_score(
+            applicant, _member(rent_budget=3900), preference)
+        assert near == far + 1
+
+    def test_age_closeness_adds_point(self):
+        applicant, preference = _member(), _preference()
+        near = match_service._suitability_score(
+            applicant, _member(birth_date=datetime(1994, 6, 1)), preference)
+        far = match_service._suitability_score(
+            applicant, _member(birth_date=datetime(1988, 6, 1)), preference)
+        assert near == far + 1
+
+    def test_tiebreak_fields_are_exposed(self):
+        applicant, preference = _member(), _preference(pet_accept="不接受")
+        clean = match_service._compat_penalties(applicant, _member(), preference)
+        assert clean["smoking"] == 0 and clean["pet"] == 0
+        assert clean["budget_gap"] == 0
+        worse = match_service._compat_penalties(
+            applicant, _member(smoking="经常", has_pet="有", rent_budget=5000), preference)
+        assert worse["smoking"] == 3
+        assert worse["pet"] == 3
+        assert worse["budget_gap"] == 2000
 
     def test_severity_gate(self):
         applicant, preference = _member(), _preference(pet_accept="不接受")
@@ -61,7 +90,7 @@ class TestQualityRanking:
             applicant, _member(), _preference())
 
     def test_quality_gate_defaults_off(self):
-        """QUALITY_GATE 是显式 A/B 实验开关，默认关闭（settings 读 env，默认 off）。"""
+        """QUALITY_GATE 仍是显式 A/B 实验开关，默认关闭；新惩罚只进排序分。"""
         from settings import QUALITY_GATE
 
         assert QUALITY_GATE is False

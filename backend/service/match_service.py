@@ -290,15 +290,71 @@ async def _close(run: AgentRun, task: MatchTask, started, ok: bool, summary: str
             error_message=None if ok else summary[:ERROR_LIMIT])
 
 
+def _interest_overlap(applicant, candidate) -> int:
+    """双方兴趣标签重合数，最多算 2 分，避免标签多的人被过度加权。"""
+    def interests(value):
+        return {item.strip() for item in str(value or "").replace("，", ",").split(",") if item.strip()}
+    return min(2, len(interests(applicant.interest_tags) & interests(candidate.interest_tags)))
+
+
+def _compat_penalties(applicant, candidate, preference) -> dict:
+    """生活方式兼容惩罚 + 接近度，供排序分与平分时的 tie-break 使用。
+
+    2026-11 质量根因（100 对独立 AI 盲评）：交付组输给“被截断合格候选”的样本里，
+    43% 出现“交付侧吸烟更差”；21% 的 pair 因原排序分二值化而同分、被任意截断。
+    因此补充：不吸烟申请方遇到“经常/偶尔吸烟”候选降权；“宠物不接受”遇到有宠
+    候选降权；预算/年龄/整洁记录连续差距，供同分时排序。全部只看档案/偏好字段，
+    可逐条解释；硬规则仍由 auditor/recheck_rows 负责，这里只影响软性排序。
+    """
+    smoke_penalty = 0
+    if applicant.smoking == "不吸烟":
+        if candidate.smoking == "经常":
+            smoke_penalty = 3
+        elif candidate.smoking == "偶尔":
+            smoke_penalty = 1
+    pet_penalty = 0
+    if (preference is not None and preference.pet_accept == "不接受"
+            and candidate.has_pet == "有"):
+        pet_penalty = 3
+    budget_gap = None
+    if candidate.rent_budget is not None and applicant.rent_budget is not None:
+        budget_gap = abs(candidate.rent_budget - applicant.rent_budget)
+    age_gap = None
+    candidate_age = member_service.calc_age(candidate.birth_date)
+    applicant_age = member_service.calc_age(applicant.birth_date)
+    if candidate_age is not None and applicant_age is not None:
+        age_gap = abs(candidate_age - applicant_age)
+    tidiness_gap = None
+    try:
+        tidiness_gap = abs(member_service.TIDINESS_LEVELS.index(candidate.tidiness)
+                           - member_service.TIDINESS_LEVELS.index(applicant.tidiness))
+    except ValueError:
+        pass
+    return {
+        "smoking": smoke_penalty,
+        "pet": pet_penalty,
+        "budget_gap": budget_gap,
+        "age_gap": age_gap,
+        "tidiness_gap": tidiness_gap,
+        "interest": _interest_overlap(applicant, candidate),
+    }
+
+
 def _suitability_score(applicant: MemberProfile, candidate: MemberProfile,
                        preference: RoommatePreference | None) -> int:
-    """交付排序用的可解释适配分：只看硬规则之外的合住匹配信号。
+    """交付排序用的可解释适配分：硬规则之外的合住匹配信号。
 
     模型给的 screen_score 是同一批候选内部的相对分，跨 run 不稳定；
     交付名单的展示顺序和截断会直接影响租客看到谁，所以用代码再算一遍
     可解释的适配分做排序，soft 条件全部来自双方档案/偏好，可逐条说明。
+
+    与原实现的差异（原因见 _compat_penalties）：
+    - 新增吸烟/宠物兼容惩罚；
+    - 预算/年龄在区间内时，更接近申请方再各 +1，减少同分导致的任意截断；
+    - 门店/作息/租期/整洁达标/兴趣的权重保持不变。
     """
     score = 0
+    compat = _compat_penalties(applicant, candidate, preference)
     if candidate.store_id == applicant.store_id:
         score += 3
     elif member_service.area_name(candidate.store_id) == member_service.area_name(applicant.store_id):
@@ -314,10 +370,14 @@ def _suitability_score(applicant: MemberProfile, candidate: MemberProfile,
     if candidate.rent_budget is not None and preference is not None:
         if preference.budget_min <= candidate.rent_budget <= preference.budget_max:
             score += 2
+            if compat["budget_gap"] is not None and compat["budget_gap"] <= 300:
+                score += 1
     age = member_service.calc_age(candidate.birth_date)
     if age is not None and preference is not None:
         if preference.age_min <= age <= preference.age_max:
             score += 1
+            if compat["age_gap"] is not None and compat["age_gap"] <= 2:
+                score += 1
     if candidate.tidiness and preference is not None:
         try:
             if (member_service.TIDINESS_LEVELS.index(candidate.tidiness)
@@ -325,10 +385,9 @@ def _suitability_score(applicant: MemberProfile, candidate: MemberProfile,
                 score += 1
         except ValueError:
             pass
-    # 兴趣重合是加分项；最多算 2 分，避免标签多的人被过度加权
-    def interests(value):
-        return {item.strip() for item in str(value or "").replace("，", ",").split(",") if item.strip()}
-    score += min(2, len(interests(applicant.interest_tags) & interests(candidate.interest_tags)))
+    score += compat["interest"]
+    score -= compat["smoking"]
+    score -= compat["pet"]
     return score
 
 
@@ -423,8 +482,22 @@ async def deliverable(task_id: int) -> tuple[list, str | None]:
         def rank_key(row: MatchCandidate):
             member = members.get(row.candidate_member_id)
             suitability = _suitability_score(applicant, member, preference) if member else 0
+            compat = (_compat_penalties(applicant, member, preference) if member else
+                      {"smoking": 0, "pet": 0, "budget_gap": None, "age_gap": None,
+                       "tidiness_gap": None, "interest": 0})
             screen, audit_round, row_id = _deliverable_sort_key(row)
-            return (-suitability, screen, audit_round, row_id)
+            # 先按适配分；同分时按“吸烟→宠物→预算→年龄→整洁→兴趣”逐项 tie-break，
+            # 不再让第 8/9 名由 row id 任意决定（根因分析里 21% 的 pair 同分）。
+            return (
+                -suitability,
+                compat["smoking"],
+                compat["pet"],
+                compat["budget_gap"] if compat["budget_gap"] is not None else 10 ** 6,
+                compat["age_gap"] if compat["age_gap"] is not None else 10 ** 6,
+                compat["tidiness_gap"] if compat["tidiness_gap"] is not None else 10 ** 6,
+                -compat["interest"],
+                screen, audit_round, row_id,
+            )
 
         passed = sorted(passed, key=rank_key)
         return passed, note
