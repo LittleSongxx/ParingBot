@@ -50,7 +50,10 @@ TAG_LIMIT = 6
 
 # 种子数据的兴趣标签与 has_pet 可能自相矛盾（历史数据），画像生成必须按档案的
 # has_pet 为准：档案写“无”时，不把本人写成养宠；动态/兴趣只能作为话题。
-PET_OWN_TERMS = ("养猫", "养狗", "养宠物", "养宠", "养仓鼠", "养鸟", "养鱼", "有猫", "有狗")# 单个标签的最长字数。标签是一两个词的短句，超长的说明模型写成了整句话
+PET_OWN_TERMS = ("养猫", "养狗", "养宠物", "养宠", "养仓鼠", "养鸟", "养鱼", "有猫", "有狗")
+# 概括里常写成“我养了一只猫”“家里有只狗”，需要正则匹配，而不是只查“养猫”。
+PET_OWN_RE = re.compile(r"(?:养|有)(?:了|着|过)?[^。！？；，,\n]{0,6}(?:猫|狗|宠物|仓鼠|鸟|鱼)")
+# 单个标签的最长字数。标签是一两个词的短句，超长的说明模型写成了整句话
 TAG_MAX_LENGTH = 30
 # 单条依据的最长字数，防止模型把整段动态贴进依据里
 EVIDENCE_MAX_LENGTH = 200
@@ -176,7 +179,7 @@ def clean_portrait(data: dict, sources: str, has_pet: str | None = None) -> tupl
         # 只删“养宠事实”句，保留其它概括；避免把种子数据的矛盾写进画像。
         kept_sentences = []
         for sentence in re.split(r"(?<=[。！？；])", summary):
-            if sentence and any(term in sentence for term in PET_OWN_TERMS):
+            if sentence and PET_OWN_RE.search(sentence):
                 continue
             kept_sentences.append(sentence)
         summary = "".join(kept_sentences).strip()
