@@ -38,7 +38,7 @@ from lib import rules, seed as seedmod  # noqa: E402
 
 VERSION = "v3"
 SUITE = "v3"
-PROTOCOL_VERSION = "v3-2026-11-04"
+PROTOCOL_VERSION = "v3-2026-11-06b"
 SEED = 20261104
 AS_OF = date(2026, 11, 4)
 DELIVER_COUNT = 8
@@ -159,8 +159,17 @@ def _acceptable_schedules(schedule: str, slot: int) -> list[str]:
 
 
 def _make_applicant(spec: dict, store_id: int, gender: str, lease_term: str,
-                    as_of: date = AS_OF):
-    """按格子生成申请方：档案 + 偏好 + 参与规则判定的 Member/Preference。"""
+                    as_of: date = AS_OF, tags_override: list[str] | None = None,
+                    nickname: str | None = None,
+                    self_intro: str | None = None):
+    """按格子生成申请方：档案 + 偏好 + 参与规则判定的 Member/Preference。
+
+    可选参数只给 v4 生成器复用；默认值下 v3 的 build_scenarios() 输出必须与
+    eval/frozen/v3/scenarios.json 逐字节一致（v3 冻结集不许漂移）：
+    - tags_override：替换兴趣标签（v4 清洗养宠标签后重建 self_intro 用）；
+    - nickname：替换昵称（v4 用 V4场景租客{seq:02d}，避免与 v3 昵称重复）；
+    - self_intro：直接指定自我介绍文本（默认按 slot/tags 模板生成）。
+    """
     slot = spec["slot"]
     pool = spec["_pool"]
     cell_pool = _raw_cell(pool, store_id, gender, lease_term)
@@ -171,14 +180,17 @@ def _make_applicant(spec: dict, store_id: int, gender: str, lease_term: str,
     birth = date(as_of.year - age, month, day)
     store_name = rules.store_name(store_id) or str(store_id)
     occupation = OCCUPATIONS[(slot - 1) % len(OCCUPATIONS)]
-    tags = list(TAG_SETS[(slot - 1) % len(TAG_SETS)])
+    if tags_override is None:
+        tags = list(TAG_SETS[(slot - 1) % len(TAG_SETS)])
+    else:
+        tags = list(tags_override)
     must_codes = ["age", "schedule"]
     extra = spec.get("extra")
     if extra:
         must_codes.append(extra)
 
     profile = {
-        "nickname": f"V3场景租客{slot:02d}",
+        "nickname": f"V3场景租客{slot:02d}" if nickname is None else nickname,
         "gender": gender,
         "birth_date": birth.isoformat(),
         "rent_budget": budget,
@@ -189,7 +201,8 @@ def _make_applicant(spec: dict, store_id: int, gender: str, lease_term: str,
         "schedule_type": schedule,
         "has_pet": "无",
         "smoking": "不吸烟",
-        "self_intro": _self_intro(slot, store_name, occupation, schedule, extra, budget, tags),
+        "self_intro": (_self_intro(slot, store_name, occupation, schedule, extra, budget, tags)
+                       if self_intro is None else self_intro),
         "roommate_expectation": _expectation(slot, store_name, age, extra, budget),
         "interest_tags": tags,
     }

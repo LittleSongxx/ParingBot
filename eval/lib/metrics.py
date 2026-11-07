@@ -17,6 +17,7 @@
 """
 from __future__ import annotations
 
+import itertools
 import math
 import random
 import statistics
@@ -385,3 +386,77 @@ def mde(sd: float, n: int, alpha: float = 0.05, power: float = 0.8) -> float:
     z_alpha = normal.inv_cdf(1 - alpha / 2)
     z_power = normal.inv_cdf(power)
     return round((z_alpha + z_power) * sd / math.sqrt(n), 6)
+
+def wilson_ci(successes: float, n: int, z: float = 1.96) -> dict:
+    """比例的 Wilson 95% 置信区间（小样本比正态近似稳）。"""
+    count = float(successes)
+    total = int(n)
+    if total <= 0:
+        return {"n": 0, "successes": 0.0, "rate": 0.0, "lo": 0.0, "hi": 0.0}
+    rate = count / total
+    denominator = 1 + z * z / total
+    centre = (rate + z * z / (2 * total)) / denominator
+    margin = (z * math.sqrt(rate * (1 - rate) / total + z * z / (4 * total * total))) / denominator
+    return {"n": total, "successes": round(count, 4), "rate": round(rate, 4),
+            "lo": round(max(0.0, centre - margin), 4),
+            "hi": round(min(1.0, centre + margin), 4)}
+
+
+def p95(values) -> float:
+    """线性插值的 P95（n 很小时比“第 7 个值”更接近真实分位数）。"""
+    data = sorted(float(value) for value in (values or []))
+    if not data:
+        return 0.0
+    if len(data) == 1:
+        return round(data[0], 6)
+    position = 0.95 * (len(data) - 1)
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return round(data[lower], 6)
+    value = data[lower] * (upper - position) + data[upper] * (position - lower)
+    return round(value, 6)
+
+
+def mde_paired(diffs, alpha: float = 0.05, power: float = 0.8) -> float:
+    """配对差的最小可检测效应：MDE = (z_(1-a/2)+z_power) * sd(diff) / sqrt(n)。"""
+    data = [float(value) for value in (diffs or [])]
+    if len(data) < 2:
+        return float("inf")
+    sd = statistics.stdev(data)
+    if sd <= 0:
+        return 0.0
+    normal = statistics.NormalDist()
+    return round((normal.inv_cdf(1 - alpha / 2) + normal.inv_cdf(power)) * sd / math.sqrt(len(data)), 6)
+
+
+def mde_two_sample(sd: float, n1: int, n2: int, alpha: float = 0.05, power: float = 0.8) -> float:
+    """两独立样本均值差的最小可检测效应（等方差近似）。"""
+    if not sd or sd <= 0 or n1 <= 0 or n2 <= 0:
+        return float("inf") if not sd or sd <= 0 or n1 <= 0 or n2 <= 0 else 0.0
+    normal = statistics.NormalDist()
+    return round((normal.inv_cdf(1 - alpha / 2) + normal.inv_cdf(power))
+                 * sd * math.sqrt(1 / n1 + 1 / n2), 6)
+
+
+def pass_power(groups, ks=(2, 3, 5)) -> dict:
+    """pass^k：同一场景 k 次 trial 全部成功才算通过（枚举全部 k 子集）。
+
+    groups: list[list[bool]]，每个元素是一个场景的 trial 结果列表；
+    返回 {"pass^2": rate, ...}；不足 k 个 trial 的 k 不报告。
+    """
+    results: dict = {}
+    for k in ks:
+        if not groups or any(len(group) < k for group in groups):
+            continue
+        passed = 0
+        for group in groups:
+            ok = True
+            for combo in itertools.combinations(range(len(group)), k):
+                if not all(group[index] for index in combo):
+                    ok = False
+                    break
+            if ok:
+                passed += 1
+        results[f"pass^{k}"] = round(passed / len(groups), 4)
+    return results

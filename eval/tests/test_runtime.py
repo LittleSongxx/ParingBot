@@ -1,3 +1,4 @@
+import hashlib
 import json
 import unittest
 from pathlib import Path
@@ -97,8 +98,31 @@ class ReportGateTest(unittest.TestCase):
 
     def test_verify_against_baseline_passes(self):
         baseline = FIXTURES / "synthetic_baseline.json"
-        baseline.write_text(json.dumps({"delivery_avg": 4.0, "failures": 0, "regression_margin_delivery": 1.0,
-                                        "max_failures_delta": 1}), encoding="utf-8")
+        labels_sha = hashlib.sha256((REPO / "eval" / "frozen" / "v3" / "labels.json").read_bytes()).hexdigest()
+        scenarios_sha = hashlib.sha256((REPO / "eval" / "frozen" / "v3" / "scenarios.json").read_bytes()).hexdigest()
+        per_scenario = {
+            "V3_01": {"delivered": [8], "target": 8, "target_attainment": 1.0},
+            "V3_02": {"delivered": [8], "target": 8, "target_attainment": 1.0},
+            "V3_03": {"delivered": [7], "target": 8, "target_attainment": 0.875},
+            "V3_04": {"delivered": [6], "target": 5, "target_attainment": 1.0},
+            "V3_05": {"delivered": [5], "target": 8, "target_attainment": 0.625},
+            "V3_06": {"delivered": [4], "target": 4, "target_attainment": 1.0},
+            "V3_07": {"delivered": [2], "target": 8, "target_attainment": 0.25},
+            "V3_08": {"delivered": [1], "target": 8, "target_attainment": 0.125},
+        }
+        payload = {
+            "schema_version": 2,
+            "protocol_version": json.loads((REPO / "eval" / "frozen" / "v3" / "scenarios.json").read_text(encoding="utf-8"))["protocol_version"],
+            "labels_sha256": labels_sha,
+            "scenarios_sha256": scenarios_sha,
+            "source": {"code_commit": "test-commit", "run_id": "test"},
+            "model_configs": [{"purpose": "审核", "model_name": "deepseek-flash"}],
+            "db_profile": "eval",
+            "failures": 0,
+            "per_scenario": per_scenario,
+            "regression": {"max_failures_delta": 0, "target_margin": 0.0351},
+        }
+        baseline.write_text(json.dumps(payload), encoding="utf-8")
         self.addCleanup(lambda: baseline.unlink(missing_ok=True))
         self.assertEqual(report.main(self._args("verify", baseline=baseline)), 0)
 

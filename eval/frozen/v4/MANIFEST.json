@@ -1,21 +1,28 @@
 {
   "version": "v4",
-  "protocol_version": "v4-2026-11-04",
+  "protocol_version": "v4-2026-11-06b",
   "seed": 20261104,
   "as_of": "2026-11-04",
-  "status": "design-frozen; labels pending human/judge; profiles sanitized for pet-tag consistency",
+  "generator": "eval/build_v4_scenarios.py",
   "scenario_count": 48,
   "positive_count": 40,
   "negative_count": 8,
   "deliver_count": 8,
-  "generator": "eval/build_v4_scenarios.py",
   "scenarios": {
     "file": "eval/frozen/v4/scenarios.json",
-    "sha256": "f52ad089ec4d6063aa9757006549c517ee2330a28dbbe93aff7f7f208922fda7"
+    "sha256": "1c1a185ca8e65c6dd23a154c8f070b88ab94b2a5d7ee0546e0cc07288a278499"
   },
   "labels": {
     "status": "pending",
-    "method": "human/judge-graded 0-3, not heuristic"
+    "method": "human/judge 0-3"
   },
-  "supply_additions": 0
+  "pool": {
+    "source": "deploy/mysql/sql/base/01-paringbot.sql",
+    "members": 900,
+    "approved": 841,
+    "base_sql_sha256": "d52f64b378351f2b1a3be693256a075b47af853e238a46dbc8018c11c1ef84da",
+    "pool_digest": "00dfb192bd2dbc77aa7ad929e823aceb837757c6be38400532ec11f85126999c"
+  },
+  "supply_additions": 0,
+  "created_at": "2026-11-06 23:20:41"
 }

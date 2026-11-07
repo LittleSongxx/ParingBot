@@ -1,6 +1,7 @@
 # Rubric v2（可判定项 + 确定性汇总）
 
 > v2.1（2026-11-04 修订）：明确 store_id 判定、data 矛盾上限；v2 首轮 5 评者 overall κ=0.832，但 commute 一致率仅 0.662，见 `analysis/deep-review/proxy-eval/v2/README.md`。
+> v2.2（2026-11-05 审计补充）：data_consistency 增加自由文本宠物矛盾判定（见下），汇总增加同族/跨族 κ 分解与 bootstrap CI。
 
 > 目标：把 v1 的“主观 1–5”改成**逐项可判定**，让不同评者（人/LLM/异族模型）更容易一致。
 > 输出 checklist，`overall` 由规则计算，评者不直接拍总分。
@@ -13,9 +14,19 @@
 | `lifestyle_conflicts` | 数组，元素 ∈ {schedule, smoking, pet, tidiness} | schedule：夜猫子 vs 早睡早起/正常作息；smoking：经常吸烟 vs 不吸烟；pet：一方养宠/过敏且另一方不接受；tidiness：双方整洁度相差 ≥2 档。可多选。 |
 | `commute` | 0/1/2 | 有 `store_id` 时：2=同 store_id；1=同片区但不同 store；0=跨片区/异地。缺 `store_id` 时：1=同片区，0=跨片区；**不得把“同片区”当同门店**。 |
 | `lease_stability` | 0/1/2 | 2=租期档位相同；1=相邻一档；0=相差 ≥2 档。 |
-| `data_consistency` | 0/1/2 | 2=资料完整自洽；1=轻微缺失/含糊；0=明显矛盾（如兴趣含养猫但 `has_pet=无` 且声明宠物过敏/不接受宠物）。 |
+| `data_consistency` | 0/1/2 | 2=资料完整自洽；1=轻微缺失/含糊；0=明显矛盾（如兴趣含养猫但 `has_pet=无` 且声明宠物过敏/不接受宠物；自由文本“不养宠物，但喜欢养猫、撸猫”这类自相矛盾也算 0）。 |
 | `boundary` | 0/1/2 | 2=无隐私/越权/承诺问题；1=轻微；0=出现隐私泄露、越权、承诺性措辞。 |
 | `reason` | 字符串 | ≤40 字，指出最关键判定依据。 |
+
+### data_consistency 的宠物规则（v2.2，`eval/human_eval/data_consistency.py` 同步实现）
+
+- `interest_tags` 含养宠词 + `has_pet=无` + 自述“不养/过敏/不能接受宠物”或 `pet_accept=不接受` → 0；
+- `has_pet=有` + `pet_accept=不接受` → 0；
+- 仅兴趣含养宠词 + `has_pet=无`、无明确不养声明 → 1（业余爱好与饲养的歧义）；
+- 自由文本（`self_intro` / `roommate_expectation`）提到养宠词 + `has_pet=无`：
+  - 同一文本同时含“不养/过敏/不能接受宠物”类表述 → 0（文本自相矛盾，例：“不养宠物，但喜欢养猫、撸猫”）；
+  - 否则 → 1（文本与档案轻微歧义，例：“平时喜欢撸猫”）。
+- “不养猫 / 没有养狗”等否定写法不算“提到养宠”，避免把否定句误判为矛盾。
 
 ## overall 计算规则（评者必须按规则算，不许直接拍）
 
@@ -39,6 +50,14 @@ else:
 ```
 
 > 盲评材料必须包含 `store_id`（否则无法判断“同门店”）；这是 v2 首轮 P04 分歧的原因。
+
+## 汇总口径（v2.2）
+
+- `rubric_v2_panel.py` 支持 `--models path.json`（评者→模型族），输出 `same_family_kappa` /
+  `cross_family_kappa` / `same_family_only`，并把 overall κ 的 pair bootstrap 95% CI 写进
+  `ci95.overall_kappa`；同族 κ 可能被同基座回声抬高，跨族 κ 才是更独立的信号；
+- 成对评审（pairwise）的盲评输入不得包含 delivered_rank/screen_score/audit_status/
+  evidence 等系统元数据（见 `pairwise_quality.safe_person`），否则材料泄漏会污染结论。
 
 ## 与 v1 的差异
 

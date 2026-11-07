@@ -13,6 +13,7 @@
 """
 
 import json
+import os
 import re
 from dataclasses import dataclass, replace
 from datetime import date
@@ -498,10 +499,16 @@ async def search_members(context: ToolContext, gender: str | None = None,
                     f"合租只找同性，申请方是{applicant.gender}，"
                     f"gender 请传「{applicant.gender}」或者不传")
             gender = applicant.gender
+    preference = None
+    if applicant is not None:
+        preference = await RoommatePreference.get_or_none(member_id=applicant.id)
+    # A/B 实验开关：默认 current 保持现有行为；hard 只让“必须项”进 SQL 硬筛，
+    # 加分项忽略（不缩小候选）。验证前不改变默认行为。
+    filter_mode = (os.environ.get("SCREENER_FILTER_MODE") or "current").strip().lower()
+    hard_only = filter_mode in ("hard", "hard_only", "must_only")
     # 首轮检索的「加分项预算」：可选项一次全用等于把加分项变成硬条件。
     # 只限制第一轮，后续放宽轮次仍允许按规则逐项收窄；超过就直接拒绝并回原因。
-    if applicant is not None and context.round_no == 1 and context.member_id:
-        preference = await RoommatePreference.get_or_none(member_id=context.member_id)
+    if preference is not None and not hard_only and context.round_no == 1 and context.member_id:
         if preference is not None:
             bonus = []
             for label, value, required in (
@@ -526,10 +533,15 @@ async def search_members(context: ToolContext, gender: str | None = None,
         lease_terms = member_service.compatible_lease_terms(applicant.lease_term)
         if lease_terms:
             query = query.filter(lease_term__in=lease_terms)
-    if budget_min is not None:
+    use_budget = preference is None or not hard_only or preference.budget_required == "必须"
+    use_age = preference is None or not hard_only or preference.age_required == "必须"
+    use_tidiness = preference is None or not hard_only or preference.tidiness_required == "必须"
+    use_schedule = preference is None or not hard_only or preference.schedule_required == "必须"
+    use_lease = preference is None or not hard_only or preference.lease_required == "必须"
+    if budget_min is not None and use_budget:
         query = query.filter(rent_budget__gte=_check_int(
             budget_min, member_service.MIN_BUDGET, member_service.MAX_BUDGET, "预算下限"))
-    if budget_max is not None:
+    if budget_max is not None and use_budget:
         query = query.filter(rent_budget__lte=_check_int(
             budget_max, member_service.MIN_BUDGET, member_service.MAX_BUDGET, "预算上限"))
     if age_min is not None and age_max is not None and int(age_min) > int(age_max):
@@ -539,23 +551,23 @@ async def search_members(context: ToolContext, gender: str | None = None,
         if age_min is not None else None,
         _check_int(age_max, member_service.MIN_AGE, member_service.MAX_AGE, "年龄上限")
         if age_max is not None else None)
-    if low:
+    if low and use_age:
         query = query.filter(birth_date__gt=low)
-    if high:
+    if high and use_age:
         query = query.filter(birth_date__lte=high)
-    if tidiness_min:
+    if tidiness_min and use_tidiness:
         if tidiness_min not in member_service.TIDINESS_LEVELS:
             raise CustomException(
                 f"最低整洁度请从这几项里选：{'、'.join(member_service.TIDINESS_LEVELS)}")
         allowed = member_service.TIDINESS_LEVELS[member_service.TIDINESS_LEVELS.index(tidiness_min):]
         query = query.filter(tidiness__in=list(allowed))
-    if lease_min:
+    if lease_min and use_lease:
         if lease_min not in member_service.LEASE_TERMS:
             raise CustomException(
                 f"最短租期请从这几项里选：{'、'.join(member_service.LEASE_TERMS)}")
         allowed = member_service.LEASE_TERMS[member_service.LEASE_TERMS.index(lease_min):]
         query = query.filter(lease_term__in=list(allowed))
-    if schedule_accept:
+    if schedule_accept and use_schedule:
         accept = split_values(schedule_accept)
         unknown = [item for item in accept if item not in member_service.SCHEDULE_TYPES]
         if unknown:
@@ -563,22 +575,26 @@ async def search_members(context: ToolContext, gender: str | None = None,
                 f"作息取值里没有：{'、'.join(unknown)}，"
                 f"请从这几项里选：{'、'.join(member_service.SCHEDULE_TYPES)}")
         query = query.filter(schedule_type__in=accept)
+    # 门店只有标「必须」时才是硬条件；标「加分」时不能把检索直接缩到同店/同片区，
+    # 否则模型按门店检索时会把其他门店的合格候选挡在外面（V4_29 发现不足的根因）。
+    store_required = getattr(preference, "store_required", "加分") if preference is not None else "加分"
     if store_scope in ("同门店", "同片区"):
-        # 门店范围是相对申请方的：模型不需要猜门店编码，优先用申请方档案里的意向门店。
-        # 显式传了 store_id 时仍按传入值处理（保留了给工具调用方留的覆盖能力）。
-        if not store_id:
-            store_id = applicant.store_id if applicant is not None else None
-        if not store_id:
-            raise CustomException(
-                f"门店范围选了「{store_scope}」，但申请方档案里没有可用的门店编码，"
-                f"请先让申请方在档案里选择意向门店")
-        if store_scope == "同门店":
-            query = query.filter(store_id=int(store_id))
-        else:
-            area = member_service.area_name(int(store_id))
-            same = [code for code, name in member_service.STORE_LIST
-                    if member_service.area_name(code) == area]
-            query = query.filter(store_id__in=same)
+        # 只有标「必须」时才把门店当硬条件；标「加分」时直接忽略这个筛选参数，
+        # 也不报错（模型可能按提示词习惯性传了门店，但加分项不该把候选缩窄）。
+        if preference is None or store_required == "必须":
+            if not store_id:
+                store_id = applicant.store_id if applicant is not None else None
+            if not store_id:
+                raise CustomException(
+                    f"门店范围选了「{store_scope}」，但申请方档案里没有可用的门店编码，"
+                    f"请先让申请方在档案里选择意向门店")
+            if store_scope == "同门店":
+                query = query.filter(store_id=int(store_id))
+            else:
+                area = member_service.area_name(int(store_id))
+                same = [code for code, name in member_service.STORE_LIST
+                        if member_service.area_name(code) == area]
+                query = query.filter(store_id__in=same)
     elif store_scope and store_scope != "不限":
         raise CustomException("门店范围只能填「同门店」「同片区」或「不限」")
     wanted_tags = split_values(interest_tags)

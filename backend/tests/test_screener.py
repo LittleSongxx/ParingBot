@@ -20,6 +20,7 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from ai import agents
+from ai import graph
 from ai import tools as tool_box
 from common.exception_handler import CustomException
 from common.times import now
@@ -404,8 +405,11 @@ async def test_save_candidates_rolls_back_when_a_row_is_invalid(db):
 
 
 async def test_search_members_defaults_to_applicant_store(db):
-    """门店范围是相对申请方的：模型没传 store_id 时用申请方自己的门店，不用它猜。"""
+    """门店标「必须」时：模型没传 store_id 时用申请方自己的门店，不用它猜。"""
     member = await _make_applicant()
+    preference = await RoommatePreference.get(member_id=member.id)
+    preference.store_required = "必须"
+    await preference.save()
     same = await _make_candidate(store_id=member.store_id)
     other = await _make_candidate(store_id=20)
     task = await _open_task(member)
@@ -416,6 +420,37 @@ async def test_search_members_defaults_to_applicant_store(db):
     ids = {row["member_id"] for row in result["candidates"]}
     assert same.id in ids
     assert other.id not in ids
+
+
+async def test_soft_store_preference_does_not_hard_filter(db):
+    """门店是加分项时，模型传 store_scope 也不能把检索硬缩到同店（V4_29 发现不足根因）。"""
+    member = await _make_applicant()  # store_required=加分
+    same = await _make_candidate(store_id=member.store_id)
+    other = await _make_candidate(store_id=20)
+    task = await _open_task(member)
+    run = await _open_run(task)
+    context = await _context(member, task, run)
+    result = await tool_box.invoke(
+        "search_members", {"store_scope": "同门店"}, context)
+    ids = {row["member_id"] for row in result["candidates"]}
+    assert same.id in ids and other.id in ids
+
+
+async def test_hard_filter_mode_ignores_soft_age(db, monkeypatch):
+    """A/B 开关：SCREENER_FILTER_MODE=hard 时加分年龄不硬筛；默认 current 仍硬筛。"""
+    member = await _make_applicant()  # 年龄 24-32 标加分
+    senior = await _make_candidate(birth_date=datetime(1970, 1, 1))  # 明显超出区间
+    task = await _open_task(member)
+    run = await _open_run(task)
+    params = {"age_min": 24, "age_max": 32}
+    current = await tool_box.invoke(
+        "search_members", params, await _context(member, task, run, 2))
+    assert senior.id not in {row["member_id"] for row in current["candidates"]}
+
+    monkeypatch.setenv("SCREENER_FILTER_MODE", "hard")
+    hard = await tool_box.invoke(
+        "search_members", params, await _context(member, task, run, 2))
+    assert senior.id in {row["member_id"] for row in hard["candidates"]}
 
 
 async def test_first_round_limits_bonus_filters(db):
@@ -808,6 +843,14 @@ async def test_model_claim_that_is_not_recorded_is_flagged(db, monkeypatch):
     assert result.rounds[0].note is None
     assert "但这一轮的放宽没有写进候选池" in result.rounds[0].mismatch
     assert "放宽没有写进候选池" in result.conclusion
+
+
+def test_pool_stagnant_low_capacity_early_stop():
+    """连续两轮同一总数、无待审、且低于交付要求才算供给停滞。"""
+    assert graph.pool_stagnant([6, 6], 6, 8, 0)
+    assert not graph.pool_stagnant([6, 7], 6, 8, 0)
+    assert not graph.pool_stagnant([6, 6], 6, 8, 1)
+    assert not graph.pool_stagnant([8, 8], 8, 8, 0)
 
 
 # ---------------------------------------------------------------- 纯函数

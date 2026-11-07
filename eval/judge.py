@@ -3,11 +3,17 @@
 """独立 judge：跨模型族评估交付候选（pointwise / pairwise）。
 
 独立性约束：judge 模型不得与生产模型相同；相同必须显式 --allow-same-model（仅探索）。
+
+审计修正（2026-11-05，A3）：
+* 输出 JSON 增加 bundle_meta（bundle 的环境/模型指纹，便于追溯“哪次评测、哪个 judge”）；
+* pairwise 增加 position_consistency 与 Wilson 95% CI（小样本下胜率必须带区间）；
+* pointwise 聚合口径保持不变（只补 bundle_meta，不改原有字段）。
 """
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 import urllib.request
@@ -16,6 +22,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 from lib.env import load_env  # noqa: E402
+
+# Wilson CI：优先用 Lead 在 eval/lib/metrics.py 的统一实现，缺失时本地兜底。
+try:  # pragma: no cover - 正常路径
+    from lib.metrics import wilson_ci as _metrics_wilson_ci
+except ImportError:  # pragma: no cover
+    _metrics_wilson_ci = None
 
 DEFAULT_ENV = ROOT.parent / ".env.eval"
 POINT_PROMPT = """你是独立合租匹配评审。只根据双方资料判断候选是否适合该申请方，不要参考已有审核结论。
@@ -40,6 +52,35 @@ PAIR_PROMPT = """你是独立合租匹配评审。下面有两个候选（A/B）
 【候选 B】
 {candidate_b}
 """
+
+
+def _local_wilson_ci(successes: float, n: int, z: float = 1.96) -> dict:
+    total = int(n)
+    count = float(successes)
+    if total <= 0:
+        return {"n": 0, "successes": 0.0, "rate": 0.0, "lo": 0.0, "hi": 0.0}
+    rate = max(0.0, min(1.0, count / total))
+    denominator = 1 + z * z / total
+    centre = (rate + z * z / (2 * total)) / denominator
+    margin = z * math.sqrt(rate * (1 - rate) / total + z * z / (4 * total * total)) / denominator
+    return {"n": total, "successes": round(count, 4), "rate": round(rate, 4),
+            "lo": round(max(0.0, centre - margin), 4),
+            "hi": round(min(1.0, centre + margin), 4)}
+
+
+def wilson_ci(successes: float, n: int) -> dict:
+    """Wilson 95% CI：优先 lib.metrics.wilson_ci，缺失/异常时本地兜底。"""
+    if _metrics_wilson_ci is not None:
+        try:
+            result = _metrics_wilson_ci(successes, n)
+            return {"n": int(result.get("n", n) or 0),
+                    "successes": round(float(result.get("successes", successes) or 0.0), 4),
+                    "rate": round(float(result.get("rate", 0.0) or 0.0), 4),
+                    "lo": round(float(result.get("lo", 0.0) or 0.0), 4),
+                    "hi": round(float(result.get("hi", 0.0) or 0.0), 4)}
+        except Exception:  # noqa: BLE001
+            pass
+    return _local_wilson_ci(successes, n)
 
 
 def text(item: dict) -> str:
@@ -81,7 +122,8 @@ def delivered(bundle: dict) -> list[dict]:
     return rows
 
 
-def pairwise(rows: list[dict], model: str, base_url: str, api_key: str) -> dict:
+def pairwise(rows: list[dict], model: str, base_url: str, api_key: str,
+             *, limit_pairs: int = 0) -> dict:
     pairs = []
     for row in rows:
         others = [item for item in (row["run"].get("candidates") or []) if not item.get("delivered")]
@@ -89,8 +131,15 @@ def pairwise(rows: list[dict], model: str, base_url: str, api_key: str) -> dict:
             pairs.append((row["applicant"], row["candidate"], others[0]))
     if not pairs:
         raise SystemExit("pairwise 需要 run 内存在未交付候选；当前 bundle 没有，改用 pointwise")
-    wins = 0
+    if limit_pairs and len(pairs) > limit_pairs:
+        # 确定性等距抽样，覆盖不同场景/run，而不是只取前几个高容量场景。
+        step = max(1, len(pairs) // limit_pairs)
+        pairs = pairs[::step][:limit_pairs]
+    delivered_wins = 0
+    control_wins = 0
+    ties = 0
     comparisons = 0
+    consistent_count = 0
     rows_out = []
     for index, (app, delivered_candidate, rejected_candidate) in enumerate(pairs):
         verdicts = []
@@ -103,22 +152,37 @@ def pairwise(rows: list[dict], model: str, base_url: str, api_key: str) -> dict:
             except Exception as exc:  # noqa: BLE001
                 verdicts.append("error:" + str(exc))
         consistent = False
-        if len(verdicts) == 2 and verdicts[0] in ("A", "B", "tie") and verdicts[1] in ("A", "B", "tie"):
-            if verdicts[0] == "tie" and verdicts[1] == "tie":
-                consistent = True
-            elif verdicts[0] == "A" and verdicts[1] == "B":
-                consistent = True
-            elif verdicts[0] == "B" and verdicts[1] == "A":
-                consistent = True
-            if consistent and verdicts[0] != "tie":
-                wins += 1
+        delivered_win = control_win = tie = False
+        if len(verdicts) == 2 and all(v in ("A", "B", "tie") for v in verdicts):
+            # 未交换时 A=delivered；交换后 A=control、B=delivered。
+            if verdicts == ["A", "B"]:
+                consistent = delivered_win = True
+                delivered_wins += 1
+            elif verdicts == ["B", "A"]:
+                consistent = control_win = True
+                control_wins += 1
+            elif verdicts == ["tie", "tie"]:
+                consistent = tie = True
+                ties += 1
+            if consistent:
+                consistent_count += 1
             comparisons += 1
         rows_out.append({"index": index, "delivered": delivered_candidate.get("nickname"),
                          "rejected": rejected_candidate.get("nickname"), "verdicts": verdicts,
-                         "consistent_after_swap": consistent})
+                         "consistent_after_swap": consistent,
+                         "delivered_win": delivered_win, "control_win": control_win, "tie": tie})
+    # tie 记 0.5 胜（与 pairwise_quality 同口径）；分母是有效 pair 数，不含 API error。
+    wins = delivered_wins + 0.5 * ties
     return {"mode": "pairwise", "model": model, "pairs": rows_out,
-            "aggregate": {"pairs": len(pairs), "valid": comparisons, "delivered_wins": wins,
-                          "delivered_win_rate": round(wins / comparisons, 3) if comparisons else None}}
+            "aggregate": {"pairs": len(pairs), "valid": comparisons,
+                          "delivered_wins": delivered_wins, "control_wins": control_wins,
+                          "ties": ties, "inconsistent": comparisons - consistent_count,
+                          "delivered_win_rate": round(wins / comparisons, 3) if comparisons else None,
+                          "position_consistency": round(consistent_count / comparisons, 3) if comparisons else None,
+                          "usable": (consistent_count / comparisons) >= 0.8 if comparisons else False,
+                          "ci95": {"delivered_win_rate": wilson_ci(wins, comparisons),
+                                   "position_consistency": wilson_ci(consistent_count, comparisons)}},
+            "note": "position_consistency<0.8 时 win_rate 不可用（位置偏差）"}
 
 
 def main(argv=None) -> int:
@@ -127,6 +191,8 @@ def main(argv=None) -> int:
     parser.add_argument("--mode", choices=("pointwise", "pairwise"), default="pointwise")
     parser.add_argument("--env-file", type=Path, default=DEFAULT_ENV)
     parser.add_argument("--sample-not-delivered", type=int, default=0)
+    parser.add_argument("--limit-pairs", type=int, default=0,
+                        help="pairwise 确定性抽样上限（0=全部；大 bundle 用 24/40 控制成本）")
     parser.add_argument("--human-labels", type=Path, default=None)
     parser.add_argument("--allow-same-model", action="store_true")
     parser.add_argument("--out", type=Path, default=None)
@@ -159,7 +225,7 @@ def main(argv=None) -> int:
     if not rows:
         raise SystemExit("bundle 中没有可评候选")
     if args.mode == "pairwise":
-        result = pairwise(rows, model, base_url, api_key)
+        result = pairwise(rows, model, base_url, api_key, limit_pairs=args.limit_pairs)
     else:
         scored = []
         for index, row in enumerate(rows):
@@ -195,6 +261,10 @@ def main(argv=None) -> int:
                 aggregate["human_n"] = n
         result = {"mode": "pointwise", "provider": provider, "model": model, "rows": scored,
                   "aggregate": aggregate}
+    # bundle 环境指纹：哪个 bundle/commit/模型配置，避免 judge 结果脱离上下文被引用。
+    result["bundle_meta"] = bundle.get("meta") or {}
+    result["judge_model"] = model
+    result["judge_provider"] = provider
     if args.json:
         args.json.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
     lines = ["# 独立 judge 报告", "", f"- 模式：{args.mode}；模型：{model}（{provider}）",

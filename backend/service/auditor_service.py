@@ -90,6 +90,21 @@ REJECT_LABELS = {
 }
 # 代码复核改判时用的否决分类：必须项验不过、或者性别不同，都只能换人
 RECHECK_CODE = "MISMATCH_HARD"
+# 软冲突（习惯冲突）否决的代码兜底：理由引用的硬事实与档案矛盾时改回通过
+CONFLICT_CODE = "PREFERENCE_CONFLICT"
+# 软冲突理由里各类冲突的线索词；只有“单一类别与档案矛盾”时才自动改判
+_CONFLICT_CUES = {
+    "pet": ("宠物", "养宠", "养猫", "养狗", "养鱼", "养鸟", "爬宠", "仓鼠", "猫砂", "撸猫"),
+    "smoke": ("吸烟", "抽烟", "烟味", "香烟"),
+    "budget": ("预算超", "超预算", "预算不符", "预算偏", "预算高", "预算低"),
+    "schedule": ("作息冲突", "作息不符", "作息不匹配", "作息差", "夜猫子"),
+    "tidiness": ("整洁差", "整洁度低", "整洁不"),
+    "lease": ("租期差", "租期不"),
+    "age": ("年龄不", "年龄超"),
+    "habit": ("习惯冲突", "生活冲突"),
+}
+_PET_WORDS = _CONFLICT_CUES["pet"]
+_SMOKE_WORDS = _CONFLICT_CUES["smoke"]
 REJECT_SOLUTIONS = {
     "MISMATCH_HARD": "本候选不匹配",
     "PREFERENCE_CONFLICT": "本候选不匹配",
@@ -263,6 +278,7 @@ def candidate_text(rows: list) -> str:
             f"候选编号 {member.id}｜{member.nickname}｜{member.gender}｜"
             f"{_text(member_service.calc_age(member.birth_date), ' 岁')}｜"
             f"预算 {_text(member.rent_budget, ' 元')}｜整洁度 {_text(member.tidiness)}｜"
+            f"吸烟 {_text(member.smoking)}｜宠物 {_text(member.has_pet)}｜"
             f"{_text(member_service.store_name(member.store_id))}｜"
             f"{_text(member.schedule_type)}｜第 {row.found_round} 轮筛出")
     return "\n".join(lines)
@@ -279,6 +295,8 @@ def instruction(rows: list, pending: int, batch_no: int) -> str:
         "双方合住习惯直接冲突的（例如一方经常在屋里吸烟、另一方受不了烟味）写 PREFERENCE_CONFLICT；"
         "申请方的档案或画像不足以判断的写 PORTRAIT_INSUFFICIENT，"
         "并在理由里点名缺的是哪个维度（例如「缺作息：几点睡、几点起都没有依据」）。",
+        "候选名单里的「吸烟」「宠物」字段是档案事实，以它为准；兴趣标签或画像里出现"
+        "养猫/养狗/养鱼/爬宠等字样只是话题，不能当作养宠证据，更不能据此判宠物冲突。",
         "全批审完再给结论，只输出一个 JSON 对象：",
         '{"audited": [{"candidate_member_id": 候选编号, "audit_status": "通过或否决", '
         '"reject_code": "否决时必填", "reject_reason": "否决时的理由"}], '
@@ -511,6 +529,46 @@ async def _recheck(applicant: MemberProfile, rows: list) -> list[Recheck]:
     return await recheck_rows(applicant, rows)
 
 
+def _other_conflict_categories(reason: str, category: str) -> list[str]:
+    """理由里除某一类之外，还提到了哪些冲突类别。"""
+    found = []
+    for name, words in _CONFLICT_CUES.items():
+        if name == category:
+            continue
+        if any(word in reason for word in words):
+            found.append(name)
+    return found
+
+
+def soft_reject_contradiction(applicant, candidate, preference,
+                              reject_code: str, reject_reason: str) -> str | None:
+    """PREFERENCE_CONFLICT 的代码兜底：理由引用的硬事实与档案矛盾时返回说明。
+
+    2026-11 质量根因：某次 v4 pilot 的 8 个被否决候选全部硬合规，但审核官把
+    「兴趣标签=养鱼/爬宠」当成真实养宠证据，与 has_pet=无 的档案字段矛盾，
+    造成假否决（交付组因此少了合格候选）。这里只做**最保守**的翻转：
+    理由里只出现单一冲突类别（宠物/吸烟/预算），且与档案硬字段矛盾，才改回通过；
+    理由里还提到作息/整洁/租期等其他冲突时不动，交给人工或下一轮。
+    """
+    if reject_code != CONFLICT_CODE or not reject_reason:
+        return None
+    reason = str(reject_reason)
+    if any(word in reason for word in _PET_WORDS) and candidate.has_pet == "无":
+        if not _other_conflict_categories(reason, "pet"):
+            return "理由按养宠否决，但档案 has_pet=无（宠物字段为权威，兴趣标签只是话题）"
+    if any(word in reason for word in _SMOKE_WORDS) and candidate.smoking == "不吸烟":
+        if not _other_conflict_categories(reason, "smoke"):
+            return "理由按吸烟否决，但档案 smoking=不吸烟"
+    if any(word in reason for word in _CONFLICT_CUES["budget"]) and preference is not None:
+        if not _other_conflict_categories(reason, "budget"):
+            budget = candidate.rent_budget
+            if (budget is not None and preference.budget_min is not None
+                    and preference.budget_max is not None
+                    and preference.budget_min <= budget <= preference.budget_max):
+                return "理由按预算不符否决，但候选预算在申请方范围内"
+    return None
+
+
 async def _prompt_values(member: MemberProfile, rows: list) -> dict:
     """组装这一批的提示词变量。"""
     portrait = await MemberPortrait.filter(
@@ -578,6 +636,44 @@ async def audit_batch(member: MemberProfile, task: MatchTask, run_id: int, *,
         decided, passed, rejected, codes = _decided_counts(pool)
         notes.append(f"代码复核改判 {len(records)} 人："
                      + "；".join(item.describe() for item in records))
+    # 模型判「硬冲突」也要由代码验一遍：硬规则归代码，模型可能把加分项
+    # （例如门店）误当必须项，造成假否决；代码双向复核找不到必须项违规的，
+    # 改回通过并留痕，避免同一候选在不同轮次里忽通过忽否决。
+    hard_rejected = [row for row in rejected if row.reject_code == RECHECK_CODE]
+    if hard_rejected:
+        conflicts = await _recheck(member, hard_rejected)
+        conflict_ids = {item.row.id for item in conflicts}
+        unjustified = [row for row in hard_rejected if row.id not in conflict_ids]
+        if unjustified:
+            for row in unjustified:
+                await MatchCandidate.filter(id=row.id).update(
+                    audit_status=AUDIT_PASS, reject_code=None, reject_reason=None)
+            pool = await MatchCandidate.filter(task_id=task.id, candidate_member_id__in=ids)
+            decided, passed, rejected, codes = _decided_counts(pool)
+            notes.append(f"模型判硬冲突但代码复核未发现必须项违规，已改回通过 {len(unjustified)} 人")
+    # 软冲突（PREFERENCE_CONFLICT）同样需要代码兜底：模型可能把兴趣标签当养宠、
+    # 把加分项当硬性条件。理由引用的字段与档案硬事实矛盾时改回通过并留痕。
+    soft_rejected = [row for row in rejected if row.reject_code == CONFLICT_CODE]
+    if soft_rejected:
+        soft_ids = [row.candidate_member_id for row in soft_rejected]
+        soft_members = {item.id: item for item in await MemberProfile.filter(id__in=soft_ids)}
+        applicant_preference = await RoommatePreference.get_or_none(member_id=member.id)
+        flipped: list[str] = []
+        for row in soft_rejected:
+            candidate = soft_members.get(row.candidate_member_id)
+            if candidate is None:
+                continue
+            note = soft_reject_contradiction(member, candidate, applicant_preference,
+                                             row.reject_code or "", row.reject_reason or "")
+            if note:
+                await MatchCandidate.filter(id=row.id).update(
+                    audit_status=AUDIT_PASS, reject_code=None, reject_reason=None)
+                flipped.append(note)
+        if flipped:
+            pool = await MatchCandidate.filter(task_id=task.id, candidate_member_id__in=ids)
+            decided, passed, rejected, codes = _decided_counts(pool)
+            notes.append(f"软冲突否决与档案字段矛盾，已改回通过 {len(flipped)} 人："
+                         + "；".join(flipped[:3]))
     detail = "、".join(f"{reject_label(code) or code} {count} 人"
                        for code, count in codes.items()) or "没有否决"
     conclusion = (f"第 {batch_no} 批审了 {len(decided)} 人，通过 {len(passed)} 人，"

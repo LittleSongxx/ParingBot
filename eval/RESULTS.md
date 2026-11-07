@@ -1,328 +1,286 @@
-# 当前评测状态（唯一有效口径）
+# 当前评测状态（唯一有效口径，2026-11-05 审计后修订）
 
-> 本文件只记录**当前有效**的结论。旧版 RESULTS 的 794 行历史数字（87.5%/93.45%/7.94/8/NDCG 42→70 等）
-> 已全部作废，原因：holdout 被按场景克隆的供给污染、oracle 与生产排序同源、CI 每次运行自动重算标签、
-> 质量指标只覆盖每申请人最新 1 个 run。保留旧数字的目的仅是追溯，不得引用为质量证据。
+> 本文件只记录**当前有效**的结论。旧版 RESULTS（含 794 行历史数字、pairwise 100%、
+> κ=0.933、内容 4.875/5 等）已全部作废，原因见 §7。
+> 有效口径 = 冻结 v3 协议 `v3-2026-11-06b` + BASELINE v2 + 2026-11-06 重冻后产生的 artifact。
+> 2026-11-06 已清洗种子池 `has_pet=无` 的养宠矛盾并重冻 v3/v4（旧协议 artifact 只对应旧池，不能与新冻结集横比）。
 
 ## 1. 现在能声称什么
 
 | 结论 | 证据 | 置信度 |
 |---|---|---|
-| 多 Agent 匹配流程可运行、可复盘 | CI backend pytest、E2E、真实运行归档（历史 artifact） | 高 |
-| 硬规则（同性/双向必须项/租期档位/交付前复核）由代码强制并有单测 | `backend/service/auditor_service.py`、`backend/tests/` | 高（机制），门禁自证问题已修 |
-| 评测工具链自身可用（冻结集、报告、门禁、安全扫描） | `eval/tests/`、`check_freeze.py`、CI | 高 |
+| 多 Agent 匹配流程可运行、可复盘 | CI backend pytest、E2E、真实运行归档 | 高 |
+| 硬规则（同性/双向必须项/租期档位/交付前复核）由代码强制并有单测 | `backend/service/auditor_service.py`、`backend/tests/` | 高（机制） |
+| 评测工具链自身可用（冻结/供给池指纹/target 归一/负向断言/门禁） | `eval/tests/` 135 tests、`check_freeze.py`、CI | 高 |
+| v3 冻结集上，baseline 交付 **7.125/8（57/64）**，达到结构上限 **57/57 target（100%）** | run 41985813976 artifact + 本地回放 | 中高（n=8，single trial） |
 
-**不能声称**：匹配准确率、Precision/NDCG 质量、holdout 泛化、内容质量、安全无风险、温度 0 可复现。
-这些要么没有独立证据，要么旧证据已被证明自证/污染。
+**不能声称**：匹配准确率/Precision/NDCG 质量、泛化、内容质量达标、安全无风险、
+温度 0 可复现、成本可控；任何旧 pairwise/κ/内容质量结论。
+**质量真值仍缺**：没有 E3 人工盲评；v4 labels 仍 pending。
 
-## 2. 当前基线状态
+## 2. v3 当前基线（BASELINE v2，2026-11-05 重跑）
 
-- **v3 首个基线已产生**（2026-11-03，GitHub Actions run 41655402168，8 个正向场景 ×1 trial）：
-  - 平均交付 **6.88/8（85.9%）**，总交付 55/64，失败 0；bootstrap 95% CI 约 **5.75–7.75/8**（n=8，区间很宽）；
-  - 低容量场景 V3_04=5/8、V3_06=4/8、V3_08=6/8；高容量场景多数 8/8；
-  - 安全：0 error / 1 warning（`reject_reason` 出现"保证"措辞，属模型文案，需后续清）；
-  - 成本未知（本次未提供单价）；judge 未配置独立 Key；人工盲评未执行；
-  - **这是回归基线，不是质量结论**：样本 8 场景、heuristic 标签、单模型，不能推导泛化能力。
-- 基线文件：`eval/frozen/v3/BASELINE.json`（对应 labels/scenarios hash 已记录）。
-- 后续 `report.py --mode verify` 会与它比较；`mode=baseline` 仍可随时重建（人工审核后替换）。
+- 文件：`eval/frozen/v3/BASELINE.json`（schema_version=2）；
+- 来源：live-eval run `41985813976`（code_commit `b6f3d74`，2026-11-05 15:32 +08），
+  经 `report.py --mode baseline` 生成、人工提交；labels/scenarios sha 与当前冻结文件一致，protocol `v3-2026-11-06b`；
+- 交付：57/64 = **89.06% raw**；`target` 合计 57（V3_04 最多 5、V3_06 最多 4），
+  **target 达成率 57/57 = 100%**；failures=0、runs=8；
+- regression：`max_failures_delta=0`、`target_margin=2/57≈0.0351`；任一场景由“有交付”退化为 0 直接失败。
+- 归档历史基线（run 41655402168 / 6.88、target 96.49%）只作追溯，不再作为当前 baseline。
 
-## 3. 如何更新本文件
+> v3 结构上限 = 57/64；当前 baseline 已经打满上限（100% target）。
+> 这意味着：**v3 交付指标不再有提升空间，也不适合用来证明质量提升**；
+> 后续主回归只能依赖硬规则/安全/失败数/负向断言/成本，质量变化必须等 E3 人工或校准 judge。
+> 任何“7.13 → 更高”的叙事都不成立（最大值就是 7.125/8）。
 
-1. 跑 `live-eval`（baseline 或 verify），保留 artifact 链接；
+## 3. verify 回放（2026-11-05 新门禁）
+
+- 归档 run `41663358923`（code `7637a5e`）：交付 57/64 = 89.06% raw，**target 100%**；failures 0；
+  用新 BASELINE v2 回放：通过（baseline hash/protocol、负向断言、bundle 指纹、freeze、safe/quality 全绿）；
+- run `41659345552` 交付 56/64（87.5% raw，target 98.2%），因 token 1,640,673 > 1,500,000 被预算门禁判失败；
+  这是 fail-closed 的预期行为，不再作为“质量回退”；
+- run `41997348370`（最新干净 verify，code `a0ef5c9`）：交付 57/64、**target 100%**、failures 0、
+  token 1,222,026、P50/P95 103.6/169.2s；**新门禁通过**（baseline hash/protocol、负向断言、bundle 指纹、
+  freeze、safe/quality 全绿）。
+- run `41991751431`：同一代码栈上 V3_07 单次运行失败（438.97s、10 轮、交付 7），门禁按 `failures 1 > 0` 正确拦下；
+  复跑 `41997348370` 通过。失败那次 V3_07 有 **1 名候选被审核否决**（8 候选 → 7 通过），疑似“有否决后补人”边界路径；
+  后续已给 `execute_task` 加 `logger.exception`，并把异常类写进运行 `error_message`、quality scorecard 输出失败明细。
+- 定向复现 run `42022916857`（debug 模式，V3_07×3）：**3/3 全部成功**，交付 `[8,8,8]`、轮次 `[4,3,3]`、
+  wall 82–100s；未复现失败。由于复现条件（至少 1 个候选被否决）是随机的，本轮结论是**间歇性边界问题**，
+  不用放宽门禁掩盖；保持 `failures > baseline+0` 的 fail-closed 规则。
+
+## 4. v4 评测集（设计冻结，尚未接门禁）
+
+- protocol `v4-2026-11-06b`；48 场景（40 正向 + 8 负向：4 缺动态、4 缺自我介绍）；
+- sha256 `31863a65c3da215995aaa97176b4c5268d1db0e1cd21bb8ea8e751002cf67967`；
+- 层配额 16/12/12；性别 20/20；门店 19/20；租期 5 档；`expect.target=min(8, eligible_unbounded)`；
+- MANIFEST 记录 base SQL 指纹 + pool digest；`supply_additions=0`；labels **pending**（human/judge 0–3）；
+- 本轮修复：slot 计数/昵称（不再“第 208 次”）、文本级宠物矛盾（清洗 tags 后重建 self_intro/moments）、
+  负向跨层跨性别、脚本生成 MANIFEST/COVERAGE、`--check` 只读 fail-closed；
+- **新协议 pilot（run `41991262897`，9 场景×3 trials）**：交付率 85.65%（95% CI 71.3–96.8%）、
+  target 达成率 99.38%、pass³(target)=0.889、failures=1、墙钟 76 分钟（V4_29 单次 483s + 低容量场景约 300s）；
+  `V4_29` 在 full pilot 交付 [6,5,6]（run1 失败），但定向复跑 `42002328618` 同一场景交付 **[1,2,6]**、无失败——
+  **同一冻结场景跨 run 波动极大**，说明 pilot 的 pass^k 不能当作稳定质量结论；低容量场景的候选发现/通过率不稳定，
+  需产品侧排查（不在本轮评测修复范围）。
+- **旧 v4 pilot 结果作废**（旧 sha `f52ad089…`、旧 target 口径）：72.2%→71.3%、pass^3 1.0→0.778、
+  target 达成率 98.61% 等数字只保留在历史段落，不得引用。
+- 全量 40×3 尚未跑；v4 labels 完成前只能做流程/成本/稳定性试点，不接门禁。
+
+## 5.5 2026-11-05 首轮探索性质量结果（E2.5/E2，不是人工真值）
+- 对象：run `41997348370` 的 quality bundle（8 申请方 / 57 交付候选 / 对照组来自截断或否决候选）。
+- 内容质量（Qwen 异族代理，n=20：8 申请方 + 12 交付候选）：
+  - faithful **4.80**（95% CI 4.15–5.0）、coherent 4.90、readable 4.85、respectful 5.00、overall **4.80**（4.45–5.0）；
+  - 规则 warning **8/20**：候选画像提到养宠但 `has_pet=无`（种子候选数据自相矛盾），说明“内容质量”与
+    “数据一致性”必须分开报告；天花板检测未触发（非全满分，有区分度）；
+  - **仪器校验通过**：4 条“已知坏”对照（profile 改坏 + 画像写养猫/每天抽烟）faithful 均值 **2.0** vs
+    clean **5.0**（delta 3.0, passed=true）——说明 judge 确实能识别矛盾，4.8 分不是无差别给高分；
+  - 这只是代理评审（E2.5），不能当作内容质量达标的证据；warning 指向的是候选数据质量问题。
+- 成对 judge（Qwen 异族，对照组=截断/否决候选；E2）：
+  - 21 对，20 对有效；delivered 胜率 **75%**（95% CI 53.1–88.8%），位置一致性 **0.85**（95% CI 64.0–94.8%）；
+  - 这是判官材料去泄漏后的第一份新 pairwise 结果；n 小、对照来自同 pool 的 near-miss，只能作为
+    “交付组相对优于对照”的弱-中等探索信号，不能声称匹配质量。
+- 结论：本轮能给出的是“流程/容量 + 内容质量代理 + 相对 judge”的**探索性**结果；
+  E3 人工盲评仍是唯一可对外质量真值。
+
+## 5. 2026-11-05 审计修复摘要（代码层）
+
+| 类别 | 修复 |
+|---|---|
+| 测量仪器 | report：target 归一 + baseline v2 provenance/hash 校验 + 负向断言 + 灾难/target 门禁 + publish 成本/judge；stats：Wilson/pass^k 全子集/配对 MDE/P95 插值 |
+| 冻结 | MANIFEST 增加 base SQL 指纹 + pool digest；check_freeze 扫描多行语句、base 中 TEST_SCENARIO 引用、eval SQL 目录缺失 fail-closed |
+| bundle/runner | `EVAL_BUNDLE_TRIALS` 多 trial 导出 + prompts_sha256；负向场景记录 expectation_ok/negative_observed；pilot 输出 target CI/哈希/source |
+| 判官 | pairwise/ranking 材料白名单（去除 delivered_rank/screen_score/evidence/A_role/B_role）；位置一致性 + Wilson CI；content 确定性抽样/真实 n；rubric 面板同族/跨族分解 |
+| 数据 | v4 重冻（见 §4）；v3 scenarios/labels 字节未变；free-text 宠物矛盾识别加入 data_consistency |
+| 产品 | 回退 65d011a 的“代理评分排序惩罚”（保留 QUALITY_GATE 默认 off 的实验开关）；短交付补筛保留但仅作为未全量验证机制 |
+| 文档 | 本文件、README/RUNBOOK/quality-policy/release-checklist、v4 DESIGN/DATASHEET/COVERAGE 全部同步 |
+
+## 5.6 自动质量评分卡（多 artifact 汇总，2026-11-05）
+
+新增 `eval/quality_scorecard.py`：对多次 run 的 matrix 汇总失败率 Wilson CI、target 达成率 CI、
+同场景跨 run 一致性、不稳定场景、内容/judge 代理信号，并输出“能/不能声称”清单。
+
+新增口径 **候选发现覆盖率** = `min(discovered / target, 1)`：目标人数中有多少被 Agent 真正找出来；
+它补上了“交付不足到底是没人还是没找到”的归因。
+
+新增口径 **候选发现覆盖率** = `min(discovered / target, 1)`、**审核否决率** = `rejected / discovered`：
+它们补上“交付不足到底是没人、没找到、还是被审核否决”的归因。
+
+v3（4 个 live-eval run：41985813976 / 41988136753 / 41991751431 / 41997348370，共 32 个 scenario-run）：
+- 失败 **1/32 = 3.12%**（Wilson 95% CI 0.5–15.7%）；target 达成率 **99.61%**（98.8–100%）；
+- 同场景跨 run 完全一致率 **87.5%**（唯一波动 V3_07：[8,8,7,8]）；
+- **候选发现覆盖率 100%**、审核否决率 **3.83%**；无 low_coverage/unstable 场景；`delivery_headroom=false`。
+
+v4（full pilot 41991262897 + 定向复跑 42002328618 / 42025074084，共 33 个 scenario-run）：
+- 失败 **1/33 = 3.03%**；target 达成率 **97.94%**；同场景跨 run 一致率 **88.9%**；
+- **候选发现覆盖率 98.97%**、审核否决率 **5.02%**；低覆盖场景只有 **V4_29**（覆盖均值 90.7% / min 33.3%）；
+- **unstable 场景 V4_29**：9 次 trial 交付 `[6,5,6,1,2,6,6,6,6]`（mean 4.89, range 5；其中 1 次失败）；
+  `quality_scorecard` 的 trial 明细显示 3 个坏 trial 的两种机制：
+  - trial4：discovered=2/passed=1（**发现不足**）；
+  - trial5：discovered=6/rejected=4/delivered=2（**审核否决过多**）；
+  - trial1：discovered=15/rejected=9 后异常失败（否决 + 补偿路径）；
+  因为不是单一质量维度，v4 的 pass^k / target 达成率不能当作稳定质量结论；
+- 两个评分卡的 `quality_claim_allowed` 均恒为 false（无 E3 人工盲评）；代理信号只作探索。
+
+## 5.7 自查：避免重蹈覆辙（eval/self_check.py，14/14 通过）
+
+新增 `eval/self_check.py` 并接入 CI freeze-guard；它不调模型/DB，检查：
+
+| 检查 | 结果 |
+|---|---|
+| 冻结文件/manifest/base SQL 指纹/pool digest/eval SQL | PASS |
+| v4 场景 sha/40+8/target/文本自洽/pool 指纹；labels 仍 pending | PASS |
+| v3 labels 可由 base SQL + 场景确定性复算 | PASS |
+| 98 个产品/评测运行脚本无 `V3_xx/V4_xx` 场景硬编码 | PASS |
+| 门禁探针：干净通过 / 单场景归零失败 / 负向断言失败 / baseline hash 漂移 / publish 缺成本+judge / token 超预算 | 全部按设计 PASS/FAIL |
+| BASELINE schema v2、protocol 一致、`max_failures_delta=0` 未被放松 | PASS |
+| live-eval 无自动重算 oracle，冻结校验显式 `--verify` | PASS |
+| judge 材料白名单（禁字段/`*_role`） | PASS |
+| 内容 judge 仪器校验（已知坏锚点/原 item 不变/天花板检测） | PASS |
+
+**自查结论**：
+- 失败没有被“放宽门禁”掩盖：V3_07/V4_29 失败后仍是 failures=1，`max_failures_delta` 保持 0；
+- 没有按场景写规则/排序/prompt：运行代码无场景 ID 硬编码；
+- 没有把代理分当质量真值：`quality_claim_allowed` 恒为 false，内容/judge 只作探索；
+- 没有在看到结果后改指标口径：本轮只新增测量（scorecard/instrument/stability），未调整门禁数值；
+- CI 的 freeze-guard 会在每次 push/PR 重跑 self-check；live-eval / v4-pilot 会归档 `quality-card.md/json`。
+
+## 5.8 产品侧根因：审核官“假硬否决”（2026-11-05 修复）
+
+V4_29 的波动不全是模型质量，bundle 逐候选对比暴露了产品 bug：
+
+- 同一候选 491（门店 11、夜猫子、预算 3600）在 t1 run64 被判 `MISMATCH_HARD`，
+  理由是“不满足申请方硬约束的大桥店门店要求”；但 V4_29 的偏好里 `store_required=加分`，
+  且同一候选在 run65/t2 里被判通过并交付。属于**模型把加分项误当必须项**的假否决。
+- 代码侧原来只复核对“通过”（`recheck_rows` 只处理 passed），不复核“否决”，
+  所以假否决会留在库里，造成 delivered 1/2 vs 6 的波动。
+
+修复（`backend/service/auditor_service.py::audit_batch`）：
+1. 模型判 `MISMATCH_HARD` 后，用 `recheck_rows` 对这批否决做双向代码复核；
+2. 代码没有发现任何必须项违规的，改回 `通过` 并清空 reject_code/reason，批次结论留痕；
+3. 代码确实发现必须项违规的，保留否决；
+4. 新增两个 backend 测试：假硬否决改回通过、真硬否决保留。
+
+**第二个产品根因：发现不足来自“加分门店被当硬筛选”**（同日修复）：
+- `search_members` 原来只要模型传 `store_scope` 就做硬 SQL 过滤，不看门店是“必须”还是“加分”；
+  V4_29 的 `store_required=加分`，主管/筛选官按“大桥店”检索时被硬筛到同店 1 人，
+  其他 5 名合格候选直接找不到（t1 run64 只发现 2 人）。
+- 修复：只有 `store_required=必须` 才按门店硬过滤；加分门店直接忽略该参数且不报错；
+  筛选官提示词同步说明“加分门店不要当硬过滤”。
+- 测试：`test_soft_store_preference_does_not_hard_filter`；`test_search_members_defaults_to_applicant_store`
+  改为“门店必须”场景。
+
+**修复后真实验证**：
+- V4_29（run `42058994426`，3 trials）：交付 `[6,6,6]`、发现 `[6,6,6]`、rejected 0、
+  target 100%、一致性 1.0、无失败；对比修复前 `[6,5,6,1,2,6,6,6,6]`。
+- 中间验证（run `42054508157`，仅审核修复、未修 store）交付 `[2,6,6]`，正好暴露发现不足；
+  store 修复后消失，形成“审核假否决 → 发现不足 → 修复”的完整归因链。
+- v3 回归 `42059041451`：交付 57/64、target 100%、failures 0，门禁全过，无回归。
+- 注意：最终验证 n=3，V4_29 仍是低容量场景；要把它从 unstable 改为稳定需要更多 trials，
+  本次只声明“根因已定位并修复、首轮验证通过”，不声明 v4 整体已稳定。
+
+## 5.9 指标自查：judge 胜率口径 bug（2026-11-06）
+
+- `eval/judge.py` 的 pairwise 旧实现把“交换后位置一致”直接累加进 `delivered_wins`，
+  导致 `delivered_win_rate` 与 `position_consistency` 永远相同。
+- 用 v4 24 对原始 verdict 重算（不重新调模型）：
+  - 交付赢 11、对照赢 6、不一致 7、平分 0；
+  - **交付胜率 45.8%**（Wilson 95% CI 27.9–64.9%）；
+  - 位置一致性 **70.8%**（CI 50.8–85.1%）→ **usable=false**（<0.8）；
+  - 旧 v4 70.8% 与任何 `judge.py --mode pairwise` 的 win_rate 全部作废，需重新跑/校准。
+- 产品侧 suitability 对照（同 bundle）：交付均值 9.77 vs 截断 8.35，18/18 个 run 交付组更高，
+  rank 1→8 的 suitability 单调下降；24 对中 20 对交付 suitability 更高。
+  说明产品排序内部有信号，judge 的 45.8% 不能反推“产品排序差”，只能说明 judge 目前不可用。
+- 内容 8/20 warning 的根因是**种子数据矛盾**（`has_pet=无` 但兴趣标签/画像写养宠）；
+  已加画像一致性兜底；2026-11-06 已用 `scripts/clean_pet_contradictions.py` 清洗种子数据并重冻 v3/v4。
+- **结论**：质量指标暂不合格的原因首先是测量仪器不可信（judge 口径+位置偏差），
+  其次是没有人工/校准标签；在修复指标前不做扩容或全量。
+
+## 6. 已知未解决问题
+
+- 无 E3 人工盲评（双人、κ≥0.6）；所有质量结论仍不可对外；
+- v4 labels pending，全量 40×3 未跑；v4 与 v3 不是独立验证集（共享 generator/seed/pool 与部分格子）；
+- v3 n=8、单 trial、上限饱和，只能做“灾难回退”回归，不能证明质量提升；
+- 独立 judge 需跨模型族并在发布模式强制；当前 CI 未配置 `EVAL_JUDGE_API_KEY`，judge/content 在非 publish 下跳过；
+- 真实供给流动性、S36 软期望误拒、种子档案矛盾、并发/注入对抗仍属产品 backlog（见 quality-policy §8）；
+- HEAD 无 live-eval artifact；合并后需重跑 baseline/verify；本机无 Docker，无法本地跑真实评测。
+
+## 7. 明确作废的旧结论
+
+| 旧结论 | 作废原因 |
+|---|---|
+| pairwise delivered 胜率 100%（12/12、30/30） | judge 材料含 `A_role/B_role`，pairwise_ranking 还含 delivered_rank/screen_score/evidence；无 artifact、不可复算 |
+| 排序 top 100% / adjacent 60–65% / tidy mismatch 7 条归因 | 同上；judge 跟随系统元数据，tidy tie-break 依据不可用 |
+| κ 0.417→0.832→0.896→0.933 | 4/5 评者与生产同族（DeepSeek），整体一致主要来自确定性汇总；v1 κ 口径被误用；无 CI/无人工 |
+| 内容质量 4.875/5、warning 2/20 | 20×4.875 非整数；CI bundle 候选 portrait 全 null；样本来源/产物不可核 |
+| target 达成率 98.61%、补筛有效 | 旧 v4 协议、补筛前单次 9 场景、只在触发场景验证；v4 重冻后作废 |
+| v3 “7.13/8 比 6.88 提升” | 容量饱和；差异 2 个交付位在噪声内；新门禁不再比较 raw delivery |
+
+## 8. 如何更新本文件
+
+1. 跑 `live-eval`（baseline 或 verify），保留 artifact 链接与 run id；
 2. 人工审阅 `regression-report.md` 与 `judge-report`（如有）；
-3. 仅把**可追溯**结论写进本文件，并注明：oracle 版本、数据版本（MANIFEST hash）、环境、n、CI；
-4. 禁止跨环境 / 跨 oracle 版本横比，禁止引用历史作废数字。
+3. 仅把**可追溯**结论写进本文件，注明：oracle/protocol 版本、MANIFEST hash、环境、n、CI；
+4. 禁止跨环境/跨 oracle 版本/跨 v4 协议横比；禁止引用旧 QUALITY 数字；
+5. 任何质量类结论必须等待 E3 人工盲评；代理评审只能写“探索性”。
+---
 
-## 4. 已知未解决问题（详见 `docs/quality-policy.md`）
+## 9. quality-v1 质量测量工具链（2026-11-06，工具就绪 ≠ 质量结论）
 
-- 真实供给流动性不足（种子池结构性问题，属产品 backlog，不能靠评测补数据解决）；
-- S36 类“候选软期望被当硬冲突”的审核缺陷（产品侧未修）；
-- 并发/多用户、错误恢复 UX、真实 prompt injection 防护；
-- 内容质量（summary/画像/解释）尚未进入人工 rubric 流程；
-- 独立 judge 目前为探索性信号，不能替代人工。
+本节只记录**测量工具**，不改变 §1 的"能/不能声称"：没有 E3 人工盲评前，任何质量数字仍然不可对外。
 
-> 资源参考：v3 的 8 个正向场景 ×1 trial 实际消耗约 164 万 token（2026-11-03 实测）。
-> workflow 的默认 token 预算已从 150 万上调到 250 万；若继续增高场景数/ trials，请同步调整。
+新增 6 项核心指标与工具（口径源 `eval/quality_spec.py`，阈值/样本下限改动会被 `self_check.py` 的冻结基线拦截）：
 
-## 2.1 verify 首跑（2026-11-03，run 41663358923）
+| 指标 | 工具 | 证据级 | 当前状态 |
+|---|---|---|---|
+| 匹配质量胜率（交付 vs near_miss/rejected/random 三档对照） | `quality_pairwise.py`（双向+多 judge+BT+Wilson/CP+position consistency） | E2→E3 | 工具完成；需真实 bundle + 100 对人工校准 |
+| 审核误拒率/假通过率 | `false_reject.py`（硬规则 replay 确定性；软冲突 judge 三分类） | E0+E2 | 工具完成；软冲突需人工校准 |
+| 交付召回率 | `delivery_recall.py`（target 容量归一 + 交付精度 + 漏斗归因） | E0 | 可跑（v3 冻结集 n=8） |
+| 内容忠实度（claim 级） | `content_faithfulness.py`（claim 拆解 + 原文引用校验 + 证据覆盖） | E2→E3 | 工具完成；需 human 校准 100 claims |
+| pass^k 稳定性 | `pass_k.py`（k 子集全通过 + cluster bootstrap） | E0/E1 | 可跑；v3 需 >=3 trials、>=10 场景才可申报 |
+| 安全/注入 | `safety_redteam.py`（24 条注入用例 + 硬规则兜底 + 负向断言） | E0 | 用例生成完成；注入需 live-eval 写入用例后重跑 |
 
-- 模式：`mode=verify`，与 BASELINE 比较；**门禁通过**；
-- 交付 **7.13/8（57/64，89.1%）**，失败 0；bootstrap 95% CI 约 **6.0–8.0/8**（n=8）；
-- 低容量场景 V3_04=5、V3_06=4，其余 8/8；pass^k 为 N/A（每场景仅 1 trial，需要 ≥3 trials）；
-- 安全：0 error / 0 warning；token 1,661,505；延迟 P50/P95 = 85.3/249.4s；成本未知（未提供单价）；
-- agreement（监控，非门禁）：precision 76.6%、recall 87.5%；这不是质量结论；
-- 同期 CI run 41663356168 全绿；live-eval baseline/verify 端到端流程已验证。
+配套：
+- `judge_calibration.py`：judge 与人工标签一致性（κ/Spearman/位置一致性/锚点/跨族/自一致）+ **PPI 偏差校正**；`usable=false` 时任何质量结论 blocked；
+- `quality_report.py`：六指标统一报告 + `claims` 申报门禁（缺校准/κ<0.6/样本不足 → fail-closed）；
+- `eval/human_eval/{build_calibration,agreement,acceptance}.py`：人工只做"校准集标注 + 分歧裁决 + 15% 验收"三件事；
+- `eval/tests` 已扩到 **305 项**（`self_check` 18/18），覆盖 judge 材料泄漏、位置偏差、阈值放松、PPI、fail-closed 门禁。
 
-## 6. 探索性代理评审（LLM 子 Agent + 异族模型 Qwen，非人工真值）
+推荐流程（先 deterministic，后 judge，最后人工收尾）：
 
-> 2026-11-04：在没有人工评审资源的情况下，用 5 个独立上下文子 Agent（DeepSeek）+ 1 个异族模型
-> Qwen3.7-plus（阿里云百炼 compatible，独立 API）对 verify run 的真实 bundle 做盲评
-> （12 交付 + 4 随机池对照，16 对；系统结论已隐藏）。详细报告在工作区
-> `analysis/deep-review/proxy-eval/README.md`。
+```bash
+# 0) 用最新 live-eval artifact（quality-bundle.json）作为输入
+# 1) 确定性指标
+python eval/delivery_recall.py --bundle quality-bundle.json --scenarios eval/frozen/v3/scenarios.json --out recall.json
+python eval/pass_k.py --matrix eval/reports --scenarios eval/frozen/v3/scenarios.json --k 3 --out pass-k.json
+python eval/safety_redteam.py --emit-cases eval/safety-cases.json
+# 2) judge 指标 + 人工盲评材料
+python eval/quality_pairwise.py --bundle quality-bundle.json --limit-pairs 120 --emit-materials materials.json --out pairwise.json
+python eval/human_eval/build_calibration.py --materials materials.json --out-dir eval/human_eval/calibration --n 100
+#    —— 两名评者填 annotations_annotator_{a,b}.csv（约 2-4 小时），agreement.py 出 κ 并裁决分歧
+python eval/human_eval/agreement.py --dir eval/human_eval/calibration
+python eval/judge_calibration.py --judge pairwise.json --human eval/human_eval/calibration/adjudication.csv --metric match_quality --human-agreement eval/human_eval/calibration/agreement.json --out calibration.json
+# 3) 汇总 + 申报门禁
+python eval/quality_report.py --pairwise pairwise.json --recall recall.json --pass-k pass-k.json --calibration calibration.json --out-md quality-report.md --out-json quality-report.json
+# 4) 人工验收 15%
+python eval/human_eval/acceptance.py --report quality-report.json --key eval/human_eval/calibration/key.json --out acceptance.csv
+```
 
-- 6 位评者一致性：Cohen kappa **0.417**、二次加权 kappa **0.630**、Spearman **0.582**（低于人工门槛 0.6）；
-- 交付组 overall **3.86**（n=12）vs 随机池对照 **1.50**（n=4）：面板能区分明显不合适的人；
-- 异族 Qwen 单独评分：交付组 **4.00**、对照 **1.25**；与 5 位 DeepSeek 评者平均分 **Spearman 0.954**；
-- 面板独立发现：交付中的 P12（候选经常吸烟、申请方不吸烟）fit 均分仅 2.0，吸烟软冲突阈值可能过松；
-  P01/P11/P04 档案存在“兴趣含养猫/养仓鼠 vs 无宠物/宠物过敏”自相矛盾，需数据一致性校验；
-- **结论**：跨族一致增强“交付组明显优于随机对照”的旁证，但仍不是人工真值；不能替代人工 kappa≥0.6，
-  不能作为发布门禁或对外质量结论。
+**当前状态**：代码/单测/离线冒烟已完成；真实 judge 冒烟（qwen3.7-plus，n=4 对）跑通双向/位置一致性/材料白名单；**人工校准尚未执行**（本轮无有效当前 bundle），因此 `quality_claim_allowed=false`，不得据此写"匹配质量"。
 
-## 7. 指标口径补充（2026-11-04）
+## 10. 匹配质量面板结果（2026-11-07，清洗后 v4 冻结集；E2.5）
 
-- 交付均值必须带 bootstrap 95% CI 与 MDE；当前 n=8 的 CI 约 ±1/8，MDE≈2/8，
-  即"平均交付差 < 2 人"不能宣称提升（见 `analysis/quality-metrics-optimization-research.md`）。
-- `pass^k` 已加入 `report.py`：同一场景 k 次全部成功才算通过；当前每场景 1 trial，先记为 N/A，
-  扩到 3 trials 后自动输出 pass^2/pass^3。
-- heuristic agreement / NDCG 仍只做监控；质量结论需要人工/judge 校准。
+来源：v4 pilot run `42252524720`（协议 `v4-2026-11-06b`，code `1715ff6`，12 场景 ×3 trials）；
+盲评包 `analysis/human-eval-pack-2026-11-07`：100 对 = 88 near_miss + 12 random + 0 rejected（清洗后审核否决率 0）。
+评者：AI-A / AI-B 两个独立盲评（各 100 对）+ 第三人 AI 裁决 16 对分歧；**0 人工**。
 
-## 8. Rubric v2 代理校准（P0，2026-11-04）
+| 口径 | 交付胜 / 对照胜 / 平 / 未决 | strict 胜率（主口径） | tie-half（辅助） |
+|---|---|---|---|
+| near_miss（n=88） | 73 / 8 / 3 / 4 | **90.1%**（73/81，95%CI 81.7–94.9%） | 86.9%（CI 78.3–92.5%） |
+| 总体（n=100，含 random） | 84 / 9 / 3 / 4 | **90.3%**（84/93，CI 82.6–94.8%） | 87.5%（CI 79.6–92.6%） |
+| random（n=12） | 11 / 1 / 0 / 0 | 91.7% | 91.7% |
 
-- 5 位评者（4 个 DeepSeek 子 Agent + Qwen3.7-plus）×16 对，rubric v2（可判定项 + 规则汇总）：
-  - overall Cohen κ **0.832**（v1 0.417）；加权 κ **0.931**（0.630）；Spearman **0.936**；
-  - hard_gate κ **0.938**；lifestyle Jaccard **1.000**；但 commute 一致率 0.662、data 一致率 0.750；
-  - 交付组 overall 4.167 vs 随机对照 1.000；
-- **重要限定**：overall κ 提升部分是“确定性汇总”造成的结构性一致，item-level 仍有分歧；
-  data 矛盾上限测试后 κ=0.828/0.927；v2.1 需补 store_id、明确同门店/同片区定义，再跑 5 评者；
-- 这是评分量表一致性，不是“匹配质量提升”；代理评审仍不能替代人工（见 `eval/human_eval/PROXY.md`）。
-
-## 9. Rubric v2.1 校准（P0 收尾，2026-11-04）
-
-- 在 v2 基础上：盲评材料加入 `store_id/store_name`；明确 commute（同 store_id=2、同片区=1、跨区=0）；
-  `data_consistency=0` 时 overall≤3；
-- 5 位评者（4 DeepSeek 子 Agent + Qwen3.7-plus）×16 对：
-  - overall κ **0.896**（v2 0.832）；加权 κ **0.941**；Spearman **0.944**；
-  - hard_gate κ **1.000**；commute 完全一致率 **1.000**（v2 0.662）；data 一致率 0.719（仍是分歧点）；
-  - 交付组 3.833 vs 随机对照 1.000（样本与 v2 不同，不做直接对比）；
-- 结论：commute 歧义已修复；data 判定（养鱼/爬宠/养仓鼠 vs has_pet）仍需白名单；仍是代理评审，不是人工真值。
-
-## 10. P1：v4 评测集设计（2026-11-04）
-
-- 生成 **40 正向 + 8 负向**（4 缺动态 + 4 缺自我介绍），确定性 seed=20261104；
-- 容量层 高 16 / 中 12 / 低 12；19 男 / 21 女；16 门店；5 个租期档；
-- 文件：`eval/frozen/v4/scenarios.json`（sha256 见 `MANIFEST.json`）、`DESIGN.md`、`DATASHEET.md`、`COVERAGE.md`；
-- **标签 pending**：不使用 heuristic gold，需人工/judge 分级 0–3；标签完成前 v4 不接门禁；
-- 下一步：12 场景×3 trials 方法验证 → 40×3 全量 → 100 对标签/校准。
-
-## 11. Rubric v2.2 校准（40 对，2026-11-04）
-
-- 样本扩到 **40 对**（30 系统交付 + 10 随机池对照），盲评材料含 store_id；数据规则明确“养宠类兴趣 vs
-  has_pet / pet_accept / 不养声明”，并给出 pet-tag 白名单；
-- 5 位评者（4 DeepSeek 子 Agent + Qwen3.7-plus）：
-  - overall κ **0.933**、加权 κ **0.933**、Spearman **0.936**；
-  - hard_gate κ 0.927；commute 完全一致率 **1.000**；data 一致率 **0.902**；
-  - 交付组 overall 3.700 vs 随机对照 1.000；
-- 规则校验：`eval/human_eval/data_consistency.py` 与 5 位评者中位数一致 **37/40（92.5%）**；
-- 仍然是代理评审（E2.5），不是人工真值；overall κ 仍含“确定性汇总”的结构性成分。
-- 下一步：用该 rubric + v4 做 12 场景×3 trials 的 pass^k/CI 方法验证；人工标签仍需 ≥100 对。
-
-## 12. v4 pilot 真实运行（2026-11-04，run 41771579066）
-
-- 范围：v4 的 9 个场景 ×3 trials（高/中/低各 3），**失败 0**；
-- 交付率 **72.2%**，bootstrap 95% CI **[55.6%, 88.9%]**；
-- **pass^3（达到 min(8, 不限门店可匹配上限)）= 1.000**；pass^3（达到 requested 8）= 0.444；pass^3（>0）= 1.000；
-  （target 口径已修正为 `eligible_unbounded`；scoped 人数只是门店偏好范围内，门店为加分项时不应作为 target）
-- 同一场景三 trial 交付完全一致率 **1.000**（当前样本下无 trial 方差）；
-- 分容量层：高容量 100%（8/8）、中容量 50%（4/8）、低容量 66.7%（3–8/8）；
-  但按“可交付上限”看，三层 pass^3 均为 1.0；
-- 结论：pilot 验证了 v4 运行链路与 pass^k/CI 口径；交付差异主要来自供给容量，而不是 trial 波动；
-- **限制**：仅 9 场景、标签未完成、无人工/judge；不能当作 v4 质量结论。
-
-## 13. 质量优化实验（2026-11-04）：排序惩罚 + 质量门禁，结果否定
-
-- **离线反事实**（基于 v2.2 的 40 对代理评分）：交付组 30 对均值 3.70；
-  其中 4 个吸烟冲突对均值 2.75、6 个整洁冲突对均值 2.77；若能把这两类都排除，
-  剩余 21 对均值可到 **4.07**。这说明“去掉明确冲突”在标注上确实能提升质量。
-- **实现 1：排序惩罚**（吸烟/整洁/宠物冲突降权）：
-  跑 v3 verify（run 41788710484）后交付仍 7.125/8，吸烟/整洁冲突候选数 8→11、5→8（run 间波动），
-  **没有观察到质量改善**；说明在“每题只要 8 人”的供给约束下，排序惩罚没有替代候选可用。
-- **实现 2：可选质量门禁**（`QUALITY_GATE=on`，剔除明确冲突）：
-  跑 v3 verify（run 41791292659）后交付 **6.625/8（82.8%）**，吸烟冲突 11→4、整洁冲突 8→6；
-  但 12 个交付对的代理评审均值 **3.625**（基线 3.70，n=12，样本不同），**没有质量提升**，
-  且交付覆盖下降 0.5/8。
-- **结论**：该方向被**否定**，质量门禁默认关闭；低质量主因不是排序，而是：
-  1) 候选人本身的档案矛盾（兴趣含养宠 vs has_pet 等）；2) 中/低容量供给不足；3) 评分 rubric 仍为代理。
-- 下一步不再做“排序层刷分”，转向数据质量修复 + 供给分层 + 人工/judge 标签校准。
-
-## 14. 数据质量修复与档案自洽指标（2026-11-04）
-
-- 根因确认：排序/门禁无效后，转向数据质量；新增 `eval/human_eval/data_consistency.py` 的
-  `assess_person()`，并在 `quality_checks` / `report` 中输出**档案自洽 warning**（不门禁）；
-- 对现有 v3 bundle 扫描：交付候选中有 **4–6 条档案自洽 warning**（candidate 3–5 条、applicant 1 条），
-  典型为“兴趣含养猫/养狗 vs has_pet=无 + 过敏/拒宠声明”；
-- v4 生成器已修复：`has_pet=无` 的档案会去掉养宠类兴趣标签并补非宠物标签；
-  v4 scenarios 重新冻结（sha256 f52ad0…），`check_v4_freeze` 现在会拒绝明显自相矛盾的档案；
-- 影响：这是**数据质量/可观测性**改进，不是匹配质量提升；v4 pilot 结果仍基于旧标签版本，
-  但场景/账号不变，后续全量 v4 使用新数据。
-
-## 15. 内容质量指标（2026-11-04，代理评审）
-
-- 此前内容质量（画像/解释）为 **N/A**；新增 `eval/content_quality.py`，用异族模型对
-  bundle 里的 portrait（summary + tags）按 faithful/coherent/readable/respectful/overall 打分；
-- 20 条样本（申请方 + 交付候选）结果：
-  - **overall 4.875/5**、faithful 4.875、coherent 5.0、readable 5.0、respectful 5.0；
-  - 规则 warning：**2/20**（“不养宠物”否定句已排除误报）；
-- 结论：内容质量在代理视角**较高**；但仍是 LLM 代理评审，不是人工真值，不能代替内容人工审核；
-- 建议把该脚本作为 live-eval 的可选步骤（需 EVAL_JUDGE_*），与匹配质量并列报告。
-
-## 16. 清理数据后的 v4 pilot 复跑（2026-11-04，run 41801505302）
-
-- 用修复后的 v4（sha256 f52ad0…，去掉 `has_pet=无` 档案的养宠类兴趣标签）复跑 9 场景 ×3 trials；
-- 与旧 pilot 对比：
-
-| 指标 | 旧 v4（有矛盾数据） | 清理后 v4 |
-|---|---|---|
-| 档案严重矛盾（9 个 profile） | **2 / 9** | **0 / 9** |
-| 交付率 | 72.2%（CI 55.6–88.9%） | **71.3%（CI 54.6–88.0%）** |
-| pass^3（target=不限门店上限） | 1.000 | **0.778** |
-| pass^3（requested 8） | 0.444 | 0.333 |
-| 同场景三 trial 完全一致率 | 1.000 | **0.778** |
-| 失败数 | 0 | 0 |
-| 墙钟均值 / P95 | 180.7s / 299.8s | 185.8s / 293.1s |
-
-- 具体 trial 波动：V4_03 一次交付 7（另两次 8）、V4_18 一次交付 3（另两次 4），因此 pass^3 从 1.0 降到 0.778；
-- 解释：清理数据没有“提升交付”，但**去掉了虚假的 2/9 档案矛盾，并让 pass^k 不再是 1.0 的假稳定**；
-  现在的结果更能反映真实 trial 波动，是评测有效性改进。
-- 结论：数据质量修复有效（严重矛盾 0/9）；v4 pilot 交付率约 71%、pass^3(target) 约 78%、一致性约 78%；仍不能当质量结论。
-
-## 17. 短交付补筛实验（2026-11-04，run 41817073894）
-
-- 根因：v4 pilot 中 V4_03 有一次只交付 7/8（候选池 9 人、通过 7 人），不是池子没人，而是
-  “通过人数不足、但候选池人数够”时主管直接收尾；
-- 实现：主管收尾前加代码门禁 `needs_shortfall_topup`——通过人数 < 交付要求、候选池总数 ≥ 交付要求、
-  无待审、仍有放宽额度时，强制再派一轮筛选补人；
-- 定向复跑 V4_03 / V4_18 ×3 trials：
-  - 0 失败；
-  - V4_03 从 [7,8,8] → **[8,8,8]**（三 trial 一致）；
-  - V4_18 从 [4,4,3] → **[4,4,4]**（三 trial 一致）；
-  - 两个场景 pass^3(target)=1.0、一致性 1.0；
-- 结论：补筛门禁对“池子够但通过不足”的短交付有效；V4_18 属于供给上限（池子本身 4 人），
-  门禁不强行补，符合预期；
-- 限制：只跑了 2 个场景 ×3 trials，尚未全量 9×3 复跑；V4_18 的 4/8 仍是真实供给问题。
-
-## 18. 短交付归因与补筛效果验证（2026-11-04）
-
-- `analyze_pilot.py` 新增短交付归因：
-  - `supply`：候选池总数 < target；
-  - `audit`：候选池够但通过人数 < target；
-  - `other`：其他；另标 `capacity_limited`（target < requested）。
-- 清理后 v4 pilot（补筛前）归因：
-  - 短交付场景 2 个；**V4_03 = audit**（池 9 人、通过 7 人），**V4_18 = supply**（池少）；
-  - 5 个场景 `capacity_limited`（target < requested，属供给上限）。
-- 补筛门禁定向复跑后（V4_03 / V4_18 ×3）：
-  - **短交付场景 0 个**，`supply/audit/other` 全为 0；
-  - V4_03 修复为 [8,8,8]，V4_18 稳定 [4,4,4] 且仍标 `capacity_limited`；
-- 结论：补筛解决的是 **audit 类短交付**；V4_18 类 supply/容量上限不能靠门禁解决，需要供给分层。
-- 限制：只定向复跑 2 个场景，尚未全量 9×3。
-
-## 19. 候选池停滞提前收尾实验（2026-11-04，否定并回退）
-
-- 动机：V4_18 类供给不足场景会跑 10–11 轮、墙钟 300s 左右，想在“候选池连续无增长”时提前收尾降延迟；
-- 实现：主管节点跟踪候选池签名（total/passed/rejected/pending），连续无变化时提前收尾；
-- 定向 V4_18 ×3（run 41839366484）：
-  - 墙钟均值 **238s → 108s**（明显降）；
-  - 但交付从 [4,4,4] 变成 **[3,3,3]**，pass^3(target=4) 从 1.0 降到 0；
-- 修正版（只在放宽额度用尽后提前收尾）定向 V4_18 ×3（run 41842044540）：
-  - 交付 [3,4,4]，pass^3(target) 仍失败；
-  - 墙钟均值 270s，没有延迟收益；
-- 结论：该优化**被否定并回退**；V4_18 的池子在前几轮看似停滞，但后续轮次还能补到人，提前收尾会牺牲交付；
-  延迟问题应通过供给分层/减少无效轮次解决，而不是提前收尾。
-
-## 20. target 达成率指标（capacity-normalized delivery，2026-11-04）
-
-- 问题：v4 中/低容量场景 raw delivery 只有 48.6%/66.7%，但这是因为 target 本身受容量限制；
-  只看“交付数/requested 8”会把供给问题误读成 Agent 质量问题。
-- 新增 `analyze_pilot.target_attainment`：`mean(min(delivered,target)/target)`，按可达到目标归一化。
-- 清理后 v4 pilot（9 场景×3）：
-  - raw delivery **71.3%**；
-  - **target 达成率 98.61%**；
-  - 分容量层：高 **98.61%**、中 **97.22%**、低 **100%**；
-  - 中容量 raw 交付率 48.6%，但 target 达成率 97.22%——说明中容量 Agent 已基本打满可达上限；
-- 补筛定向 V4_03/V4_18：target 达成率 **100%**。
-- 结论：capacity-normalized 后交付表现**高**；raw delivery 低主要是供给上限，不是 Agent 不稳定。
-  该指标与 raw delivery、pass^3 一起报告，避免单一口径误导。
-
-## 21. 成对质量评审（pairwise，2026-11-04）
-
-- 新增 `eval/pairwise_quality.py`：同一申请人下，比较“系统交付候选 vs 随机池候选”，
-  并做 A/B 位置交换，报告 delivered 胜率与 position consistency；
-- 12 对结果：
-  - **delivered 胜率 100%**（12/12）；
-  - **position consistency 0.917**（11/12，交换后仍选同一身份）；
-  - usable=true（一致性 ≥0.8）；
-- 解释：随机池对照含性别/门店等硬冲突，因此 100% 胜率只能证明**交付组明显优于随机对照**，
-  不能证明“匹配质量高”；它补的是 pairwise 证据，不是人工真值；
-- 修正了一个度量 bug：最初 position consistency 计算把归一化标签用反，误报 0；修正后为 0.917。
-
-## 22. 成对质量评审：难负例对照（2026-11-04）
-
-- 随机池对照可能过于简单（含性别/门店硬冲突），所以新增 `--control hard`：
-  同一申请人、同性别、同片区，但至少带一个软冲突（吸烟/宠物/作息/预算）的难负例；
-- 12 对结果：
-  - delivered 胜率 **100%**（12/12）；
-  - position consistency **1.000**；
-  - usable=true；
-- 对比随机对照：随机池 100% / 0.917；难负例 100% / 1.000；
-- 解释：即使在同性别、同片区、带软冲突的难负例前，交付组仍被一致选中；
-  这是较强的相对质量证据，但仍是 LLM 代理评审（n=12），不是人工真值；
-- 下一步：难负例扩到 30+ 对，并加入“交付组内部排序”pairwise（不只 vs 对照）。
-
-## 23. 成对评审扩样本 + 跨族 judge（2026-11-04）
-
-- Qwen judge，难负例对照，样本从 12 扩到 **30 对**：
-  - delivered 胜率 **100%**（30/30）；
-  - position consistency **1.000**；
-- 跨族 DeepSeek judge，难负例 12 对：
-  - delivered 胜率 **100%**（12/12）；
-  - position consistency **1.000**；
-  - 与 Qwen 结论一致（都是 12/12 选交付组）；
-- 解释：难负例（同性别/同片区/带软冲突）下交付组仍全胜，且 Qwen/DeepSeek 两族一致；
-  但仍为 LLM 代理评审、对照包含明显软冲突，不能当作人工真值；
-- 兼容性修复：DeepSeek reasoning 输出可能只放在 `reasoning_content`，judge 解析已兼容。
-
-## 24. 交付名单内部排序评审（2026-11-04）
-
-- 新增 `eval/pairwise_ranking.py`：对每个 run 取 `delivered_rank` 最高 vs 最低的两位交付候选，
-  同一申请人做 A/B 成对评审（位置交换）；
-- 8 对结果：
-  - **top 胜率 100%**（8/8）；
-  - position consistency **1.000**；
-  - usable=true；
-- 解释：系统交付排序的“第一名 vs 最后一名”与独立 judge 偏好一致，说明排序至少在两端有区分度；
-  但这是代理评审、n=8，且只比较首尾，不代表中间排序完全正确；
-- 下一步：比较相邻 rank（1v2、2v3…）检验排序细粒度。
-
-## 25. 相邻 rank 排序评审（2026-11-04）
-
-- 新增 `pairwise_ranking.py --mode adjacent`：同一 run 内相邻两位交付候选（1v2、2v3…）做 A/B 评审；
-- 10 对结果：
-  - top（排名更高者）胜率 **60%**；
-  - position consistency **0.90**；
-  - usable=true；
-- 与首尾对比（top vs bottom 100%）：
-  - 交付名单**两端**排序很稳；
-  - **中间相邻 rank 只有 60%**，说明细粒度排序有明显噪声/并列；
-- 结论：排序优化下一步应针对中段（1v2、2v3），而不是继续验证首尾；
-  但当前排序信号仍是“优于随机/难负例”，不能说过度拟合。
-
-## 26. 相邻 rank 扩样本（20 对，2026-11-04）
-
-- `pairwise_ranking.py --mode adjacent --limit 20`：
-  - top 胜率 **65%**（13/20）；
-  - position consistency **0.80**（borderline usable）；
-- 与 10 对样本（60%/0.90）一致：中段排序确实只有约 6 成与 judge 偏好一致；
-- 抽查 7 个 mismatch：多数是“整洁度档位不同”（一般 vs 整洁、洁癖 vs 整洁等），
-  说明 `_suitability_score` 只用“达标/不达标”处理整洁度，缺少档位距离/一致性 tie-break；
-- 结论：中段排序是下一个优化点；建议加“整洁度距申请方的距离/数据自洽惩罚”作为 tie-break，
-  再用相邻 rank 复测；不能只靠首尾 100% 下结论。
-
-## 27. 整洁度 tie-break 实验（2026-11-04，未达标准已回退）
-
-- 动机：相邻 rank 20 对里 7 个 mismatch 多数指向“整洁度档位”；
-- 实现：`_suitability_score` 增加整洁度距离加分（同档 +2、相邻 +1、差 ≥2 档 -1）；
-- 跑 v3 verify（run 41973093745）：交付仍 7.125/8，门禁通过；
-- 相邻 rank 20 对复测：
-  - top 胜率 **65% → 67.5%**（小幅提升）；
-  - position consistency **0.80 → 0.75**（低于 usable 阈值 0.8）；
-- 结论：提升幅度在噪声内、一致性反而下降，**未达到验收标准，已 revert**；
-- 后续中段排序优化应换方法：扩大相邻样本 / 跨族 judge / 学习排序权重，而不是单点 tidy tie-break。
+- **口径**：strict = delivered/(delivered+control)，剔除 tie/未决；tie 率与未决率必须单列
+  （near_miss：tie 3.4%、unresolved 4.5%）；tie-half 仅作辅助，不得当 headline；
+- AI-AI 3 分类一致率 84%，Cohen κ=**0.72**；第三人 16 对：12 对形成 2/3 多数、4 对仍无多数（unresolved）；
+- 与旧池对比（同面板口径）：旧池 near_miss strict 约 74.7%（59/79）→ 新池 **90.1%**；
+- 证据等级仍是 **E2.5**：`quality_claim_allowed=false`（无人工 κ）；旧池 artifact 不可与新冻结集横比。

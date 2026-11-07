@@ -87,6 +87,77 @@ def balance_hit(trial: dict) -> str | None:
 
 
 # --------------------------------------------------------------------------
+# 负向场景契约（纯函数，可离线单测）
+# --------------------------------------------------------------------------
+NEGATIVE_STATUS_PREFIX = "未运行（负向："
+PRECHECK_STATUS = "未运行（只做前置检查）"
+
+
+def _has_rejection_evidence(record: dict) -> bool:
+    """记录里是否有「API 层/保存阶段拒绝」这类可观测证据。"""
+    if record.get("api_rejected") or record.get("rejection"):
+        return True
+    probe = record.get("rerun_probe") or {}
+    if probe and str(probe.get("code")) not in ("200", "None", ""):
+        return True
+    status = str(record.get("status") or "")
+    return any(marker in status for marker in ("API 层拒绝", "保存阶段", "被拒收"))
+
+
+def check_negative_expectation(scenario: dict, record: dict) -> dict:
+    """校验负向场景是否真的观察到了预期阻断（纯函数，不依赖网络/数据库）。
+
+    返回 ``{"ok": bool, "observed": str, "detail": {...}}``：
+
+    * ``api_rejected``：保存阶段/API 层直接拒绝（intro 类负向）；
+    * ``readiness_blocked``：readiness ``can_run is False`` 且 blocker 与期望一致；
+    * ``unexpected_can_run``：readiness 意外放行（负向场景被当成可运行）；
+    * ``blocker_mismatch``：确实被阻断，但阻断项与 ``expect.blocker`` 不一致；
+    * ``not_run_without_evidence``：只做了前置检查、没有任何拒绝证据；
+    * ``unknown``：场景执行出错或没有可判定信息。
+    """
+    expect = scenario.get("expect") or {}
+    expected_blocker = expect.get("blocker")
+    readiness = record.get("readiness") or {}
+    blocker = (readiness.get("blocker") or {}).get("key")
+    detail = {
+        "expected_blocker": expected_blocker,
+        "expected_can_run": expect.get("can_run"),
+        "run": scenario.get("run"),
+        "status": record.get("status"),
+        "can_run": readiness.get("can_run"),
+        "blocker": blocker,
+        "rejected": bool(record.get("rejection")),
+        "probe_rerun": record.get("rerun_probe"),
+    }
+    if _has_rejection_evidence(record):
+        return {"ok": True, "observed": "api_rejected", "detail": detail}
+    if readiness.get("can_run") is False:
+        if blocker == expected_blocker:
+            return {"ok": True, "observed": "readiness_blocked", "detail": detail}
+        return {"ok": False, "observed": "blocker_mismatch", "detail": detail}
+    if readiness.get("can_run") is True:
+        return {"ok": False, "observed": "unexpected_can_run", "detail": detail}
+    if str(record.get("status") or "").startswith(PRECHECK_STATUS):
+        return {"ok": False, "observed": "not_run_without_evidence", "detail": detail}
+    return {"ok": False, "observed": "unknown", "detail": detail}
+
+
+def _make_negative_record(record: dict, scenario: dict, reason: str | None = None) -> dict:
+    """负向场景收尾：写 status 并按契约记录期望校验结果。
+
+    ``reason`` 为空时保留已有 status（例如 readiness 阻断）。
+    """
+    if reason:
+        record["status"] = f"{NEGATIVE_STATUS_PREFIX}{reason}）"
+    expectation = check_negative_expectation(scenario, record)
+    record["expectation_ok"] = expectation["ok"]
+    record["negative_observed"] = expectation["observed"]
+    record["expectation"] = expectation
+    return record
+
+
+# --------------------------------------------------------------------------
 # 主流程
 # --------------------------------------------------------------------------
 def run_scenario(api: Api, admin: str, scenario: dict, args, env: dict) -> dict:
@@ -113,9 +184,10 @@ def run_scenario(api: Api, admin: str, scenario: dict, args, env: dict) -> dict:
         except Exception as exc:  # noqa: BLE001
             if scenario.get("run", True):
                 raise
-            record["status"] = "未运行（负向：档案不完整，API 层拒绝）"
+            record["api_rejected"] = True
+            record["rejection"] = {"stage": "profile", "message": str(exc)[:300]}
             record["notes"].append(str(exc)[:300])
-            return record
+            return _make_negative_record(record, scenario, "档案不完整，API 层拒绝")
     if scenario.get("preference"):
         try:
             save_preference(api, token, scenario["preference"])
@@ -123,9 +195,10 @@ def run_scenario(api: Api, admin: str, scenario: dict, args, env: dict) -> dict:
         except Exception as exc:  # noqa: BLE001
             if scenario.get("run", True):
                 raise
-            record["status"] = "未运行（负向：偏好不完整，API 层拒绝）"
+            record["api_rejected"] = True
+            record["rejection"] = {"stage": "preference", "message": str(exc)[:300]}
             record["notes"].append(str(exc)[:300])
-            return record
+            return _make_negative_record(record, scenario, "偏好不完整，API 层拒绝")
     if scenario.get("moments"):
         moment_state = ensure_moments(api, token, scenario["moments"])
         record["moments"] = moment_state
@@ -161,12 +234,16 @@ def run_scenario(api: Api, admin: str, scenario: dict, args, env: dict) -> dict:
         record["notes"].append("已验证 API 层拒绝发起")
 
     if args.phase == "ready" or not scenario.get("run"):
-        record["status"] = "未运行（只做前置检查）"
+        record["status"] = PRECHECK_STATUS
+        if scenario.get("run") is False:
+            _make_negative_record(record, scenario)
         return record
 
     if not state.get("can_run"):
         record["status"] = "未运行（readiness 阻断）"
         print("  跳过真实运行：readiness 已阻断")
+        if scenario.get("run") is False:
+            _make_negative_record(record, scenario)
         return record
 
     trials = args.trials or scenario.get("trials", 1)
@@ -198,6 +275,8 @@ def summarize(record: dict) -> dict:
             "status": record.get("status"),
             "blocker": blocker.get("key"),
             "can_run": (record.get("readiness") or {}).get("can_run"),
+            "expectation_ok": record.get("expectation_ok"),
+            "negative_observed": record.get("negative_observed"),
         }
     walls = [row.get("wall_seconds") or 0 for row in runs]
     rounds = [row.get("total_round") or 0 for row in runs]

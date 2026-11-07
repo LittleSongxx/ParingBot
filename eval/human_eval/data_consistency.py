@@ -8,6 +8,13 @@
 - has_pet=有 + pet_accept=不接受 → 0；
 - 仅“兴趣含养宠类 + has_pet=无”而无明确不养声明 → 1（业余爱好与饲养的歧义）；
 - 关键字段缺失 → 1；否则 2。
+
+A3 审计补充（2026-11-05）：只看 interest_tags 会漏掉自由文本里的宠物矛盾。
+现在 self_intro / roommate_expectation 里出现 PET_TAGS 词：
+- 若同一文本同时含 NO_PET_PHRASES（如“不养宠物，但喜欢养猫、撸猫”）→ 0：
+  文本自相矛盾，是明显数据质量问题；
+- 否则（只说“喜欢撸猫”但档案 has_pet=无）→ 1：文本与档案的轻微歧义。
+否定写法（“不养猫”“没有养狗”）不算“提到养宠”，避免把否定句误判成矛盾。
 """
 from __future__ import annotations
 
@@ -21,6 +28,8 @@ NO_PET_PHRASES = (
     "不养宠物", "不能接受宠物", "不接受宠物", "对动物毛发过敏", "动物毛发过敏",
     "不能接受室友养宠", "不太能接受室友养宠", "不能接受室友养宠物",
 )
+# 宠物词的否定前缀（命中则这次提及不算“养宠声明”）
+_NEGATED_PREFIX = re.compile(r"(不|没|没有|无|不想|不打算|不准备)$")
 
 
 def _pref_detail(person: dict) -> dict:
@@ -48,6 +57,20 @@ def _tags(person: dict) -> set[str]:
     return set()
 
 
+def _text_pet_mentions(text: str) -> set[str]:
+    """自由文本里“提到养宠”的词；被“不/没/没有”否定的提及不算。"""
+    mentions = set()
+    for tag in PET_TAGS:
+        position = text.find(tag)
+        while position >= 0:
+            prefix = text[max(0, position - 3):position]
+            if not _NEGATED_PREFIX.search(prefix):
+                mentions.add(tag)
+                break
+            position = text.find(tag, position + 1)
+    return mentions
+
+
 def _person_reasons(person: dict) -> list[str]:
     reasons: list[str] = []
     tags = _tags(person) & PET_TAGS
@@ -55,12 +78,18 @@ def _person_reasons(person: dict) -> list[str]:
     accept = _pet_accept(person)
     text = _text(person)
     says_no = any(phrase in text for phrase in NO_PET_PHRASES)
-    if has_pet == "无" and tags and (says_no or accept == "不接受"):
-        reasons.append(f"has_pet=无 但兴趣含{','.join(sorted(tags))} 且有不养/过敏表述")
+    text_tags = _text_pet_mentions(text)
+    mentions = sorted(tags | text_tags)
+    if has_pet == "无" and mentions:
+        # tags 口径沿用旧规则（兴趣含养宠 + 明确不养/pet_accept 不接受 → 0）；
+        # 自由文本口径按 A3 契约：文本同时含养宠词与不养声明才是明显自相矛盾 → 0。
+        severe = bool((tags and (says_no or accept == "不接受")) or (text_tags and says_no))
+        if severe:
+            reasons.append(f"has_pet=无 但提到{','.join(mentions)} 且有不养/过敏/不接受表述")
+        else:
+            reasons.append(f"提到{','.join(mentions)} 但 has_pet=无（轻微歧义）")
     elif has_pet == "有" and accept == "不接受":
         reasons.append("has_pet=有 但 pet_accept=不接受")
-    elif has_pet == "无" and tags:
-        reasons.append(f"兴趣含{','.join(sorted(tags))} 但 has_pet=无（轻微歧义）")
     if has_pet in (None, "") or "interest_tags" not in person:
         reasons.append("关键字段缺失")
     return reasons

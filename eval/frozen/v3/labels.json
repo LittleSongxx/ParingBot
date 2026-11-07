@@ -1,6 +1,6 @@
 {
   "version": "v3",
-  "protocol_version": "v3-2026-11-04",
+  "protocol_version": "v3-2026-11-06b",
   "method": "heuristic-offline-v1",
   "note": "离线启发式 gold（非人工金标）：由 v3 场景 + 仓库种子 SQL + 固定权重算出，只用于排序/命中率参照；禁止在 CI 中自动重算，变更需升 protocol_version 并人工审阅",
   "seed": 20261104,

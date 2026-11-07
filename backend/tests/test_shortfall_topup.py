@@ -13,3 +13,8 @@ def test_no_topup_when_pool_too_small():
 def test_no_topup_when_pending_or_relax_exhausted():
     assert not graph.needs_shortfall_topup({"passed": 7, "total": 9, "pending": 1}, 8, 0, 2)
     assert not graph.needs_shortfall_topup({"passed": 7, "total": 9, "pending": 0}, 8, 2, 2)
+
+
+def test_no_topup_when_relax_limit_zero():
+    """relax_used=0 但 relax_limit=0：没有放宽额度时不能补筛。"""
+    assert not graph.needs_shortfall_topup({"passed": 7, "total": 9, "pending": 0}, 8, 0, 0)

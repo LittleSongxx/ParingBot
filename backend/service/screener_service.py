@@ -179,7 +179,8 @@ def instruction(member: MemberProfile, round_no: int, pool: int, deliver: int) -
         f"意向门店 {member_service.store_name(member.store_id)}，门店编号 {member.store_id}）"
         f"筛第 {round_no} 轮候选。",
         f"合租只找同性，检索时 gender 传「{target_gender(member)}」；"
-        f"门店范围不是不限时，store_id 传申请方的门店编号 {member.store_id}。",
+        f"门店只有标为「必须」时才按门店硬筛（此时 store_id 传 {member.store_id}）；"
+        f"标为「加分」的门店范围不要当成硬过滤条件。",
     ]
     if round_no == 1:
         parts.append("这一轮是硬筛：按合住偏好里的条件检索，不要放宽任何维度。")
