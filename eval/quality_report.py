@@ -76,14 +76,27 @@ def _summary_row(key: str, payload: dict | None) -> dict:
     if not payload:
         return row
     if key == "match_quality":
-        row["value"] = _fmt_pct(payload.get("win_rate"))
+        strict = payload.get("strict_win_rate")
+        rate = strict if strict is not None else payload.get("win_rate")
+        ci = payload.get("strict_win_rate_ci95") or payload.get("win_rate_ci95")
+        row["value"] = _fmt_pct(rate)
         row["n"] = str(payload.get("n_pairs_judged") or payload.get("n_pairs") or "-")
-        row["ci"] = _fmt_ci(payload.get("win_rate_ci95"))
+        row["ci"] = _fmt_ci(ci)
         by = payload.get("by_stratum") or {}
-        detail = ", ".join(f"{name}={_fmt_pct((block or {}).get('win_rate'))}"
+
+        def _block_rate(block):
+            block = block or {}
+            value = block.get("strict_win_rate")
+            return value if value is not None else block.get("win_rate")
+
+        detail = ", ".join(f"{name}={_fmt_pct(_block_rate(block))}"
                            for name, block in by.items())
-        row["note"] = (f"position={payload.get('position_consistency')}"
-                       + (f"; {detail}" if detail else ""))
+        row["note"] = ("strict（剔除 tie/未决）"
+                       + (f"; tie={_fmt_pct(payload.get('tie_rate'))}"
+                          if payload.get("tie_rate") is not None else "")
+                       + (f"; {detail}" if detail else "")
+                       + (f"; position={payload.get('position_consistency')}"
+                          if payload.get("position_consistency") is not None else ""))
     elif key == "false_reject":
         hard = (payload.get("hard") or {}).get("rate")
         soft = (payload.get("soft") or {}).get("rate")

@@ -177,14 +177,20 @@ class PairwisePipelineTest(unittest.TestCase):
         self.assertEqual(payload["protocol"], spec.PROTOCOL_VERSION)
         self.assertEqual(payload["judge_version"], spec.JUDGE_VERSION)
         for key in ("n_pairs", "n_pairs_judged", "n_errors", "delivered_wins",
-                    "control_wins", "ties", "inconsistent", "win_rate",
-                    "win_rate_ci95", "position_consistency",
+                    "control_wins", "ties", "inconsistent", "decisive_pairs",
+                    "win_rate", "win_rate_ci95", "strict_win_rate",
+                    "strict_win_rate_ci95", "tie_rate", "position_consistency",
                     "position_consistency_ci95", "by_stratum", "by_judge",
                     "bradley_terry", "pairs", "materials_safe", "usable", "reasons"):
             self.assertIn(key, payload, key)
         self.assertEqual(payload["n_pairs"], len(self.pairs))
         self.assertEqual(payload["n_errors"], 0)
         self.assertEqual(payload["win_rate"], 1.0)                     # fake judge 100% 选交付
+        self.assertEqual(payload["decisive_pairs"],
+                         payload["delivered_wins"] + payload["control_wins"])
+        self.assertEqual(payload["strict_win_rate"], 1.0)              # 全为有方向的对
+        self.assertIsNotNone(payload["strict_win_rate_ci95"])
+        self.assertEqual(payload["tie_rate"], 0.0)
         self.assertEqual(payload["position_consistency"], 1.0)         # 双向一致
         self.assertGreaterEqual(payload["delivered_wins"], 1)
         self.assertTrue(payload["materials_safe"])
@@ -236,6 +242,8 @@ class PairwisePipelineTest(unittest.TestCase):
         self.assertEqual(payload["n_errors"], 0)
         self.assertEqual(payload["ties"], payload["n_pairs_judged"])
         self.assertEqual(payload["win_rate"], 0.5)       # tie 记 0.5
+        self.assertIsNone(payload["strict_win_rate"])     # 没有有方向的对，strict 不适用
+        self.assertEqual(payload["tie_rate"], 1.0)
         self.assertEqual(payload["position_consistency"], 1.0)
         self.assertTrue(payload["usable"])
 
@@ -459,7 +467,7 @@ class QualityReportPipelineTest(unittest.TestCase):
             self.assertTrue(report["claims"]["per_metric"][key]["allowed"], key)
         text = qr.render(report)
         self.assertIn("质量报告", text)
-        self.assertIn("匹配质量胜率", text)
+        self.assertIn("匹配质量严格胜率", text)
         self.assertIn("可申报", text)
         self.assertEqual(text, qr.render(report), "render 必须确定性可复现")
 

@@ -69,17 +69,20 @@ class MetricSpec:
 METRICS: dict[str, MetricSpec] = {
     "match_quality": MetricSpec(
         key="match_quality",
-        name_zh="匹配质量胜率（交付 vs 对照）",
-        definition=("成对盲评胜率：交付候选 vs 对照候选（near-miss 截断/软否决/随机池三档分开报），"
+        name_zh="匹配质量严格胜率（交付 vs 对照）",
+        definition=("成对盲评的 strict 决断胜率：delivered/(delivered+control)，剔除平手/未决；"
+                    "tie 率与未决率必须单独报告，tie-half 仅作辅助口径。"
+                    "near-miss（同 run 合格但被截断）为主对照，rejected/random 为弱对照；"
                     "judge 双向交换 + 多 judge 聚合，报告 Wilson/CP CI 与 position consistency；"
                     "人工校准 100 对后做 PPI 校正。"),
         evidence="E2→E3",
         deterministic=False,
         human_calibration=True,
-        qualified="near-miss 对照胜率 >=60%（95%CI 下限>50%），position consistency>=0.85，judge-human kappa>=0.6",
-        excellent="near-miss 对照胜率 >=70-75%（CI 下限>60%），kappa>=0.7，跨族 Spearman>=0.7，holdout 复现",
+        qualified="near-miss strict 胜率 >=60%（95%CI 下限>50%），position consistency>=0.85，judge-human kappa>=0.6",
+        excellent="near-miss strict 胜率 >=70-75%（CI 下限>60%），kappa>=0.7，跨族 Spearman>=0.7，holdout 复现",
         sample_guidance=">=100 对（每档 >=20），n=100 约可检出 10pp 差异；90% 功效检测 65% vs 50% 需约 85 对",
-        claim="交付名单相对 {control} 对照的盲评胜率 {rate}（n={n}，95%CI {ci}，judge {judge}，人类校准 kappa={kappa}）",
+        claim=("near-miss strict 决断胜率 {rate}（n={n}，95%CI {ci}，tie 率 {tie}，"
+               "judge {judge}，人类校准 kappa={kappa}）"),
         thresholds={"qualified_win_rate": 0.60, "excellent_win_rate": 0.72,
                     "min_ci_low": 0.50, "excellent_min_ci_low": 0.60},
     ),
@@ -218,15 +221,19 @@ def claim_gate(metric_key: str, payload: dict | None, calibration: dict | None) 
 
     level = "qualified"
     if metric_key == "match_quality":
-        rate = payload.get("win_rate")
-        ci = payload.get("win_rate_ci95")
+        # 申报主口径：strict（剔除 tie/未决）；旧 artifact 没有 strict 字段时回退到 tie-half。
+        rate = payload.get("strict_win_rate")
+        ci = payload.get("strict_win_rate_ci95")
+        if rate is None:
+            rate = payload.get("win_rate")
+            ci = payload.get("win_rate_ci95")
         n = int(payload.get("n_pairs") or 0)
         if n < SAMPLE_FLOORS["pairwise_min_pairs"]:
             reasons.append(f"样本 {n} < {SAMPLE_FLOORS['pairwise_min_pairs']}")
         if rate is None or float(rate) < spec.thresholds["qualified_win_rate"]:
-            reasons.append(f"胜率 {rate} < 合格线 {spec.thresholds['qualified_win_rate']}")
+            reasons.append(f"strict 胜率 {rate} < 合格线 {spec.thresholds['qualified_win_rate']}")
         if not _ci_ok(ci, spec.thresholds["min_ci_low"]):
-            reasons.append(f"胜率 CI 下限未超过 {spec.thresholds['min_ci_low']}")
+            reasons.append(f"strict 胜率 CI 下限未超过 {spec.thresholds['min_ci_low']}")
         if not reasons and float(rate) >= spec.thresholds["excellent_win_rate"] \
                 and _ci_ok(ci, spec.thresholds["excellent_min_ci_low"]):
             level = "excellent"

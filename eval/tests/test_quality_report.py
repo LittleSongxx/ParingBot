@@ -84,8 +84,28 @@ class QualityReportTest(unittest.TestCase):
             self.assertEqual(report["claims"]["per_metric"][key]["allowed"], True, key)
         text = qr.render(report)
         self.assertIn("质量报告", text)
-        self.assertIn("匹配质量胜率", text)
+        self.assertIn("匹配质量严格胜率", text)
         self.assertIn("可申报", text)
+
+    def test_match_quality_gate_uses_strict_rate_when_present(self):
+        """主口径是 strict：tie-heavy 的 tie-half 偏低时，strict 达标仍应 allowed。"""
+        payloads = _payloads()
+        payloads["match_quality"].update({
+            "win_rate": 0.55,
+            "win_rate_ci95": {"mean": 0.55, "lo": 0.48, "hi": 0.62,
+                              "n": 115, "method": "wilson"},
+            "strict_win_rate": 0.90,
+            "strict_win_rate_ci95": {"mean": 0.90, "lo": 0.82, "hi": 0.95,
+                                     "n": 80, "method": "wilson"},
+            "tie_rate": 0.20,
+            "decisive_pairs": 80,
+        })
+        report = qr.build(payloads, _calibrations(True), {"code_commit": "abc123"})
+        gate = report["claims"]["per_metric"]["match_quality"]
+        self.assertTrue(gate["allowed"], gate["reasons"])
+        row = [item for item in report["rows"] if item["key"] == "match_quality"][0]
+        self.assertEqual(row["value"], "90.0%")
+        self.assertIn("tie=20.0%", row["note"])
 
     def test_missing_calibration_blocks_quality_claim(self):
         report = qr.build(_payloads(), None, {"code_commit": "abc123"})

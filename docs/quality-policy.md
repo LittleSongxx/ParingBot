@@ -132,3 +132,5 @@ git 历史中仍保留旧版评测脚本、被污染供给 SQL 与旧 RESULTS �
 3. 确定性指标（交付召回/pass^k/硬规则安全）可直接用 E0/E1，但必须带 n、协议、CI；v3 已饱和，不作为质量提升证据。
 4. 人工只做校准集标注、分歧裁决、15% 验收抽样；不做全量标注。
 5. 申报门禁在 `eval/quality_report.py` 的 `claims`；`quality_claim_allowed=false` 时禁止对外声称质量。
+6. match_quality 申报主口径为 **strict 决断胜率**（delivered/(delivered+control)，剔除 tie/未决）；
+   tie 率/未决率必须单列，tie-half 仅作辅助；不得用 tie-half 与旧协议或公开 benchmark 横比。

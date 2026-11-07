@@ -266,3 +266,21 @@ python eval/human_eval/acceptance.py --report quality-report.json --key eval/hum
 ```
 
 **当前状态**：代码/单测/离线冒烟已完成；真实 judge 冒烟（qwen3.7-plus，n=4 对）跑通双向/位置一致性/材料白名单；**人工校准尚未执行**（本轮无有效当前 bundle），因此 `quality_claim_allowed=false`，不得据此写"匹配质量"。
+
+## 10. 匹配质量面板结果（2026-11-07，清洗后 v4 冻结集；E2.5）
+
+来源：v4 pilot run `42252524720`（协议 `v4-2026-11-06b`，code `1715ff6`，12 场景 ×3 trials）；
+盲评包 `analysis/human-eval-pack-2026-11-07`：100 对 = 88 near_miss + 12 random + 0 rejected（清洗后审核否决率 0）。
+评者：AI-A / AI-B 两个独立盲评（各 100 对）+ 第三人 AI 裁决 16 对分歧；**0 人工**。
+
+| 口径 | 交付胜 / 对照胜 / 平 / 未决 | strict 胜率（主口径） | tie-half（辅助） |
+|---|---|---|---|
+| near_miss（n=88） | 73 / 8 / 3 / 4 | **90.1%**（73/81，95%CI 81.7–94.9%） | 86.9%（CI 78.3–92.5%） |
+| 总体（n=100，含 random） | 84 / 9 / 3 / 4 | **90.3%**（84/93，CI 82.6–94.8%） | 87.5%（CI 79.6–92.6%） |
+| random（n=12） | 11 / 1 / 0 / 0 | 91.7% | 91.7% |
+
+- **口径**：strict = delivered/(delivered+control)，剔除 tie/未决；tie 率与未决率必须单列
+  （near_miss：tie 3.4%、unresolved 4.5%）；tie-half 仅作辅助，不得当 headline；
+- AI-AI 3 分类一致率 84%，Cohen κ=**0.72**；第三人 16 对：12 对形成 2/3 多数、4 对仍无多数（unresolved）；
+- 与旧池对比（同面板口径）：旧池 near_miss strict 约 74.7%（59/79）→ 新池 **90.1%**；
+- 证据等级仍是 **E2.5**：`quality_claim_allowed=false`（无人工 κ）；旧池 artifact 不可与新冻结集横比。

@@ -835,9 +835,14 @@ def _bucket_result(*, n_pairs: int, delivered: int, control: int, ties: int,
                    dry_run: bool = False) -> dict:
     judged = 0 if dry_run else max(0, n_pairs - errors)
     resolved = delivered + control + ties
+    decisive = delivered + control
     win = delivered + TIE_WEIGHT * ties
     win_rate = round(win / resolved, 4) if resolved else None
     win_ci = _rate_ci(win, resolved)
+    # strict：只算有方向的对，剔除 tie/inconsistent（质量申报主口径）。
+    strict_win_rate = round(delivered / decisive, 4) if decisive else None
+    strict_ci = _rate_ci(delivered, decisive)
+    tie_rate = round(ties / resolved, 4) if resolved else None
     observation_count = len(observations)
     consistent_obs = sum(1 for flag in observations if flag)
     position_consistency = (round(consistent_obs / observation_count, 4)
@@ -869,8 +874,12 @@ def _bucket_result(*, n_pairs: int, delivered: int, control: int, ties: int,
         "control_wins": control,
         "ties": ties,
         "inconsistent": inconsistent,
+        "decisive_pairs": decisive,
         "win_rate": win_rate,
         "win_rate_ci95": win_ci,
+        "strict_win_rate": strict_win_rate,
+        "strict_win_rate_ci95": strict_ci,
+        "tie_rate": tie_rate,
         "position_consistency": position_consistency,
         "position_consistency_ci95": position_ci,
         "n_judgements": observation_count,
@@ -1082,7 +1091,9 @@ def summarize(pair_details: list, *, models=None, seed: int = DEFAULT_SEED,
         "limit_pairs": int(limit_pairs),
         "tie_weight": TIE_WEIGHT,
         "error_definition": "无任一 judge 的双向调用都成功解析的对",
-        "win_rate_denominator": "方向一致的多数票判定对（tie 记 0.5）",
+        "win_rate_denominator": "tie 记 0.5（辅助口径）；strict_win_rate = delivered/(delivered+control)，不含 tie/inconsistent（主口径）",
+        "strict_win_rate_definition": "只统计有方向的多数票判定：delivered/(delivered+control)",
+        "tie_rate_definition": "ties/(delivered+control+ties)",
         "position_consistency_min": POSITION_CONSISTENCY_MIN,
         "max_error_rate": MAX_ERROR_RATE,
         "ci_methods": ["wilson", "clopper_pearson"],
@@ -1107,8 +1118,12 @@ def summarize(pair_details: list, *, models=None, seed: int = DEFAULT_SEED,
         "control_wins": overall["control_wins"],
         "ties": overall["ties"],
         "inconsistent": overall["inconsistent"],
+        "decisive_pairs": overall["decisive_pairs"],
         "win_rate": overall["win_rate"],
         "win_rate_ci95": overall["win_rate_ci95"],
+        "strict_win_rate": overall["strict_win_rate"],
+        "strict_win_rate_ci95": overall["strict_win_rate_ci95"],
+        "tie_rate": overall["tie_rate"],
         "position_consistency": overall["position_consistency"],
         "position_consistency_ci95": overall["position_consistency_ci95"],
         "position_consistency_n": overall["n_judgements"],
@@ -1122,7 +1137,12 @@ def summarize(pair_details: list, *, models=None, seed: int = DEFAULT_SEED,
             "ties": overall["ties"],
             "inconsistent": overall["inconsistent"],
             "errors": overall["n_errors"],
+            "decisive": overall["decisive_pairs"],
             "win_rate": overall["win_rate"],
+            "win_rate_ci95": overall["win_rate_ci95"],
+            "strict_win_rate": overall["strict_win_rate"],
+            "strict_win_rate_ci95": overall["strict_win_rate_ci95"],
+            "tie_rate": overall["tie_rate"],
         },
         "bradley_terry": _bradley_terry(rows, dry_run=dry_run),
         "pairs": details,
